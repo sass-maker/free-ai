@@ -70,6 +70,7 @@ describe('POST /v1/images/generations', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'test-proj',
       },
       body: JSON.stringify({ model: 'auto', prompt: 'a small cat' }),
@@ -90,7 +91,7 @@ describe('POST /v1/images/generations', () => {
     const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k' });
     const req = new Request('https://gateway.test/v1/images/generations', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer test-gateway-key' },
       body: JSON.stringify({ model: 'auto', prompt: 'hello' }),
     });
 
@@ -108,6 +109,7 @@ describe('POST /v1/images/generations', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'test-proj',
       },
       body: JSON.stringify({ model: 'totally-unknown-model-xyz', prompt: 'hi' }),
@@ -127,6 +129,7 @@ describe('POST /v1/images/generations', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'test-proj',
         'x-gateway-force-provider': 'together',
       },
@@ -151,6 +154,7 @@ describe('POST /v1/images/generations', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'test-proj',
         'x-gateway-force-provider': 'gemini',
       },
@@ -171,6 +175,7 @@ describe('POST /v1/images/generations', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'test-proj',
       },
       body: JSON.stringify({ model: 'auto', prompt: '' }), // prompt min(1)

@@ -23,11 +23,13 @@ function makeDoNamespace(handler: (path: string, init?: RequestInit) => Promise<
 
 export interface FakeEnvOverrides {
   TOGETHER_API_KEY?: string;
+  GATEWAY_API_KEY?: string;
   GEMINI_API_KEY?: string;
   GROQ_API_KEY?: string;
   NVIDIA_API_KEY?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_WORKERS_AI_API_KEY?: string;
+  WORKERS_AI_ENABLED?: string;
   kv?: Map<string, string>;
   providerStats?: unknown[];
   // Allow tests to simulate rate-limit denials
@@ -108,12 +110,14 @@ export function makeTestEnv(overrides: FakeEnvOverrides = {}) {
     HEALTH_DO,
     RATE_LIMIT_DO,
     HEALTH_KV,
+    GATEWAY_API_KEY: overrides.GATEWAY_API_KEY ?? 'test-gateway-key',
     TOGETHER_API_KEY: overrides.TOGETHER_API_KEY,
     GEMINI_API_KEY: overrides.GEMINI_API_KEY,
     GROQ_API_KEY: overrides.GROQ_API_KEY,
     NVIDIA_API_KEY: overrides.NVIDIA_API_KEY,
     CLOUDFLARE_ACCOUNT_ID: overrides.CLOUDFLARE_ACCOUNT_ID,
     CLOUDFLARE_WORKERS_AI_API_KEY: overrides.CLOUDFLARE_WORKERS_AI_API_KEY,
+    WORKERS_AI_ENABLED: overrides.WORKERS_AI_ENABLED,
   };
 
   return { env, kv };

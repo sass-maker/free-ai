@@ -185,6 +185,7 @@ export interface Env {
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_API_TOKEN?: string;
   CLOUDFLARE_WORKERS_AI_API_KEY?: string;
+  WORKERS_AI_ENABLED?: string;
   GATEWAY_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
   CEREBRAS_API_KEY?: string;

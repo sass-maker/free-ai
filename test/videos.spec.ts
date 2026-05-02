@@ -57,6 +57,7 @@ describe('POST /v1/videos/generations (submit)', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'proj1',
       },
       body: JSON.stringify({ model: 'auto', prompt: 'clouds rolling by' }),
@@ -94,6 +95,7 @@ describe('POST /v1/videos/generations (submit)', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'proj1',
       },
       body: JSON.stringify({ model: 'auto', prompt: 'hi' }),
@@ -110,7 +112,7 @@ describe('POST /v1/videos/generations (submit)', () => {
     const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k' });
     const req = new Request('https://gateway.test/v1/videos/generations', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer test-gateway-key' },
       body: JSON.stringify({ model: 'auto', prompt: 'hi' }),
     });
 
@@ -127,6 +129,7 @@ describe('POST /v1/videos/generations (submit)', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'proj1',
       },
       body: JSON.stringify({ model: 'auto', prompt: 'hi' }),
@@ -145,6 +148,7 @@ describe('POST /v1/videos/generations (submit)', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'proj1',
       },
       body: JSON.stringify({ model: 'auto', prompt: 'hi' }),
@@ -180,7 +184,10 @@ describe('GET /v1/videos/generations/{id} (poll)', () => {
     );
 
     const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k', kv });
-    const req = new Request('https://gateway.test/v1/videos/generations/job-known', { method: 'GET' });
+    const req = new Request('https://gateway.test/v1/videos/generations/job-known', {
+      method: 'GET',
+      headers: { authorization: 'Bearer test-gateway-key' },
+    });
 
     const res = await app.fetch(req, env, makeCtx());
     expect(res.status).toBe(200);
@@ -205,7 +212,10 @@ describe('GET /v1/videos/generations/{id} (poll)', () => {
     mocks.togetherVideoPoll.mockResolvedValueOnce({ id: 'unknown-id', status: 'processing' });
 
     const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k' }); // empty KV
-    const req = new Request('https://gateway.test/v1/videos/generations/unknown-id', { method: 'GET' });
+    const req = new Request('https://gateway.test/v1/videos/generations/unknown-id', {
+      method: 'GET',
+      headers: { authorization: 'Bearer test-gateway-key' },
+    });
     const res = await app.fetch(req, env, makeCtx());
 
     expect(res.status).toBe(200);
@@ -216,7 +226,10 @@ describe('GET /v1/videos/generations/{id} (poll)', () => {
 
   it('returns 503 when the provider key is missing', async () => {
     const { env } = makeTestEnv(); // no TOGETHER_API_KEY
-    const req = new Request('https://gateway.test/v1/videos/generations/any', { method: 'GET' });
+    const req = new Request('https://gateway.test/v1/videos/generations/any', {
+      method: 'GET',
+      headers: { authorization: 'Bearer test-gateway-key' },
+    });
     const res = await app.fetch(req, env, makeCtx());
     expect(res.status).toBe(503);
     const body = (await res.json()) as { error: { code: string } };
@@ -229,7 +242,10 @@ describe('GET /v1/videos/generations/{id} (poll)', () => {
     // handler surfaces poller errors as 501 "not implemented" rather than 502.
     mocks.togetherVideoPoll.mockRejectedValueOnce(new Error('poll upstream failed'));
     const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k' });
-    const req = new Request('https://gateway.test/v1/videos/generations/job-fail', { method: 'GET' });
+    const req = new Request('https://gateway.test/v1/videos/generations/job-fail', {
+      method: 'GET',
+      headers: { authorization: 'Bearer test-gateway-key' },
+    });
     const res = await app.fetch(req, env, makeCtx());
     expect(res.status).toBe(501);
     const body = (await res.json()) as { error: { message: string; type: string; code: string } };

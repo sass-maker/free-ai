@@ -1,4 +1,5 @@
 import { estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
+import { isWorkersAiEnabled } from '../config';
 import type { Env } from '../types';
 
 export interface WorkersAiSttInput {
@@ -16,6 +17,10 @@ export interface WorkersAiSttOutput {
 }
 
 export async function callWorkersAiStt(input: WorkersAiSttInput): Promise<WorkersAiSttOutput> {
+  if (!isWorkersAiEnabled(input.env)) {
+    throw new Error('Workers AI is disabled');
+  }
+
   if (!input.env.AI || typeof input.env.AI.run !== 'function') {
     throw new Error('Workers AI binding not available');
   }

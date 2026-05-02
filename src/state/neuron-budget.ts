@@ -87,14 +87,14 @@ function getBudgetStub(env: Env) {
  * Attempt to debit `neurons` from the daily Workers AI budget.
  *
  * Returns `{ allowed: false }` when the request would exceed the daily cap.
- * Returns `{ allowed: true }` with no debit when the binding is missing — we
- * fail open in environments without the DO so non-Workers-AI flows keep
- * working (e.g. local dev, providers that don't touch Workers AI).
+ * Returns `{ allowed: false }` when the binding is missing or unavailable.
+ * This is a financial guardrail, so Workers AI calls fail closed instead of
+ * risking billable usage when the Durable Object cannot enforce the budget.
  */
 export async function tryDebitNeurons(env: Env, neurons: number): Promise<DebitResult> {
   const stub = getBudgetStub(env);
   if (!stub) {
-    return { allowed: true, used: 0, remaining: Number.POSITIVE_INFINITY, retryAfter: 0, dayKey: '' };
+    return { allowed: false, used: 0, remaining: 0, retryAfter: 60, dayKey: '' };
   }
 
   try {
@@ -105,10 +105,7 @@ export async function tryDebitNeurons(env: Env, neurons: number): Promise<DebitR
     });
     return (await response.json()) as DebitResult;
   } catch {
-    // Fail open on transient DO errors so a single hiccup doesn't take the
-    // whole gateway offline. The budget is best-effort, not a financial
-    // guard rail with strong consistency.
-    return { allowed: true, used: 0, remaining: Number.POSITIVE_INFINITY, retryAfter: 0, dayKey: '' };
+    return { allowed: false, used: 0, remaining: 0, retryAfter: 60, dayKey: '' };
   }
 }
 

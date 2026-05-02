@@ -54,7 +54,7 @@ describe('POST /v1/audio/speech', () => {
     const audio = new Uint8Array([0xff, 0xfb, 0x90, 0x44]).buffer;
     mocks.workersAiTtsMock.mockResolvedValueOnce({ audio, contentType: 'audio/mpeg' });
 
-    const { env } = makeTestEnv();
+    const { env } = makeTestEnv({ WORKERS_AI_ENABLED: 'true' });
     // Workers AI key/binding:
     (env as unknown as { AI: unknown }).AI = makeAi();
 
@@ -62,6 +62,7 @@ describe('POST /v1/audio/speech', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'proj-tts',
       },
       body: JSON.stringify({ model: 'auto', input: 'hello world' }),
@@ -78,11 +79,11 @@ describe('POST /v1/audio/speech', () => {
   });
 
   it('returns 400 when project_id is missing', async () => {
-    const { env } = makeTestEnv();
+    const { env } = makeTestEnv({ WORKERS_AI_ENABLED: 'true' });
     (env as unknown as { AI: unknown }).AI = makeAi();
     const req = new Request('https://gateway.test/v1/audio/speech', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer test-gateway-key' },
       body: JSON.stringify({ model: 'auto', input: 'hi' }),
     });
 
@@ -99,6 +100,7 @@ describe('POST /v1/audio/speech', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'proj-tts',
       },
       body: JSON.stringify({ model: 'auto', input: 'hi' }),
@@ -112,13 +114,14 @@ describe('POST /v1/audio/speech', () => {
 
   it('returns 502 when all TTS providers fail', async () => {
     mocks.workersAiTtsMock.mockRejectedValueOnce(new Error('ai busy'));
-    const { env } = makeTestEnv();
+    const { env } = makeTestEnv({ WORKERS_AI_ENABLED: 'true' });
     (env as unknown as { AI: unknown }).AI = makeAi();
 
     const req = new Request('https://gateway.test/v1/audio/speech', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'proj-tts',
         'x-gateway-force-provider': 'workers_ai',
       },
@@ -139,6 +142,7 @@ describe('POST /v1/audio/speech', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
         'x-gateway-project-id': 'proj-tts',
       },
       body: JSON.stringify({ model: 'auto', input: '' }),

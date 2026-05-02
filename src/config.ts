@@ -1229,7 +1229,7 @@ const DEFAULT_RATE_LIMIT: RateLimitConfig = {
 };
 
 const PROVIDER_KEY_REQUIRED: Record<TextProvider, boolean> = {
-  workers_ai: false,
+  workers_ai: true,
   groq: true,
   gemini: true,
   openrouter: true,
@@ -1241,6 +1241,10 @@ const PROVIDER_KEY_REQUIRED: Record<TextProvider, boolean> = {
   cohere: true,
   mistral: true,
 };
+
+export function isWorkersAiEnabled(env: Env): boolean {
+  return env.WORKERS_AI_ENABLED === 'true';
+}
 
 function safeParse<T>(value: string | undefined): T | null {
   if (!value) {
@@ -1257,7 +1261,7 @@ function safeParse<T>(value: string | undefined): T | null {
 function hasProviderKey(env: Env, provider: TextProvider): boolean {
   switch (provider) {
     case 'workers_ai':
-      return true;
+      return isWorkersAiEnabled(env) && (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY));
     case 'groq':
       return Boolean(env.GROQ_API_KEY);
     case 'gemini':
@@ -1477,7 +1481,7 @@ export function hasImageProviderKey(env: Env, provider: ImageProvider): boolean 
     case 'together':
       return Boolean(env.TOGETHER_API_KEY);
     case 'workers_ai':
-      return Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY);
+      return isWorkersAiEnabled(env) && (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY));
     case 'pollinations':
       return true;
     case 'gemini':
@@ -1503,7 +1507,7 @@ export function hasTtsProviderKey(env: Env, provider: AudioTtsProvider): boolean
     case 'groq':
       return Boolean(env.GROQ_API_KEY);
     case 'workers_ai':
-      return Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY);
+      return isWorkersAiEnabled(env) && (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY));
     default:
       return false;
   }
@@ -1514,7 +1518,7 @@ export function hasSttProviderKey(env: Env, provider: AudioSttProvider): boolean
     case 'groq':
       return Boolean(env.GROQ_API_KEY);
     case 'workers_ai':
-      return Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY);
+      return isWorkersAiEnabled(env) && (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY));
     case 'gemini':
       return Boolean(env.GEMINI_API_KEY);
     default:

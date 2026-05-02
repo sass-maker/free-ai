@@ -47,3 +47,4 @@ tag = "v2"
 new_sqlite_classes = ["NeuronBudgetDO"]
 
 [vars]
+WORKERS_AI_ENABLED = "true"

@@ -1,4 +1,5 @@
-import { buildBudgetExhaustedResponse, estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
+import { estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
+import { isWorkersAiEnabled } from '../config';
 import type { ProviderCaller, ProviderEmbeddingCaller } from './types';
 
 class BudgetExhaustedError extends Error {
@@ -137,8 +138,12 @@ function extractWorkersAiEmbeddingRows(result: unknown): number[][] {
 }
 
 export const callWorkersAi: ProviderCaller = async (input) => {
+  if (!isWorkersAiEnabled(input.env)) {
+    throw new Error('Workers AI is disabled');
+  }
+
   // Gate every Workers AI invocation through the daily Neuron budget so we
-  // never exceed the 10k/day free quota. Fails open if the DO is unbound.
+  // never exceed the 10k/day free quota.
   const cost = estimateNeuronCost(input.model);
   const debit = await tryDebitNeurons(input.env, cost);
   if (!debit.allowed) {
@@ -248,6 +253,10 @@ export const callWorkersAi: ProviderCaller = async (input) => {
 };
 
 export const callWorkersAiEmbeddings: ProviderEmbeddingCaller = async (input) => {
+  if (!isWorkersAiEnabled(input.env)) {
+    throw new Error('Workers AI is disabled');
+  }
+
   const inputChars = Array.isArray(input.input)
     ? input.input.reduce((sum, item) => sum + String(item).length, 0)
     : String(input.input ?? '').length;

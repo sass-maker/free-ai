@@ -17,6 +17,7 @@ import {
   hasSttProviderKey,
   hasTtsProviderKey,
   hasVideoProviderKey,
+  isWorkersAiEnabled,
 } from './config';
 import {
   imageProviderCallers,
@@ -374,10 +375,9 @@ app.use('*', async (c, next) => {
 });
 
 // ── API key authentication on all /v1 mutation endpoints ───────────
-// GATEWAY_API_KEY must be set as a wrangler secret in production.
-// Requests that set x-gateway-internal bypass auth (internal Worker-to-Worker
-// calls are already network-isolated — the header is added by /v1/responses
-// when it re-dispatches to /v1/chat/completions within the same isolate).
+// GATEWAY_API_KEY must be set as a wrangler secret in production. Fail closed
+// for token-spending routes if it is missing; otherwise a misconfigured deploy
+// would silently become public.
 const AUTH_EXEMPT_GET = new Set([
   '/v1/analytics',
   '/v1/stats/providers',
@@ -388,9 +388,15 @@ const AUTH_EXEMPT_GET = new Set([
 
 app.use('/v1/*', async (c, next) => {
   const isExemptGet = c.req.method === 'GET' && AUTH_EXEMPT_GET.has(new URL(c.req.url).pathname);
-  const isInternal = c.req.header('x-gateway-internal') === '1';
 
-  if (!isExemptGet && !isInternal && c.env.GATEWAY_API_KEY) {
+  if (!isExemptGet) {
+    if (!c.env.GATEWAY_API_KEY) {
+      return c.json(
+        { error: { message: 'Gateway API key is not configured', type: 'configuration_error', code: 'auth_not_configured' } },
+        503,
+      );
+    }
+
     const authHeader = c.req.header('authorization') ?? '';
     const providedKey = authHeader.startsWith('Bearer ')
       ? authHeader.slice(7)
@@ -467,6 +473,10 @@ function getForcedEmbeddingProvider(
 }
 
 function workersAiEmbeddingAvailable(env: Env): boolean {
+  if (!isWorkersAiEnabled(env)) {
+    return false;
+  }
+
   if (env.AI && typeof env.AI.run === 'function') {
     return true;
   }
@@ -874,7 +884,7 @@ app.openapi(chatRoute, async (c) => {
     now,
     modelOverride: forcedModel,
     requiredCapabilities,
-  })), { project: projectId, meta: { model: normalized.model } });
+  })), { context: { project: projectId, model: normalized.model } });
 
   const requestedModel = normalized.model.trim().toLowerCase();
   const shouldRoundRobin =
@@ -897,15 +907,13 @@ app.openapi(chatRoute, async (c) => {
   }
 
   if (selected.length === 0) {
-    if (!c.req.header('x-gateway-internal')) {
-      c.executionCtx.waitUntil(
-        recordAnalytics({
-          db: c.env.GATEWAY_DB,
-          projectId,
-          outcome: 'error',
-        })
-      );
-    }
+    c.executionCtx.waitUntil(
+      recordAnalytics({
+        db: c.env.GATEWAY_DB,
+        projectId,
+        outcome: 'error',
+      })
+    );
 
     return c.json(
       {
@@ -1153,50 +1161,44 @@ app.openapi(chatRoute, async (c) => {
   ).catch(() => undefined);
 
   if (streamResponse) {
-    if (!c.req.header('x-gateway-internal')) {
-      c.executionCtx.waitUntil(
-        recordAnalytics({
-          db: c.env.GATEWAY_DB,
-          projectId,
-          outcome: 'ok',
-          provider: chosenMeta?.provider,
-          model: chosenMeta?.model,
-        })
-      );
-    }
+    c.executionCtx.waitUntil(
+      recordAnalytics({
+        db: c.env.GATEWAY_DB,
+        projectId,
+        outcome: 'ok',
+        provider: chosenMeta?.provider,
+        model: chosenMeta?.model,
+      })
+    );
 
     return streamResponse;
   }
 
   if (finalResponse && chosenMeta) {
-    if (!c.req.header('x-gateway-internal')) {
-      c.executionCtx.waitUntil(
-        recordAnalytics({
-          db: c.env.GATEWAY_DB,
-          projectId,
-          outcome: 'ok',
-          provider: chosenMeta.provider,
-          model: chosenMeta.model,
-        })
-      );
-    }
+    c.executionCtx.waitUntil(
+      recordAnalytics({
+        db: c.env.GATEWAY_DB,
+        projectId,
+        outcome: 'ok',
+        provider: chosenMeta.provider,
+        model: chosenMeta.model,
+      })
+    );
 
     return c.json(finalResponse as never, 200);
   }
 
   const status = lastErrorClass === 'input_nonretriable' ? 400 : lastErrorClass === 'usage_retriable' ? 429 : 502;
 
-  if (!c.req.header('x-gateway-internal')) {
-    c.executionCtx.waitUntil(
-      recordAnalytics({
-        db: c.env.GATEWAY_DB,
-        projectId,
-        outcome: 'error',
-        provider: chosenMeta?.provider,
-        model: chosenMeta?.model,
-      })
-    );
-  }
+  c.executionCtx.waitUntil(
+    recordAnalytics({
+      db: c.env.GATEWAY_DB,
+      projectId,
+      outcome: 'error',
+      provider: chosenMeta?.provider,
+      model: chosenMeta?.model,
+    })
+  );
 
   return c.json(
     {
@@ -1301,11 +1303,15 @@ app.openapi(responsesRoute, async (c) => {
   const headers = new Headers();
   headers.set('content-type', 'application/json');
   headers.set('x-gateway-source-endpoint', 'responses');
-  headers.set('x-gateway-internal', '1');
 
   const authorization = c.req.header('authorization');
   if (authorization) {
     headers.set('authorization', authorization);
+  }
+
+  const apiKey = c.req.header('x-api-key');
+  if (apiKey) {
+    headers.set('x-api-key', apiKey);
   }
 
   const forceProvider = c.req.header('x-gateway-force-provider');
@@ -1860,9 +1866,9 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
   }
 
   // Step 3: Text-to-Speech via Workers AI
-  if (!c.env.AI) {
+  if (!isWorkersAiEnabled(c.env) || !c.env.AI) {
     return c.json(
-      { error: { message: 'TTS requires Workers AI binding', type: 'configuration_error' } },
+      { error: { message: 'TTS requires Workers AI to be explicitly enabled', type: 'configuration_error' } },
       503,
     );
   }
