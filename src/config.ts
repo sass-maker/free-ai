@@ -913,18 +913,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     enabled: true,
     priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
     capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
-  },
-  {
-    id: 'openrouter-inclusionai-ling-2-6-flash-free',
-    provider: 'openrouter',
-    model: 'inclusionai/ling-2.6-flash:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
-  },
-  {
+  }  {
     id: 'openrouter-baidu-qianfan-ocr-fast-free',
     provider: 'openrouter',
     model: 'baidu/qianfan-ocr-fast:free',
@@ -1094,6 +1083,58 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
     capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
   },
+
+  // ── Auto-added by weekly model check (review priority + capabilities) ──
+  {
+    id: 'openrouter-openrouter-owl-alpha',
+    provider: 'openrouter',
+    model: 'openrouter/owl-alpha',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
+  {
+    id: 'openrouter-nvidia-nemotron-3-nano-omni-30b-a3b-reasoning-fre',
+    provider: 'openrouter',
+    model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
+  {
+    id: 'openrouter-poolside-laguna-xs-2-free',
+    provider: 'openrouter',
+    model: 'poolside/laguna-xs.2:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
+  {
+    id: 'openrouter-poolside-laguna-m-1-free',
+    provider: 'openrouter',
+    model: 'poolside/laguna-m.1:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
+  {
+    id: 'openrouter-inclusionai-ling-2-6-1t-free',
+    provider: 'openrouter',
+    model: 'inclusionai/ling-2.6-1t:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
 ];
 
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
@@ -1198,7 +1239,7 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'mistral:pixtral-large-latest': { requestsPerDay: 300 },
   // AUTO-ADDED limits
   'openrouter:tencent/hy3-preview:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:inclusionai/ling-2.6-flash:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+ // AUTO-ADDED — tune
   'openrouter:baidu/qianfan-ocr-fast:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:google/gemma-4-26b-a4b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:google/gemma-4-31b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
@@ -1216,6 +1257,12 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:google/gemma-3-4b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'cerebras:qwen-3-235b-a22b-instruct-2507': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'cerebras:zai-glm-4.7': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  // AUTO-ADDED limits
+  'openrouter:openrouter/owl-alpha': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:poolside/laguna-xs.2:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:poolside/laguna-m.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:inclusionai/ling-2.6-1t:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
 
 export interface RateLimitConfig {
