@@ -133,6 +133,20 @@ export const DASHBOARD_HTML = `<!doctype html>
   .pill-ok { background: rgba(34,197,94,0.15); color: var(--success); }
   .pill-warn { background: rgba(245,158,11,0.15); color: var(--warn); }
   .pill-err { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .lab-grid { display: grid; grid-template-columns: 180px 1fr 1fr auto; gap: 10px; align-items: start; }
+  .lab-grid input, .lab-grid select, .lab-grid textarea, .lab-grid button {
+    width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 9px 10px; font-size: 12px; font-family: inherit; outline: none;
+  }
+  .lab-grid textarea { grid-column: 1 / 4; min-height: 130px; resize: vertical; font-family: var(--mono); }
+  .lab-grid button { cursor: pointer; white-space: nowrap; }
+  .lab-grid button:hover { border-color: var(--accent); }
+  .lab-result { margin-top: 12px; padding: 12px; min-height: 90px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 6px; overflow: auto; white-space: pre-wrap; }
+  @media (max-width: 960px) {
+    .lab-grid { grid-template-columns: 1fr; }
+    .lab-grid textarea { grid-column: auto; }
+  }
 </style>
 </head>
 <body>
@@ -189,6 +203,36 @@ export const DASHBOARD_HTML = `<!doctype html>
         <span><i style="background:#6b7280"></i>provider_fatal</span>
         <span><i style="background:#22c55e"></i>success</span>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Request replay lab</h2>
+      <div class="lab-grid">
+        <select id="replayProvider">
+          <option value="groq">groq</option>
+          <option value="gemini">gemini</option>
+          <option value="workers_ai">workers_ai</option>
+          <option value="openrouter">openrouter</option>
+          <option value="cerebras">cerebras</option>
+          <option value="sambanova">sambanova</option>
+          <option value="nvidia">nvidia</option>
+          <option value="github_models">github_models</option>
+          <option value="pollinations">pollinations</option>
+          <option value="cohere">cohere</option>
+          <option value="mistral">mistral</option>
+        </select>
+        <input id="replayModel" placeholder="model or auto" value="auto" />
+        <input id="replayProject" placeholder="project_id" value="replay-lab" />
+        <button id="replayBtn">Replay</button>
+        <textarea id="replayPayload" spellcheck="false">{
+  "messages": [
+    { "role": "user", "content": "Reply with one short diagnostic sentence." }
+  ],
+  "temperature": 0.2,
+  "max_tokens": 64
+}</textarea>
+      </div>
+      <pre class="lab-result mono" id="replayResult">No replay run yet.</pre>
     </div>
 
     <div class="card">
@@ -260,6 +304,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     schedule();
   });
   $('refreshBtn').addEventListener('click', () => refresh());
+  $('replayBtn').addEventListener('click', () => replayRequest());
 
   document.addEventListener('visibilitychange', schedule);
   window.addEventListener('focus', () => { if (state.autoRefresh) refresh(); });
@@ -273,6 +318,38 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   function authHeaders() {
     return state.apiKey ? { Authorization: 'Bearer ' + state.apiKey } : {};
+  }
+
+  async function replayRequest() {
+    const out = $('replayResult');
+    let payload;
+    try {
+      payload = JSON.parse($('replayPayload').value);
+    } catch (err) {
+      out.textContent = 'Invalid JSON: ' + err.message;
+      return;
+    }
+
+    payload.provider = $('replayProvider').value;
+    payload.model = $('replayModel').value.trim() || 'auto';
+    payload.project_id = $('replayProject').value.trim() || 'replay-lab';
+
+    out.textContent = 'Running replay...';
+    try {
+      const res = await fetch('/v1/debug/replay', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      try {
+        out.textContent = JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        out.textContent = text;
+      }
+    } catch (err) {
+      out.textContent = 'Replay failed — ' + err.message;
+    }
   }
 
   async function fetchBoth(signal) {

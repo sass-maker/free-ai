@@ -55,6 +55,20 @@ import { DASHBOARD_HTML } from './dashboard-html';
 
 const app = new OpenAPIHono<{ Bindings: Env }>();
 
+const TEXT_PROVIDER_VALUES = [
+  'workers_ai',
+  'groq',
+  'gemini',
+  'openrouter',
+  'cerebras',
+  'sambanova',
+  'nvidia',
+  'github_models',
+  'pollinations',
+  'cohere',
+  'mistral',
+] as const;
+
 const contentPartTextSchema = z.object({
   type: z.literal('text'),
   text: z.string().min(1).max(100_000),
@@ -306,6 +320,37 @@ const analyticsResponseSchema = z.object({
   ),
 });
 
+const replayRequestSchema = chatRequestSchema
+  .extend({
+    provider: z.enum(TEXT_PROVIDER_VALUES).optional(),
+    include_completion: z.boolean().default(true),
+  })
+  .openapi('ReplayRequest');
+
+const replayResponseSchema = z
+  .object({
+    ok: z.boolean(),
+    request_id: z.string(),
+    provider: z.string(),
+    model: z.string(),
+    latency_ms: z.number(),
+    selected: z.object({
+      id: z.string(),
+      provider: z.string(),
+      model: z.string(),
+      reasoning: z.string(),
+      supports_streaming: z.boolean(),
+    }),
+    completion: z.record(z.string(), z.unknown()).optional(),
+    error: z
+      .object({
+        message: z.string(),
+        type: z.string(),
+      })
+      .optional(),
+  })
+  .openapi('ReplayResponse');
+
 interface EmbeddingCandidate {
   provider: EmbeddingProvider;
   model: string;
@@ -454,7 +499,7 @@ function getForcedTextProvider(c: { req: { header: (key: string) => string | und
     return undefined;
   }
 
-  if (['workers_ai', 'groq', 'gemini', 'openrouter', 'cerebras', 'sambanova', 'nvidia'].includes(value)) {
+  if ((TEXT_PROVIDER_VALUES as readonly string[]).includes(value)) {
     return value as TextProvider;
   }
 
@@ -1215,6 +1260,181 @@ app.openapi(chatRoute, async (c) => {
     },
     status,
   );
+});
+
+const replayRoute = createRoute({
+  method: 'post',
+  path: '/v1/debug/replay',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: replayRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Direct provider replay result for debugging',
+      content: {
+        'application/json': { schema: replayResponseSchema },
+      },
+    },
+    400: {
+      description: 'Invalid replay request',
+      content: {
+        'application/json': { schema: errorSchema },
+      },
+    },
+    502: {
+      description: 'Provider replay failed',
+      content: {
+        'application/json': { schema: replayResponseSchema },
+      },
+    },
+    503: {
+      description: 'No matching provider/model configured',
+      content: {
+        'application/json': { schema: errorSchema },
+      },
+    },
+  },
+});
+
+app.openapi(replayRoute, async (c) => {
+  const body = c.req.valid('json');
+  const requestId = createRequestId();
+  const provider = body.provider ?? getForcedTextProvider(c);
+
+  if (!provider) {
+    return c.json(
+      {
+        error: {
+          message: 'Replay requires `provider` or x-gateway-force-provider',
+          type: 'invalid_request_error',
+          code: 'missing_provider',
+        },
+      },
+      400,
+    );
+  }
+
+  const normalizedMessages = normalizeMessages(body.messages, body.prompt);
+  if (normalizedMessages.length === 0) {
+    return c.json(
+      {
+        error: {
+          message: 'Either `messages` or `prompt` is required',
+          type: 'invalid_request_error',
+          code: 'missing_input',
+        },
+      },
+      400,
+    );
+  }
+
+  const normalized: NormalizedChatRequest = {
+    model: body.model,
+    messages: normalizedMessages,
+    stream: false,
+    temperature: body.temperature,
+    max_tokens: body.max_tokens,
+    reasoning_effort: body.reasoning_effort,
+    min_reasoning_level: body.min_reasoning_level ?? (body.reasoning_effort === 'auto' ? undefined : body.reasoning_effort),
+    tools: body.tools as Tool[] | undefined,
+    tool_choice: body.tool_choice as NormalizedChatRequest['tool_choice'],
+    response_format: body.response_format as ResponseFormat | undefined,
+  };
+
+  const forcedModel = c.req.header('x-gateway-force-model') ?? (normalized.model.trim() === 'auto' ? undefined : normalized.model);
+  const registry = getModelRegistry(c.env).filter((candidate) => candidate.provider === provider);
+  const requiredCapabilities = deriveRequiredCapabilities({
+    tools: normalized.tools,
+    response_format: normalized.response_format,
+    messages: normalized.messages,
+  });
+
+  const selected = selectCandidates(registry, new Map(), {
+    min_reasoning_level: normalized.min_reasoning_level,
+    stream: false,
+    now: Date.now(),
+    modelOverride: forcedModel,
+    requiredCapabilities,
+    evaluationMap: parseEvaluationWeights(c.env.MODEL_EVALUATIONS_JSON),
+  });
+
+  const candidate = selected[0];
+  if (!candidate) {
+    return c.json(
+      {
+        error: {
+          message: 'No matching configured provider/model can replay this request',
+          type: 'configuration_error',
+          code: 'no_replay_candidate',
+        },
+      },
+      503,
+    );
+  }
+
+  const startedAt = Date.now();
+  const selectedPayload = {
+    id: candidate.id,
+    provider: candidate.provider,
+    model: candidate.model,
+    reasoning: candidate.reasoning,
+    supports_streaming: candidate.supportsStreaming,
+  };
+
+  try {
+    const caller = providerCallers[candidate.provider];
+    if (!caller) {
+      throw new Error(`No caller for provider ${candidate.provider}`);
+    }
+
+    const providerResult = await caller({
+      env: c.env,
+      provider: candidate.provider,
+      model: candidate.model,
+      messages: normalized.messages,
+      temperature: normalized.temperature,
+      max_tokens: normalized.max_tokens,
+      stream: false,
+      tools: normalized.tools,
+      tool_choice: normalized.tool_choice,
+      response_format: normalized.response_format,
+    });
+
+    return c.json(
+      {
+        ok: true,
+        request_id: requestId,
+        provider: candidate.provider,
+        model: candidate.model,
+        latency_ms: Date.now() - startedAt,
+        selected: selectedPayload,
+        completion: body.include_completion === false ? undefined : (providerResult.completion ?? {}),
+      },
+      200,
+    );
+  } catch (error) {
+    return c.json(
+      {
+        ok: false,
+        request_id: requestId,
+        provider: candidate.provider,
+        model: candidate.model,
+        latency_ms: Date.now() - startedAt,
+        selected: selectedPayload,
+        error: {
+          message: getErrorMessage(error),
+          type: classifyError(error),
+        },
+      },
+      502,
+    );
+  }
 });
 
 const responsesRoute = createRoute({
