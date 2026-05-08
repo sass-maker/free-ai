@@ -1,5 +1,6 @@
 import { getTierOrder } from '../config';
-import type { ChatMessage, ContentPart, ModelCandidate, ModelStateSnapshot, ReasoningEffort, ReasoningTier, ResponseFormat, Tool } from '../types';
+import { evaluationWeight } from './evaluation-weights';
+import type { ChatMessage, ContentPart, ModelCandidate, ModelEvaluationSnapshot, ModelStateSnapshot, ReasoningEffort, ReasoningTier, ResponseFormat, Tool } from '../types';
 
 export interface RequiredCapabilities {
   toolCalling?: boolean;
@@ -101,12 +102,14 @@ export function computeScore(
   requested: ReasoningEffort,
   candidate: ModelCandidate,
   state: ModelStateSnapshot | undefined,
+  evaluation: ModelEvaluationSnapshot | undefined,
 ): number {
   const successRate = state ? state.successRate : 0.5;
   const headroom = state ? state.headroom : 1;
   const avgLatencyMs = state ? state.avgLatencyMs : 1500;
   const latencyScore = clamp(1 - avgLatencyMs / 8000);
   const fit = reasoningFit(requested, candidate.reasoning);
+  const evalWeight = evaluationWeight(evaluation);
 
   const score =
     successRate * 0.6 +
@@ -115,7 +118,7 @@ export function computeScore(
     fit * 0.05 +
     candidate.priority * 0.02;
 
-  return score;
+  return score * evalWeight;
 }
 
 interface SelectOptions {
@@ -125,6 +128,7 @@ interface SelectOptions {
   modelOverride?: string;
   excludedKeys?: Set<string>;
   requiredCapabilities?: RequiredCapabilities;
+  evaluationMap?: Map<string, ModelEvaluationSnapshot>;
 }
 
 const reasoningRank: Record<ReasoningTier, number> = {
@@ -192,7 +196,9 @@ export function selectCandidates(
   const ranked: Array<{ candidate: ModelCandidate; score: number; tierIndex: number }> = [];
 
   for (const candidate of available) {
-    const state = stateMap.get(`${candidate.provider}:${candidate.model}`);
+    const key = `${candidate.provider}:${candidate.model}`;
+    const state = stateMap.get(key);
+    const evaluation = options.evaluationMap?.get(key) ?? options.evaluationMap?.get(candidate.id);
     const tierIndex = order.indexOf(candidate.reasoning);
     if (tierIndex === -1) {
       continue;
@@ -200,7 +206,7 @@ export function selectCandidates(
 
     ranked.push({
       candidate,
-      score: computeScore(scoringReasoning, candidate, state),
+      score: computeScore(scoringReasoning, candidate, state, evaluation),
       tierIndex,
     });
   }

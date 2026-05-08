@@ -79,6 +79,12 @@ Returns the list of models currently registered in the gateway in OpenAI-compati
 | `provider` | string | Gateway provider key. One of `groq`, `gemini`, `workers_ai`, `openrouter`, `cerebras`, `sambanova`, `nvidia`, `voyage_ai`. |
 | `reasoning_tier` | string \| null | Reasoning capability tier (`"low"`, `"medium"`, `"high"`), or `null` for standard models. |
 | `supports_streaming` | boolean | Whether the model supports SSE streaming. |
+| `evaluation_weight` | number | Continuous eval routing multiplier derived from `MODEL_EVALUATIONS_JSON`; `1` means no eval nudge. |
+| `evaluation_sample_count` | number | Number of recent eval samples behind the current weight. |
+| `evaluated_at` | string \| null | Timestamp for the current eval snapshot, when supplied. |
+
+Continuous evals are optional and never bypass hard filters. The router still excludes unhealthy,
+rate-limited, incompatible, or capability-mismatched models before applying eval weights.
 
 ## Model Capabilities
 

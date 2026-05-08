@@ -29,6 +29,7 @@ import {
 } from './providers';
 import { classifyError, isRetriableFailure } from './router/classify-error';
 import { deriveRequiredCapabilities, selectCandidates } from './router/select-model';
+import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
 import { consumeIpRateLimit, healthLookup, healthRecord, healthSnapshot, nextRoundRobinOffset, providerStats } from './state/client';
 import { HealthStateDO } from './state/health-do';
 import { IpRateLimitDO } from './state/ip-rate-limit-do';
@@ -259,6 +260,9 @@ const modelItemSchema = z.object({
   cooldown_until: z.number(),
   success_rate: z.number(),
   headroom: z.number(),
+  evaluation_weight: z.number(),
+  evaluation_sample_count: z.number(),
+  evaluated_at: z.string().nullable(),
   enabled: z.boolean(),
 });
 
@@ -872,6 +876,7 @@ app.openapi(chatRoute, async (c) => {
   }
 
   const stateMap = await healthLookup(c.env, modelKeys, lookupLimits, now);
+  const evaluationMap = parseEvaluationWeights(c.env.MODEL_EVALUATIONS_JSON);
   const requiredCapabilities = deriveRequiredCapabilities({
     tools: normalized.tools,
     response_format: normalized.response_format,
@@ -884,6 +889,7 @@ app.openapi(chatRoute, async (c) => {
     now,
     modelOverride: forcedModel,
     requiredCapabilities,
+    evaluationMap,
   })), { context: { project: projectId, model: normalized.model } });
 
   const requestedModel = normalized.model.trim().toLowerCase();
@@ -2401,12 +2407,15 @@ app.openapi(modelsRoute, async (c) => {
   }
 
   const stateMap = await healthLookup(c.env, keys, lookupLimits, Date.now());
+  const evaluationMap = parseEvaluationWeights(c.env.MODEL_EVALUATIONS_JSON);
 
   const parallel = pLimit(8);
   const data = await Promise.all(
     registry.map((candidate) =>
       parallel(async () => {
-        const snapshot = stateMap.get(getModelKey(candidate.provider, candidate.model));
+        const key = getModelKey(candidate.provider, candidate.model);
+        const snapshot = stateMap.get(key);
+        const evaluation = evaluationMap.get(key) ?? evaluationMap.get(candidate.id);
         return {
           id: candidate.id,
           provider: candidate.provider,
@@ -2416,6 +2425,9 @@ app.openapi(modelsRoute, async (c) => {
           cooldown_until: snapshot?.cooldownUntil ?? 0,
           success_rate: snapshot?.successRate ?? 0.5,
           headroom: snapshot?.headroom ?? 1,
+          evaluation_weight: evaluationWeight(evaluation),
+          evaluation_sample_count: evaluation?.sampleCount ?? 0,
+          evaluated_at: evaluation?.evaluatedAt ?? null,
           enabled: candidate.enabled,
         };
       }),

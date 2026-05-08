@@ -117,6 +117,14 @@ export interface ModelStateSnapshot {
   shortRetriableFailures: number;
 }
 
+export interface ModelEvaluationSnapshot {
+  qualityScore: number;
+  taskSuccessRate: number;
+  freshness: number;
+  sampleCount: number;
+  evaluatedAt?: string;
+}
+
 export interface AttemptRecord {
   ts: number;
   latencyMs: number;
@@ -196,6 +204,7 @@ export interface Env {
   MISTRAL_API_KEY?: string;
   TOGETHER_API_KEY?: string;
   MODEL_REGISTRY_JSON?: string;
+  MODEL_EVALUATIONS_JSON?: string;
   PROVIDER_LIMITS_JSON?: string;
   RATE_LIMIT_CONFIG_JSON?: string;
   DOCS_SITE_URL?: string;

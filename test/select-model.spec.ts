@@ -56,9 +56,21 @@ function snapshot(key: string, successRate: number, avgLatencyMs: number, cooldo
 
 describe('computeScore', () => {
   it('prefers higher success rate over lower latency when close', () => {
-    const highSuccess = computeScore('medium', registry[0], snapshot('groq:model-a', 0.95, 1800));
-    const lowSuccessFast = computeScore('medium', registry[1], snapshot('gemini:model-b', 0.55, 300));
+    const highSuccess = computeScore('medium', registry[0], snapshot('groq:model-a', 0.95, 1800), undefined);
+    const lowSuccessFast = computeScore('medium', registry[1], snapshot('gemini:model-b', 0.55, 300), undefined);
     expect(highSuccess).toBeGreaterThan(lowSuccessFast);
+  });
+
+  it('uses continuous evaluation as a routing weight', () => {
+    const baseline = computeScore('medium', registry[0], snapshot('groq:model-a', 0.8, 900), undefined);
+    const evaluated = computeScore('medium', registry[0], snapshot('groq:model-a', 0.8, 900), {
+      qualityScore: 1,
+      taskSuccessRate: 1,
+      freshness: 1,
+      sampleCount: 20,
+    });
+
+    expect(evaluated).toBeGreaterThan(baseline);
   });
 });
 
@@ -85,6 +97,43 @@ describe('selectCandidates', () => {
         min_reasoning_level: 'medium',
         stream: false,
         now,
+      },
+    );
+
+    expect(selected[0]?.provider).toBe('gemini');
+  });
+
+  it('lets eval weights reorder otherwise healthy candidates', () => {
+    const selected = selectCandidates(
+      registry,
+      new Map([
+        ['groq:model-a', snapshot('groq:model-a', 0.8, 800, 0)],
+        ['gemini:model-b', snapshot('gemini:model-b', 0.8, 800, 0)],
+      ]),
+      {
+        min_reasoning_level: 'medium',
+        stream: false,
+        now: Date.now(),
+        evaluationMap: new Map([
+          [
+            'gemini:model-b',
+            {
+              qualityScore: 1,
+              taskSuccessRate: 1,
+              freshness: 1,
+              sampleCount: 25,
+            },
+          ],
+          [
+            'groq:model-a',
+            {
+              qualityScore: 0.2,
+              taskSuccessRate: 0.2,
+              freshness: 0.4,
+              sampleCount: 25,
+            },
+          ],
+        ]),
       },
     );
 
