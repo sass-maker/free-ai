@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import app from '../src/index';
+import { makeCtx, makeTestEnv } from './helpers/env';
+
 const mocks = vi.hoisted(() => ({
   togetherImageMock: vi.fn(),
   geminiImageMock: vi.fn(),
@@ -32,9 +35,6 @@ vi.mock('../src/providers', async (importOriginal) => {
     },
   };
 });
-
-import app from '../src/index';
-import { makeCtx, makeTestEnv } from './helpers/env';
 
 function makeAi() {
   return { run: vi.fn(async () => new Uint8Array([1, 2, 3])) };

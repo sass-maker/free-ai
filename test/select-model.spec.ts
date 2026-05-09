@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { getModelRegistry } from '../src/config';
 import { computeScore, deriveRequiredCapabilities, selectCandidates } from '../src/router/select-model';
 import type { Env, ModelCandidate, ModelStateSnapshot } from '../src/types';

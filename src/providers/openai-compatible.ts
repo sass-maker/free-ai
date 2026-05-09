@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+
 import type { EmbeddingProvider, TextProvider } from '../types';
 import type {
   ProviderCallInput,

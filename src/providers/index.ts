@@ -1,3 +1,12 @@
+import type {
+  AudioSttProvider,
+  AudioTtsProvider,
+  EmbeddingProvider,
+  Env,
+  ImageProvider,
+  TextProvider,
+  VideoProvider,
+} from '../types';
 import { callCerebras } from './cerebras';
 import { callCohere } from './cohere';
 import { callGemini, callGeminiEmbeddings } from './gemini';
@@ -21,15 +30,6 @@ import { callWorkersAi, callWorkersAiEmbeddings } from './workers-ai';
 import { callWorkersAiImages, type WorkersAiImageInput, type WorkersAiImageOutput } from './workers-ai-images';
 import { callWorkersAiStt } from './workers-ai-stt';
 import { callWorkersAiTts } from './workers-ai-tts';
-import type {
-  AudioSttProvider,
-  AudioTtsProvider,
-  EmbeddingProvider,
-  Env,
-  ImageProvider,
-  TextProvider,
-  VideoProvider,
-} from '../types';
 
 export const providerCallers: Record<TextProvider, ProviderCaller> = {
   workers_ai: callWorkersAi,

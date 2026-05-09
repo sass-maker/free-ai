@@ -1,6 +1,6 @@
 import { getTierOrder } from '../config';
-import { evaluationWeight } from './evaluation-weights';
 import type { ChatMessage, ContentPart, ModelCandidate, ModelEvaluationSnapshot, ModelStateSnapshot, ReasoningEffort, ReasoningTier, ResponseFormat, Tool } from '../types';
+import { evaluationWeight } from './evaluation-weights';
 
 export interface RequiredCapabilities {
   toolCalling?: boolean;

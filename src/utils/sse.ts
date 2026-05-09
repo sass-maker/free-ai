@@ -21,6 +21,7 @@ export function createSseStream(
   void producer(writer)
     .catch(async (error) => {
       await writer.write(toSseData({ error: { message: 'Stream error', type: 'stream_error' } }));
+      // eslint-disable-next-line no-console -- SSE producer failures are only observable in worker logs.
       console.log(`[sse] stream_error: ${error instanceof Error ? error.message : String(error)}`);
     })
     .finally(async () => {

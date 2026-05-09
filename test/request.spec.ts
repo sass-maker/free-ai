@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { normalizeMessages } from '../src/utils/request';
 
 describe('normalizeMessages', () => {

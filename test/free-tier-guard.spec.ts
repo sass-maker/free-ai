@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import { getModelRegistry, getTtsRegistry, isWorkersAiEnabled } from '../src/config';
 import { callWorkersAi } from '../src/providers/workers-ai';
 import { tryDebitNeurons } from '../src/state/neuron-budget';

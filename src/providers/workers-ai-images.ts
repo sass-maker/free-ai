@@ -1,5 +1,5 @@
-import { estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
 import { isWorkersAiEnabled } from '../config';
+import { estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
 import type { Env } from '../types';
 
 export interface WorkersAiImageInput {

@@ -1,4 +1,23 @@
-import type { Env, ModelCandidate, Provider, ProviderLimitConfig, ReasoningEffort, ReasoningTier, TextProvider } from './types';
+import type {
+  AudioSttModelCandidate,
+  AudioSttProvider,
+  AudioTtsModelCandidate,
+  AudioTtsProvider,
+  Env,
+  ImageModelCandidate,
+  ImageProvider,
+  ModelCandidate,
+  Provider,
+  ProviderLimitConfig,
+  ReasoningEffort,
+  ReasoningTier,
+  TextProvider,
+  VideoModelCandidate,
+  VideoProvider,
+} from './types';
+// ═══════════════════════════════════════════════════════════════════
+// Multi-modal registries: image, video, TTS, STT
+// ═══════════════════════════════════════════════════════════════════
 
 const DEFAULT_MODELS: ModelCandidate[] = [
   // ── Workers AI (free via Cloudflare binding / REST) ─────────────────
@@ -1376,21 +1395,6 @@ export function getTierOrder(reasoning: ReasoningEffort): ReasoningTier[] {
 export function getModelKey(provider: Provider, model: string): string {
   return `${provider}:${model}`;
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// Multi-modal registries: image, video, TTS, STT
-// ═══════════════════════════════════════════════════════════════════
-
-import type {
-  AudioSttModelCandidate,
-  AudioSttProvider,
-  AudioTtsModelCandidate,
-  AudioTtsProvider,
-  ImageModelCandidate,
-  ImageProvider,
-  VideoModelCandidate,
-  VideoProvider,
-} from './types';
 
 const DEFAULT_IMAGE_MODELS: ImageModelCandidate[] = [
   // Together (free via key)

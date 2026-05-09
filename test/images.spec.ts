@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import app from '../src/index';
+import { makeCtx, makeTestEnv } from './helpers/env';
+
 // Mock provider callers BEFORE importing the app so the app captures our stubs.
 // `vi.hoisted` runs before `vi.mock` hoist so stubs are available in the factory.
 const mocks = vi.hoisted(() => ({
@@ -42,9 +45,6 @@ vi.mock('../src/providers', async (importOriginal) => {
     },
   };
 });
-
-import app from '../src/index';
-import { makeCtx, makeTestEnv } from './helpers/env';
 
 describe('POST /v1/images/generations', () => {
   beforeEach(() => {

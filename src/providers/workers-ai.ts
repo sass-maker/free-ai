@@ -1,5 +1,5 @@
-import { estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
 import { isWorkersAiEnabled } from '../config';
+import { estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
 import type { ProviderCaller, ProviderEmbeddingCaller } from './types';
 
 class BudgetExhaustedError extends Error {
