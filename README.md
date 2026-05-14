@@ -11,6 +11,10 @@ This gateway is built to be hyper-scalable, stateless, and 100% free using the C
 - **State Management:** Cloudflare Durable Objects track rate limiting and rolling model health (success rates, latencies).
 - **Caching:** Cloudflare KV stores fast, ephemeral health snapshots to keep edge routing instant.
 
+## Cloudflare Cost Posture
+
+The committed Cloudflare config is free-first. Workers AI is bound but disabled by default, Workers Logs sampling is off, CPU is capped to the Workers Free limit, and the unused Cloudflare Rate Limiting binding is not configured. Run `pnpm audit:cloudflare-costs` before deployment prep; `pnpm check` runs it automatically. See [docs/cloudflare-cost-guardrails.md](docs/cloudflare-cost-guardrails.md) for the current guardrails.
+
 ## Authentication & Project ID
 
 The gateway is open and requires no global API key for chat requests. However, **all completion, response, and embedding requests strictly require a `project_id`** to track isolated analytics.

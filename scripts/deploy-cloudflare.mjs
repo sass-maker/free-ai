@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { auditCloudflareCostConfig } from './audit-cloudflare-costs.mjs';
 
 const ROOT = process.cwd();
 const WRANGLER_TEMPLATE = resolve(ROOT, 'wrangler.toml');
@@ -338,6 +339,11 @@ function main() {
 
   let deployConfig = withKvIds(template, resolvedKv.id, resolvedKv.previewId);
   deployConfig = withVarsFromEnv(deployConfig, env);
+
+  const audit = auditCloudflareCostConfig(deployConfig, WRANGLER_GENERATED);
+  if (!audit.ok) {
+    throw new Error(`Cloudflare cost audit failed:\n- ${audit.failures.join('\n- ')}`);
+  }
 
   writeFileSync(WRANGLER_GENERATED, deployConfig, 'utf8');
   console.log(`Generated ${WRANGLER_GENERATED}`);
