@@ -1,7 +1,3 @@
-// TODO(orchestrator): register route in src/index.ts:
-//   app.openapi(providerStatsRoute, async (c) => c.json({ stats: await providerStats(c.env) }));
-// (place alongside the other health/snapshot route handlers)
-
 import type { Env, FailureClass, ModelStateSnapshot, ProviderLimitConfig } from '../types';
 import type { ProviderStats } from './health-do';
 
