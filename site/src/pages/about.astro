@@ -1,0 +1,71 @@
+---
+const title = "About — free-ai gateway";
+const description = "Why it exists, how it routes, and what the SLOs are.";
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: ui-sans-serif, system-ui, sans-serif; background: #09090b; color: #e4e4e7; margin: 0; padding: 0; }
+      main { max-width: 720px; margin: 0 auto; padding: 64px 24px; line-height: 1.7; }
+      h1 { font-size: 32px; margin: 0; color: #fbbf24; }
+      h2 { font-size: 18px; margin-top: 32px; color: #fde68a; }
+      a { color: #fbbf24; }
+      code { background: #18181b; padding: 1px 4px; border-radius: 4px; font-size: 13px; }
+      ul { padding-left: 24px; }
+      li { margin: 4px 0; }
+      p { color: #d4d4d8; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="/">← free-ai</a>
+      <h1>About</h1>
+      <p>
+        free-ai is an OpenAI-compatible gateway on top of a fleet of free LLM
+        providers. Send one request; the gateway scores 30+ candidate models
+        on per-IP rate-limit headroom, recent success rate, latency, and
+        capability fit, then routes to the best one with retry on failure.
+      </p>
+
+      <h2>Why</h2>
+      <p>
+        Free tiers exist on Groq, Cerebras, SambaNova, OpenRouter, Workers AI,
+        Gemini, NVIDIA, and a few more. Each has different rate limits, model
+        coverage, and reliability. Routing across all of them gives you
+        meaningful free-tier throughput plus automatic fallback when one is
+        down — without you having to maintain the matrix.
+      </p>
+
+      <h2>Capability filtering</h2>
+      <ul>
+        <li>Requests with <code>tools</code> route only to tool-capable models.</li>
+        <li><code>response_format: json_object</code> routes to JSON-mode models.</li>
+        <li>Image content routes to vision-capable models.</li>
+        <li>If no candidate matches, the gateway returns <code>503</code> with a clear reason.</li>
+      </ul>
+
+      <h2>Cost guardrails</h2>
+      <p>
+        Committed Cloudflare config is intentionally free-first:
+        <code>WORKERS_AI_ENABLED="false"</code> by default, CPU capped at the
+        Workers Free limit, Workers Logs sampling off, no paid Rate Limiting
+        binding. A <code>pnpm audit:cloudflare-costs</code> step runs in
+        <code>pnpm check</code> and the deploy pipeline. See the
+        <a href="/docs/cloudflare-cost-guardrails"> cost-guardrails doc</a> for the live thresholds.
+      </p>
+
+      <h2>API shape</h2>
+      <p>
+        Use it like the OpenAI SDK. Set
+        <code>baseURL</code> to <code>https://free-ai-gateway.sarthakagrawal927.workers.dev/v1</code>
+        and pass a <code>project_id</code> in the body so usage gets logged
+        against your project for analytics.
+      </p>
+    </main>
+  </body>
+</html>
