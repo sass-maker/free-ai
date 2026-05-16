@@ -23,7 +23,7 @@ The Responses API is an alternative to Chat Completions that uses the [OpenAI Re
 | `temperature` | number | — | Sampling temperature (0–2). |
 | `max_output_tokens` | number | — | Maximum number of tokens to generate. |
 | `min_reasoning_level` | string | — | Minimum reasoning tier for auto-routing. One of `"low"`, `"medium"`, `"high"`. |
-| `project_id` | string | — | Optional tag for grouping requests in analytics. |
+| `project_id` | string | required* | Project tag for analytics and rate accounting. You can also send `x-gateway-project-id`; one of the two is required. |
 
 ### Input Formats
 

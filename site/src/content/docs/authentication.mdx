@@ -3,8 +3,6 @@ title: "Authentication"
 description: "How to obtain and use API keys with the AI Gateway."
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
-
 ## Bearer Token Auth
 
 All requests to protected endpoints must include an `Authorization` header with a Bearer token:
@@ -15,35 +13,9 @@ Authorization: Bearer <GATEWAY_API_KEY>
 
 ## Obtaining an API Key
 
-Request a key by sending a `POST` to `/access/request-key`. No body is required — the gateway issues a key based on your IP and a server-side secret.
+Production keys are currently provisioned by the operator and stored as the `GATEWAY_API_KEY` Worker secret. The documented self-serve `POST /access/request-key` flow is not live yet; do not build clients that depend on it until that endpoint ships.
 
-<Tabs>
-<TabItem label="curl">
-```bash
-curl -X POST https://your-gateway.workers.dev/access/request-key
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-const response = await fetch('https://your-gateway.workers.dev/access/request-key', {
-  method: 'POST',
-});
-
-const { key } = await response.json();
-console.log('Your API key:', key);
-```
-</TabItem>
-</Tabs>
-
-The response contains your key:
-
-```json
-{
-  "key": "gw_..."
-}
-```
-
-Store this key securely. Treat it like a password — do not commit it to source control.
+Store this key securely. Treat it like a password: do not commit it to source control, expose it in browser code, or log it from Workers.
 
 ## Using the Key
 
@@ -53,7 +25,7 @@ Include the key in every request to a protected endpoint:
 curl https://your-gateway.workers.dev/v1/chat/completions \
   -H "Authorization: Bearer gw_..." \
   -H "Content-Type: application/json" \
-  -d '{ "model": "auto", "messages": [{ "role": "user", "content": "Hi" }] }'
+  -d '{ "model": "auto", "project_id": "my_project", "messages": [{ "role": "user", "content": "Hi" }] }'
 ```
 
 ## Environment Variable Pattern
@@ -66,7 +38,7 @@ export GATEWAY_API_KEY="gw_..."
 curl https://your-gateway.workers.dev/v1/chat/completions \
   -H "Authorization: Bearer $GATEWAY_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "model": "auto", "messages": [{ "role": "user", "content": "Hi" }] }'
+  -d '{ "model": "auto", "project_id": "my_project", "messages": [{ "role": "user", "content": "Hi" }] }'
 ```
 
 ## Public Endpoints

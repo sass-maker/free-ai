@@ -270,6 +270,24 @@ export const DASHBOARD_HTML = `<!doctype html>
 </div>
 
 <script type="module">
+  function capturePageCrash(error, source) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('foundry_page_crash', {
+      project_slug: 'free-ai',
+      route: location.origin + location.pathname,
+      source,
+      message,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+  }
+
+  window.addEventListener('error', (event) => {
+    capturePageCrash(event.error || event.message, 'window_error');
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    capturePageCrash(event.reason, 'unhandled_rejection');
+  });
+
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => (n ?? 0).toLocaleString();
   const pct = (n) => (isFinite(n) ? (n * 100).toFixed(1) + '%' : '—');

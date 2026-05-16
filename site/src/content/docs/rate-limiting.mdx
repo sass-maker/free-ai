@@ -14,7 +14,7 @@ The gateway applies two independent layers of rate limiting:
 
 ## IP-Based Rate Limiting
 
-Unauthenticated endpoints (e.g. `/health`, `/access/request-key`) are protected by IP-based rate limiting using Cloudflare Durable Objects.
+Unauthenticated endpoints such as `/health` are protected by IP-based rate limiting using Cloudflare Durable Objects.
 
 When the limit is exceeded the gateway returns `429 Too Many Requests` with a `Retry-After` header indicating how many seconds to wait before retrying.
 

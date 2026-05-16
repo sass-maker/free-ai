@@ -17,13 +17,19 @@ The committed Cloudflare config is free-first. Workers AI is bound but disabled 
 
 ## Authentication & Project ID
 
-The gateway is open and requires no global API key for chat requests. However, **all completion, response, and embedding requests strictly require a `project_id`** to track isolated analytics.
+Production gateway requests require a Bearer token:
+
+```http
+Authorization: Bearer <GATEWAY_API_KEY>
+```
+
+All completion, response, embedding, image, video, and audio requests also require a `project_id` so analytics and rate accounting stay isolated by app.
 
 You can provide the project ID in one of two ways:
 1. As a field in the JSON body: `"project_id": "my_project_123"`
 2. As a header: `X-Gateway-Project-Id: my_project_123`
 
-*(Note: The `/v1/analytics` endpoint does require the `GATEWAY_API_KEY` Bearer token to prevent unauthorized access to your aggregate data).*
+Public health and model listing endpoints do not require a token. Data-generating `/v1/*` endpoints fail closed with `401` when `GATEWAY_API_KEY` is missing or invalid.
 
 ## Chat Models
 
@@ -126,6 +132,7 @@ This makes the gateway compatible with agent frameworks like LangChain, CrewAI, 
 
 ```bash
 curl $GATEWAY_URL/v1/chat/completions \
+  -H "Authorization: Bearer $GATEWAY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "auto",
@@ -151,6 +158,7 @@ curl $GATEWAY_URL/v1/chat/completions \
 
 ```bash
 curl $GATEWAY_URL/v1/chat/completions \
+  -H "Authorization: Bearer $GATEWAY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "auto",
@@ -190,6 +198,7 @@ POST /v1/chat/completions
 
 ```bash
 curl $GATEWAY_URL/v1/chat/completions \
+  -H "Authorization: Bearer $GATEWAY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "auto",
@@ -278,7 +287,7 @@ Works with the standard OpenAI SDK:
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  apiKey: 'anything',
+  apiKey: process.env.GATEWAY_API_KEY,
   baseURL: 'https://free-ai-gateway.sarthakagrawal927.workers.dev/v1',
 });
 

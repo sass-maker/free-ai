@@ -24,7 +24,7 @@ POST /v1/chat/completions
 | `tools` | array | — | List of tool/function definitions. When present, the gateway only routes to models that support tool calling. |
 | `tool_choice` | string \| object | — | Controls tool use: `"none"`, `"auto"`, `"required"`, or `{ type: "function", function: { name: "..." } }`. |
 | `response_format` | object | — | Set to `{ type: "json_object" }` for structured JSON output. Gateway only routes to models with JSON mode support. |
-| `project_id` | string | — | Optional tag for grouping requests in analytics. |
+| `project_id` | string | required* | Project tag for analytics and rate accounting. You can also send `x-gateway-project-id`; one of the two is required. |
 
 ### Message Object
 

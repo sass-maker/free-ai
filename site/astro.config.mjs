@@ -29,7 +29,6 @@ export default defineConfig({
             { label: 'Responses API', slug: 'responses-api' },
             { label: 'Embeddings', slug: 'embeddings' },
             { label: 'Models', slug: 'models' },
-            { label: 'Key Request', slug: 'key-request' },
           ],
         },
         {

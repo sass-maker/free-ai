@@ -1,6 +1,6 @@
 import { swaggerUI } from '@hono/swagger-ui';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { configurePostHog, flushPostHog,trace } from '@saas-maker/ops';
+import { capture, configurePostHog, flushPostHog,trace } from '@saas-maker/ops';
 import pLimit from 'p-limit';
 import pRetry, { AbortError } from 'p-retry';
 
@@ -440,6 +440,17 @@ app.use('/v1/*', async (c, next) => {
 
   if (!isExemptGet) {
     if (!c.env.GATEWAY_API_KEY) {
+      capture({
+        distinctId: 'free-ai',
+        event: 'foundry_auth_failure',
+        properties: {
+          project_slug: 'free-ai',
+          route: new URL(c.req.url).pathname,
+          stage: 'signin',
+          reason: 'GATEWAY_API_KEY missing',
+          source: 'gateway-auth',
+        },
+      });
       return c.json(
         { error: { message: 'Gateway API key is not configured', type: 'configuration_error', code: 'auth_not_configured' } },
         503,
@@ -454,6 +465,17 @@ app.use('/v1/*', async (c, next) => {
     // Constant-time comparison to prevent timing attacks
     const expected = c.env.GATEWAY_API_KEY;
     if (providedKey.length !== expected.length || !isConstantTimeEqual(providedKey, expected)) {
+      capture({
+        distinctId: 'free-ai',
+        event: 'foundry_auth_failure',
+        properties: {
+          project_slug: 'free-ai',
+          route: new URL(c.req.url).pathname,
+          stage: 'signin',
+          reason: 'Invalid API key',
+          source: 'gateway-auth',
+        },
+      });
       return c.json(
         { error: { message: 'Unauthorized', type: 'authentication_error', code: 'invalid_api_key' } },
         401,
