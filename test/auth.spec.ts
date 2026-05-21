@@ -50,3 +50,57 @@ describe('/v1 authentication', () => {
     });
   });
 });
+
+function analyticsRequest(headers: HeadersInit = {}) {
+  return new Request('https://gateway.test/v1/analytics?days=7', {
+    method: 'GET',
+    headers,
+  });
+}
+
+describe('/v1/analytics authentication', () => {
+  it('rejects requests without a Bearer token', async () => {
+    const { env } = makeTestEnv({ GATEWAY_API_KEY: 'secret-key' });
+    const res = await app.fetch(analyticsRequest(), env, makeCtx());
+
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toMatchObject({
+      error: { code: 'invalid_api_key' },
+    });
+  });
+
+  it('rejects requests with an incorrect token', async () => {
+    const { env } = makeTestEnv({ GATEWAY_API_KEY: 'secret-key' });
+    const res = await app.fetch(
+      analyticsRequest({ authorization: 'Bearer wrong-key' }),
+      env,
+      makeCtx(),
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('allows requests with the correct Bearer token', async () => {
+    const { env } = makeTestEnv({ GATEWAY_API_KEY: 'secret-key' });
+    const res = await app.fetch(
+      analyticsRequest({ authorization: 'Bearer secret-key' }),
+      env,
+      makeCtx(),
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      total_requests: expect.any(Number),
+    });
+  });
+
+  it('fails closed (503) when GATEWAY_API_KEY is not configured', async () => {
+    const { env } = makeTestEnv({ GATEWAY_API_KEY: '' });
+    const res = await app.fetch(analyticsRequest(), env, makeCtx());
+
+    expect(res.status).toBe(503);
+    await expect(res.json()).resolves.toMatchObject({
+      error: { code: 'auth_not_configured' },
+    });
+  });
+});
