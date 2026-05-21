@@ -11,7 +11,7 @@ OpenAI-compatible API gateway on Cloudflare Workers — routes requests across 3
 - Framework: Hono + CF Workers (`@hono/zod-openapi` for typed routes + Swagger UI at `/docs`)
 - Language: TypeScript (strict, ESM, ES2022)
 - DB: Cloudflare D1 (SQLite) — anonymous aggregate analytics (`GATEWAY_DB`)
-- Auth: None on chat/embedding endpoints; `GATEWAY_API_KEY` Bearer required for `/v1/analytics` — NOT yet enforced (known gap)
+- Auth: `GATEWAY_API_KEY` Bearer required on all `/v1/*` routes except a small read-only allowlist (`/v1/models`, `/v1/stats/providers`, `/v1/dashboard`, `/v1/budget`). `/v1/analytics` IS now enforced — it exposes provider/project load.
 - Testing: Vitest (unit), Playwright (e2e mock + live smoke)
 - Deploy: Cloudflare Workers via `wrangler deploy`
 - Package manager: pnpm
@@ -64,7 +64,8 @@ node scripts/sync-dev-vars.mjs  # sync .env to wrangler dev vars
 - **Request flow**: IP rate limit → parse/validate (Zod) → build model registry from available API keys → fetch health snapshots from `HealthStateDO` → `selectCandidates()` scores + ranks → retry loop (`p-retry`) calling provider → return OpenAI-format response with `x_gateway` metadata.
 - **Scoring formula**: `successRate×0.6 + headroom×0.2 + latencyScore×0.15 + reasoningFit×0.05 + priority×0.02`. Failed models cooled down and excluded.
 - **Capability filtering**: requests with `tools` → tool-capable models only; `response_format: json_object` → JSON-mode only; image content → vision-capable only. Returns 503 if no capable model available.
-- **Known gaps**: (1) Analytics endpoint (`/v1/analytics`) is intentionally public by design (see code comment in handler) — not a bug. (2) `model=auto` vision routing: **verified working** (2026-04-25) — image payloads correctly route to vision-capable models via `deriveRequiredCapabilities` + `supportsVisionInput` in `select-model.ts`.
+- **Auth note**: `/v1/analytics` now requires the `GATEWAY_API_KEY` Bearer token (removed from `AUTH_EXEMPT_GET`) — it exposes provider/project load and is no longer public.
+- **Known gaps**: `model=auto` vision routing: **verified working** (2026-04-25) — image payloads correctly route to vision-capable models via `deriveRequiredCapabilities` + `supportsVisionInput` in `select-model.ts`.
 - **tsconfig**: was broken (no `include`, no workers types, `noPropertyAccessFromIndexSignature` conflict) — fixed 2026-04-25. Now typechecks clean with `@cloudflare/workers-types`, `e2e-live` excluded (it needs `@types/node` which isn't installed and runs locally only).
 - **State**: single global `HealthStateDO`; per-IP `IpRateLimitDO`. KV (`HEALTH_KV`) for fast health snapshots.
 - **Providers requiring API keys**: OpenRouter, Cerebras, SambaNova, NVIDIA, Groq, Gemini, Voyage. Workers AI uses CF AI binding (no extra key).

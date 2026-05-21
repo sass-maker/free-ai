@@ -55,8 +55,8 @@ const description = "Why it exists, how it routes, and what the SLOs are.";
         <code>WORKERS_AI_ENABLED="false"</code> by default, CPU capped at the
         Workers Free limit, Workers Logs sampling off, no paid Rate Limiting
         binding. A <code>pnpm audit:cloudflare-costs</code> step runs in
-        <code>pnpm check</code> and the deploy pipeline. See the
-        <a href="/docs/cloudflare-cost-guardrails"> cost-guardrails doc</a> for the live thresholds.
+        <code>pnpm check</code> and the deploy pipeline, so a cost regression
+        fails the build before it ships.
       </p>
 
       <h2>API shape</h2>

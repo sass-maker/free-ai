@@ -2,6 +2,17 @@
 
 OpenAI-compatible API gateway that routes requests across free LLM providers with health-aware model selection, capability-based filtering, and aggregated analytics. Powered by [SaaS Maker](https://sassmaker.com).
 
+## Deployment & External Services
+
+| Concern | Service |
+|---------|---------|
+| Hosting | Cloudflare Workers (`free-ai-gateway`) — deployed via `wrangler deploy` |
+| Database | Cloudflare D1 (`free-ai-gateway-db`) — anonymous aggregate analytics |
+| State / Caching | Cloudflare Durable Objects (`HealthStateDO`, `IpRateLimitDO`, `NeuronBudgetDO`); Cloudflare KV (`HEALTH_KV`) |
+| Marketing / docs site | Astro + Starlight (`site/`), built into `site/dist` and served by the Worker via the `ASSETS` binding — no separate deploy |
+| AI | Cloudflare Workers AI (`AI` binding) plus upstream provider free tiers (Groq, Gemini, OpenRouter, Cerebras, SambaNova, NVIDIA, Voyage) |
+| CI/CD | GitHub Actions (`.github/workflows/cloudflare-deploy.yml`) — auto-deploy on push to `main` |
+
 ## Architecture & Toolkit
 
 This gateway is built to be hyper-scalable, stateless, and 100% free using the Cloudflare ecosystem:
@@ -262,6 +273,22 @@ GET /health
 ```
 
 Returns model health snapshots.
+
+### Analytics
+
+```
+GET /v1/analytics?project_id=<id>&days=<n>
+Authorization: Bearer <GATEWAY_API_KEY>
+```
+
+Returns aggregate request volume and success rates broken down by provider,
+model, project, and day. This exposes operational load/health data, so it
+**requires the `GATEWAY_API_KEY` Bearer token** — the same key used for
+chat/embedding requests. Requests without a valid token get `401`; if the key
+is not configured on the deploy, the endpoint fails closed with `503`.
+
+The owner dashboard at `/dashboard` has a "Bearer token" field that supplies
+this token.
 
 ## Response Extensions
 
