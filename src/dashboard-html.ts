@@ -154,6 +154,22 @@ export const DASHBOARD_HTML = `<!doctype html>
     .lab-grid { grid-template-columns: 1fr; }
     .lab-grid textarea { grid-column: auto; }
   }
+
+  .pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px; margin-bottom: 16px; }
+  .pcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .pcard.available { border-color: rgba(34,197,94,0.25); }
+  .pcard.degraded { border-color: rgba(245,158,11,0.25); }
+  .pcard.cooldown, .pcard.exhausted { border-color: rgba(239,68,68,0.25); }
+  .pcard .pname { font-weight: 600; font-size: 13px; letter-spacing: -0.01em; display: flex;
+    align-items: center; justify-content: space-between; }
+  .pcard .pcounts { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pcard .pcap { display: flex; flex-direction: column; gap: 3px; }
+  .pcard .pcap-label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .pcard .pbest { font-size: 11px; color: var(--muted); font-family: var(--mono);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 960px) { .pcards { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
 <body>
@@ -188,6 +204,8 @@ export const DASHBOARD_HTML = `<!doctype html>
       <div class="kpi bad"><div class="label">Failed</div><div class="value" id="kpiFailed">0</div><div class="sub" id="kpiFailedSub">—</div></div>
       <div class="kpi"><div class="label">Active models</div><div class="value" id="kpiActive">0</div><div class="sub" id="kpiActiveSub">—</div></div>
     </div>
+
+    <div id="providerCards" class="pcards" style="display:none"></div>
 
     <div class="grid grid-2" id="analyticsCharts">
       <div class="card locked-panel" id="timelineCard">
@@ -519,6 +537,7 @@ export const DASHBOARD_HTML = `<!doctype html>
       renderProjects(analytics.projects || {});
     }
 
+    renderProviderCards(routing);
     renderThrottles(providerStats && providerStats.stats ? providerStats.stats : []);
     renderHealth(healthItems);
     renderRouting(routing);
@@ -558,6 +577,54 @@ export const DASHBOARD_HTML = `<!doctype html>
     $('kpiSuccess').parentElement.querySelector('.label').textContent = 'Available';
     $('kpiFailed').parentElement.querySelector('.label').textContent = 'Unavailable';
     $('kpiActive').parentElement.querySelector('.label').textContent = 'Fallback ready';
+  }
+
+  function renderProviderCards(routing) {
+    const container = $('providerCards');
+    const providers = routing?.providers || {};
+    const fallbackOrder = routing?.fallback_order || [];
+    const entries = Object.entries(providers);
+    if (entries.length === 0) { container.style.display = 'none'; return; }
+    container.style.display = '';
+
+    // Aggregate daily capacity per provider from fallback_order
+    const capacity = {};
+    for (const item of fallbackOrder) {
+      const p = capacity[item.provider] || { used: 0, limit: 0 };
+      p.used += item.daily_used || 0;
+      p.limit += item.daily_limit || 0;
+      capacity[item.provider] = p;
+    }
+
+    // Sort: available first, then degraded, then cooldown/exhausted
+    const priority = { available: 0, degraded: 1, cooldown: 2, exhausted: 2 };
+    entries.sort((a, b) => {
+      const aStatus = a[1].available_models > 0 ? 'available' : a[1].degraded_models > 0 ? 'degraded' : a[1].cooldown_models > 0 ? 'cooldown' : 'exhausted';
+      const bStatus = b[1].available_models > 0 ? 'available' : b[1].degraded_models > 0 ? 'degraded' : b[1].cooldown_models > 0 ? 'cooldown' : 'exhausted';
+      return (priority[aStatus] || 0) - (priority[bStatus] || 0);
+    });
+
+    container.innerHTML = '';
+    for (const [name, p] of entries) {
+      const status = p.available_models > 0 ? 'available' : p.degraded_models > 0 ? 'degraded' : p.cooldown_models > 0 ? 'cooldown' : 'exhausted';
+      const statusCls = { available: 'ok', degraded: 'warn', cooldown: 'err', exhausted: 'err' };
+      const cap = capacity[name] || { used: 0, limit: 0 };
+      const usageRatio = cap.limit > 0 ? Math.min(1, cap.used / cap.limit) : 0;
+      const capBarCls = usageRatio >= 0.9 ? 'danger' : usageRatio >= 0.7 ? 'warn' : '';
+      const countBadges = [];
+      if (p.available_models > 0) countBadges.push('<span class="badge ok">' + p.available_models + ' avail</span>');
+      if (p.degraded_models > 0) countBadges.push('<span class="badge warn">' + p.degraded_models + ' deg</span>');
+      if (p.cooldown_models > 0) countBadges.push('<span class="badge err">' + p.cooldown_models + ' cool</span>');
+      if (p.exhausted_models > 0) countBadges.push('<span class="badge err">' + p.exhausted_models + ' exh</span>');
+      const div = document.createElement('div');
+      div.className = 'pcard ' + status;
+      div.innerHTML =
+        '<div class="pname">' + escape(name) + '<span class="badge ' + statusCls[status] + '">' + status + '</span></div>' +
+        '<div class="pcounts">' + countBadges.join('') + '</div>' +
+        (cap.limit > 0 ? '<div class="pcap"><div class="progress ' + capBarCls + '"><div style="width:' + (usageRatio * 100).toFixed(1) + '%"></div></div><div class="pcap-label">' + fmt(cap.used) + ' / ' + fmt(cap.limit) + ' daily</div></div>' : '') +
+        (p.best_model ? '<div class="pbest">' + escape(p.best_model) + '</div>' : '');
+      container.appendChild(div);
+    }
   }
 
   function renderRouting(routing) {

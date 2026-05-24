@@ -323,6 +323,32 @@ const routingStatusSchema = z.object({
   ),
 });
 
+const routingConfigSchema = z.object({
+  ok: z.literal(true),
+  scoring: z.object({
+    success_rate: z.number(),
+    headroom: z.number(),
+    latency: z.number(),
+    reasoning_fit: z.number(),
+    priority: z.number(),
+  }),
+  evaluation_weight_range: z.tuple([z.number(), z.number()]),
+  cooldown: z.object({
+    single_retriable_failure_seconds: z.number(),
+    burst_retriable_failures_seconds: z.number(),
+    burst_threshold: z.number(),
+    burst_window: z.number(),
+  }),
+  retry: z.object({
+    max_attempts: z.number(),
+  }),
+  thresholds: z.object({
+    degraded_success_rate: z.number(),
+    degraded_latency_ms: z.number(),
+    degraded_short_retriable_failures: z.number(),
+  }),
+});
+
 const healthSchema = z.object({
   ok: z.boolean(),
   models: z.array(
@@ -444,6 +470,7 @@ const RATE_LIMIT_EXEMPT_GET = new Set([
   '/v1/analytics',
   '/v1/stats/providers',
   '/v1/routing/status',
+  '/v1/routing/config',
   '/v1/models',
   '/v1/dashboard',
 ]);
@@ -484,6 +511,7 @@ app.use('*', async (c, next) => {
 const AUTH_EXEMPT_GET = new Set([
   '/v1/stats/providers',
   '/v1/routing/status',
+  '/v1/routing/config',
   '/v1/models',
   '/v1/dashboard',
   '/v1/budget',
@@ -2889,6 +2917,49 @@ app.openapi(routingStatusRoute, async (c) => {
     },
     fallback_order: fallbackOrder,
     providers,
+  });
+});
+
+const routingConfigRoute = createRoute({
+  method: 'get',
+  path: '/v1/routing/config',
+  responses: {
+    200: {
+      description: 'Routing policy: scoring weights, cooldown constants, retry limits, and degradation thresholds',
+      content: {
+        'application/json': {
+          schema: routingConfigSchema,
+        },
+      },
+    },
+  },
+});
+
+app.openapi(routingConfigRoute, (c) => {
+  return c.json({
+    ok: true as const,
+    scoring: {
+      success_rate: 0.6,
+      headroom: 0.2,
+      latency: 0.15,
+      reasoning_fit: 0.05,
+      priority: 0.02,
+    },
+    evaluation_weight_range: [0.8, 1.2] as [number, number],
+    cooldown: {
+      single_retriable_failure_seconds: 45,
+      burst_retriable_failures_seconds: 120,
+      burst_threshold: 7,
+      burst_window: 10,
+    },
+    retry: {
+      max_attempts: 2,
+    },
+    thresholds: {
+      degraded_success_rate: 0.75,
+      degraded_latency_ms: 5000,
+      degraded_short_retriable_failures: 1,
+    },
   });
 });
 
