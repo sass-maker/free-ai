@@ -903,17 +903,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
   },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
-    {
-    id: 'openrouter-baidu-qianfan-ocr-fast-free',
-    provider: 'openrouter',
-    model: 'baidu/qianfan-ocr-fast:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
-  },
-  {
+      {
     id: 'openrouter-google-gemma-4-26b-a4b-it-free',
     provider: 'openrouter',
     model: 'google/gemma-4-26b-a4b-it:free',
@@ -1084,11 +1074,22 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     enabled: true,
     priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
     capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
-  },
-  {
-    id: 'openrouter-inclusionai-ring-2-6-1t-free',
+  }  {
+    id: 'openrouter-baidu-cobuddy-free',
     provider: 'openrouter',
-    model: 'inclusionai/ring-2.6-1t:free',
+    model: 'baidu/cobuddy:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
+
+  // ── Auto-added by weekly model check (review priority + capabilities) ──
+  {
+    id: 'openrouter-deepseek-deepseek-v4-flash-free',
+    provider: 'openrouter',
+    model: 'deepseek/deepseek-v4-flash:free',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
@@ -1096,9 +1097,9 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
   },
   {
-    id: 'openrouter-baidu-cobuddy-free',
+    id: 'openrouter-arcee-ai-trinity-large-thinking-free',
     provider: 'openrouter',
-    model: 'baidu/cobuddy:free',
+    model: 'arcee-ai/trinity-large-thinking:free',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
@@ -1206,7 +1207,7 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'mistral:ministral-3b-latest': { requestsPerDay: 1000 },
   'mistral:pixtral-large-latest': { requestsPerDay: 300 },
   // AUTO-ADDED limits
-  'openrouter:baidu/qianfan-ocr-fast:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+ // AUTO-ADDED — tune
   'openrouter:google/gemma-4-26b-a4b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:google/gemma-4-31b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-3-super-120b-a12b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
@@ -1226,8 +1227,11 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:poolside/laguna-xs.2:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:poolside/laguna-m.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   // AUTO-ADDED limits
-  'openrouter:inclusionai/ring-2.6-1t:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+ // AUTO-ADDED — tune
   'openrouter:baidu/cobuddy:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  // AUTO-ADDED limits
+  'openrouter:deepseek/deepseek-v4-flash:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:arcee-ai/trinity-large-thinking:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
 
 export interface RateLimitConfig {
