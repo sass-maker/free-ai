@@ -37,4 +37,16 @@ describe('Dashboard HTML routes', () => {
     expect([301, 302, 307, 308]).toContain(res.status);
     expect(res.headers.get('location')).toBe('/dashboard');
   });
+
+  it('includes unauthenticated dashboard guidance and public endpoint fetches', async () => {
+    const res = await fetchRoute('/dashboard');
+    const html = await res.text();
+
+    expect(html).toContain('Usage analytics require credentials');
+    expect(html).toContain('GATEWAY_API_KEY');
+    expect(html).toContain('/v1/routing/status');
+    expect(html).toContain('authRequired');
+    expect(html).toContain('Routing fallback order');
+    expect(html).toContain('Analytics locked');
+  });
 });

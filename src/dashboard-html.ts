@@ -52,9 +52,16 @@ export const DASHBOARD_HTML = `<!doctype html>
   .last-updated { color: var(--muted); font-size: 12px; font-family: var(--mono); }
 
   .banner { padding: 10px 14px; border-radius: var(--radius); margin-bottom: 16px;
-    background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4);
-    color: #fca5a5; font-size: 13px; display: none; }
+    font-size: 13px; display: none; line-height: 1.5; }
   .banner.show { display: block; }
+  .banner.error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; }
+  .banner.info { background: rgba(124, 92, 255, 0.1); border: 1px solid rgba(124, 92, 255, 0.35); color: #c4b5fd; }
+  .banner.info code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-family: var(--mono); color: var(--text); }
+  .locked-panel { position: relative; }
+  .locked-panel .locked-overlay { position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; text-align: center; padding: 24px; border-radius: var(--radius);
+    background: rgba(10, 10, 11, 0.82); border: 1px dashed var(--border); color: var(--muted); font-size: 13px; z-index: 2; }
+  .locked-panel .locked-overlay strong { display: block; color: var(--text); margin-bottom: 6px; font-weight: 600; }
 
   .empty-state { padding: 60px 20px; text-align: center; color: var(--muted);
     background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); }
@@ -154,7 +161,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   <div class="topbar">
     <h1><span class="dot"></span>Free AI Gateway — Live</h1>
     <div class="spacer"></div>
-    <input id="apiKey" type="password" placeholder="Bearer token (if required)" autocomplete="off" />
+    <input id="apiKey" type="password" placeholder="GATEWAY_API_KEY (Bearer token)" autocomplete="off" />
     <select id="rangeSel">
       <option value="1">1d</option>
       <option value="7" selected>7d</option>
@@ -166,7 +173,8 @@ export const DASHBOARD_HTML = `<!doctype html>
     <span class="last-updated" id="lastUpdated">—</span>
   </div>
 
-  <div class="banner" id="errBanner"></div>
+  <div class="banner info" id="authBanner"></div>
+  <div class="banner error" id="errBanner"></div>
 
   <div id="emptyState" class="empty-state" style="display:none">
     <div style="font-size:15px;color:var(--text);margin-bottom:6px;">No traffic yet</div>
@@ -181,16 +189,26 @@ export const DASHBOARD_HTML = `<!doctype html>
       <div class="kpi"><div class="label">Active models</div><div class="value" id="kpiActive">0</div><div class="sub" id="kpiActiveSub">—</div></div>
     </div>
 
-    <div class="grid grid-2">
-      <div class="card">
+    <div class="grid grid-2" id="analyticsCharts">
+      <div class="card locked-panel" id="timelineCard">
         <h2>Timeline — Successful vs Failed (per day)</h2>
         <div class="chart-wrap"><canvas id="chartTimeline"></canvas></div>
       </div>
-      <div class="card">
+      <div class="card locked-panel" id="providersCard">
         <h2>Provider breakdown</h2>
         <div class="chart-wrap"><canvas id="chartProviders"></canvas></div>
         <div id="providerBadges" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
+    </div>
+
+    <div class="card" id="routingCard">
+      <h2>Routing fallback order</h2>
+      <table>
+        <thead><tr>
+          <th>Rank</th><th>Model</th><th>Provider</th><th>Status</th><th>Success</th><th>Reasons</th>
+        </tr></thead>
+        <tbody id="routingBody"></tbody>
+      </table>
     </div>
 
     <div class="card" id="throttleCard" style="display:none">
@@ -246,8 +264,8 @@ export const DASHBOARD_HTML = `<!doctype html>
       </table>
     </div>
 
-    <div class="grid grid-2">
-      <div class="card">
+    <div class="grid grid-2" id="analyticsTables">
+      <div class="card locked-panel" id="topModelsCard">
         <h2>Top 10 models</h2>
         <table>
           <thead><tr>
@@ -256,7 +274,7 @@ export const DASHBOARD_HTML = `<!doctype html>
           <tbody id="topModelsBody"></tbody>
         </table>
       </div>
-      <div class="card">
+      <div class="card locked-panel" id="projectsCard">
         <h2>Projects</h2>
         <table>
           <thead><tr>
@@ -300,6 +318,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     charts: { timeline: null, providers: null },
     inFlight: null,
     timer: null,
+    analyticsAuthed: false,
   };
 
   $('apiKey').value = state.apiKey;
@@ -332,6 +351,31 @@ export const DASHBOARD_HTML = `<!doctype html>
     if (!msg) { b.classList.remove('show'); b.textContent = ''; return; }
     b.textContent = msg;
     b.classList.add('show');
+  }
+
+  function showAuthBanner(required) {
+    const b = $('authBanner');
+    if (!required) { b.classList.remove('show'); b.innerHTML = ''; return; }
+    b.innerHTML =
+      '<strong>Usage analytics require credentials.</strong> '
+      + 'Paste your <code>GATEWAY_API_KEY</code> as a Bearer token in the field above to unlock request volume, '
+      + 'timeline charts, and project breakdown. Model health, routing status, and provider throttle stats below are public.';
+    b.classList.add('show');
+  }
+
+  function setAnalyticsLocked(locked) {
+    const msg =
+      '<div class="locked-overlay"><div><strong>Analytics locked</strong>'
+      + 'Add your <code style="font-family:var(--mono);color:var(--text)">GATEWAY_API_KEY</code> Bearer token above to view this panel.</div></div>';
+    for (const id of ['timelineCard', 'providersCard', 'topModelsCard', 'projectsCard']) {
+      const card = $(id);
+      const existing = card.querySelector('.locked-overlay');
+      if (locked) {
+        if (!existing) card.insertAdjacentHTML('beforeend', msg);
+      } else if (existing) {
+        existing.remove();
+      }
+    }
   }
 
   function authHeaders() {
@@ -370,18 +414,44 @@ export const DASHBOARD_HTML = `<!doctype html>
     }
   }
 
-  async function fetchBoth(signal) {
+  async function fetchData(signal) {
     const headers = authHeaders();
-    const [a, h, p] = await Promise.all([
-      fetch('/v1/analytics?days=' + state.days, { headers, signal }),
-      fetch('/health', { headers, signal }),
+    const [healthRes, statsRes, routingRes, analyticsRes] = await Promise.all([
+      fetch('/health', { signal }),
       fetch('/v1/stats/providers', { signal }).catch(() => null),
+      fetch('/v1/routing/status', { signal }).catch(() => null),
+      fetch('/v1/analytics?days=' + state.days, { headers, signal }),
     ]);
-    if (!a.ok) throw new Error('Analytics ' + a.status + ': ' + (await a.text()).slice(0, 200));
-    if (!h.ok) throw new Error('Health ' + h.status + ': ' + (await h.text()).slice(0, 200));
+
+    if (!healthRes.ok) {
+      throw new Error('Health ' + healthRes.status + ': ' + (await healthRes.text()).slice(0, 200));
+    }
+
+    const health = await healthRes.json();
     let providerStats = null;
-    if (p && p.ok) { try { providerStats = await p.json(); } catch { providerStats = null; } }
-    return { analytics: await a.json(), health: await h.json(), providerStats };
+    if (statsRes && statsRes.ok) {
+      try { providerStats = await statsRes.json(); } catch { providerStats = null; }
+    }
+    let routing = null;
+    if (routingRes && routingRes.ok) {
+      try { routing = await routingRes.json(); } catch { routing = null; }
+    }
+
+    let analytics = null;
+    let authRequired = false;
+    if (!analyticsRes.ok) {
+      const authStatus = analyticsRes.status === 401 || analyticsRes.status === 403
+        || (analyticsRes.status === 503 && !state.apiKey);
+      if (!state.apiKey && authStatus) {
+        authRequired = true;
+      } else {
+        throw new Error('Analytics ' + analyticsRes.status + ': ' + (await analyticsRes.text()).slice(0, 200));
+      }
+    } else {
+      analytics = await analyticsRes.json();
+    }
+
+    return { health, providerStats, routing, analytics, authRequired };
   }
 
   async function refresh() {
@@ -389,14 +459,17 @@ export const DASHBOARD_HTML = `<!doctype html>
     const ctrl = new AbortController();
     state.inFlight = ctrl;
     try {
-      const { analytics, health, providerStats } = await fetchBoth(ctrl.signal);
+      const { health, providerStats, routing, analytics, authRequired } = await fetchData(ctrl.signal);
       state.inFlight = null;
-      render(analytics, health, providerStats);
+      state.analyticsAuthed = !authRequired && analytics != null;
+      render({ analytics, health, providerStats, routing, authRequired });
       showError('');
+      showAuthBanner(authRequired);
       $('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
     } catch (err) {
       if (err.name === 'AbortError') return;
       state.inFlight = null;
+      showAuthBanner(false);
       showError('Fetch failed — ' + err.message);
     }
   }
@@ -408,20 +481,51 @@ export const DASHBOARD_HTML = `<!doctype html>
     }
   }
 
-  function render(analytics, health, providerStats) {
-    const total = analytics.total_requests || 0;
+  function render({ analytics, health, providerStats, routing, authRequired }) {
     const healthItems = health.items || health.models || [];
     const activeModels = healthItems.filter((h) => (h.attempts || 0) > 0).length;
+    const total = analytics?.total_requests || 0;
+    const hasPublicData = healthItems.length > 0 || routing?.fallback_order?.length > 0;
 
-    if (total === 0 && activeModels === 0) {
+    if (authRequired && !hasPublicData) {
+      $('emptyState').style.display = 'block';
+      $('mainView').style.display = 'none';
+      setAnalyticsLocked(true);
+      return;
+    }
+
+    if (!authRequired && analytics && total === 0 && activeModels === 0) {
       $('emptyState').style.display = 'block';
       $('mainView').style.display = 'none';
       return;
     }
+
     $('emptyState').style.display = 'none';
     $('mainView').style.display = '';
 
-    // KPIs
+    if (authRequired || !analytics) {
+      renderRoutingKpis(routing);
+      setAnalyticsLocked(true);
+      renderTimeline([]);
+      renderProviders({});
+      renderTopModels({});
+      renderProjects({});
+    } else {
+      renderAnalyticsKpis(analytics, healthItems, activeModels);
+      setAnalyticsLocked(false);
+      renderTimeline(analytics.daily || []);
+      renderProviders(analytics.providers || {});
+      renderTopModels(analytics.models || {});
+      renderProjects(analytics.projects || {});
+    }
+
+    renderThrottles(providerStats && providerStats.stats ? providerStats.stats : []);
+    renderHealth(healthItems);
+    renderRouting(routing);
+  }
+
+  function renderAnalyticsKpis(analytics, healthItems, activeModels) {
+    const total = analytics.total_requests || 0;
     $('kpiTotal').textContent = fmt(total);
     $('kpiTotalSub').textContent = 'last ' + state.days + 'd';
     $('kpiSuccess').textContent = pct(analytics.success_rate || 0);
@@ -430,13 +534,53 @@ export const DASHBOARD_HTML = `<!doctype html>
     $('kpiFailedSub').textContent = total > 0 ? pct((analytics.failed_requests || 0) / total) + ' of total' : '—';
     $('kpiActive').textContent = activeModels;
     $('kpiActiveSub').textContent = healthItems.length + ' registered';
+    $('kpiSuccess').parentElement.className = 'kpi good';
+    $('kpiFailed').parentElement.className = 'kpi bad';
+    $('kpiTotal').parentElement.querySelector('.label').textContent = 'Total requests';
+    $('kpiSuccess').parentElement.querySelector('.label').textContent = 'Success rate';
+    $('kpiFailed').parentElement.querySelector('.label').textContent = 'Failed';
+    $('kpiActive').parentElement.querySelector('.label').textContent = 'Active models';
+  }
 
-    renderTimeline(analytics.daily || []);
-    renderProviders(analytics.providers || {});
-    renderThrottles(providerStats && providerStats.stats ? providerStats.stats : []);
-    renderHealth(healthItems);
-    renderTopModels(analytics.models || {});
-    renderProjects(analytics.projects || {});
+  function renderRoutingKpis(routing) {
+    const summary = routing?.summary || {};
+    $('kpiTotal').textContent = fmt(summary.configured_models || 0);
+    $('kpiTotalSub').textContent = 'configured';
+    $('kpiSuccess').textContent = fmt(summary.available_models || 0);
+    $('kpiSuccessSub').textContent = (summary.degraded_models || 0) + ' degraded';
+    $('kpiFailed').textContent = fmt((summary.cooldown_models || 0) + (summary.exhausted_models || 0));
+    $('kpiFailedSub').textContent = (summary.cooldown_models || 0) + ' cooldown · ' + (summary.exhausted_models || 0) + ' exhausted';
+    $('kpiActive').textContent = summary.fallback_ready ? 'Yes' : 'No';
+    $('kpiActiveSub').textContent = summary.top_provider ? 'top: ' + summary.top_provider : '—';
+    $('kpiSuccess').parentElement.className = 'kpi good';
+    $('kpiFailed').parentElement.className = 'kpi';
+    $('kpiTotal').parentElement.querySelector('.label').textContent = 'Configured models';
+    $('kpiSuccess').parentElement.querySelector('.label').textContent = 'Available';
+    $('kpiFailed').parentElement.querySelector('.label').textContent = 'Unavailable';
+    $('kpiActive').parentElement.querySelector('.label').textContent = 'Fallback ready';
+  }
+
+  function renderRouting(routing) {
+    const tb = $('routingBody');
+    tb.innerHTML = '';
+    const items = routing?.fallback_order || [];
+    if (items.length === 0) {
+      tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Routing status unavailable</td></tr>';
+      return;
+    }
+    const statusCls = { available: 'ok', degraded: 'warn', cooldown: 'err', exhausted: 'err' };
+    for (const item of items.slice(0, 15)) {
+      const cls = statusCls[item.status] || 'mute';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + item.rank + '</td>' +
+        '<td class="mono">' + escape(item.id) + '</td>' +
+        '<td>' + escape(item.provider) + '</td>' +
+        '<td><span class="badge ' + cls + '">' + escape(item.status) + '</span></td>' +
+        '<td>' + pct(item.success_rate || 0) + '</td>' +
+        '<td class="mono" style="font-size:11px;color:var(--muted)">' + escape((item.reasons || []).join(', ')) + '</td>';
+      tb.appendChild(tr);
+    }
   }
 
   const chartColors = {
