@@ -12,7 +12,6 @@ test.describe('Playground FE (mocked API)', () => {
       const body = request.postDataJSON() as {
         model: string;
         prompt: string;
-        min_reasoning_level: string;
         stream: boolean;
       };
 
@@ -20,7 +19,6 @@ test.describe('Playground FE (mocked API)', () => {
       expect(body).toEqual({
         model: 'auto',
         prompt: 'Explain edge runtimes briefly',
-        min_reasoning_level: 'medium',
         stream: false,
       });
 
@@ -43,7 +41,6 @@ test.describe('Playground FE (mocked API)', () => {
             provider: 'groq',
             model: 'llama-3.1-8b-instant',
             attempts: 1,
-            reasoning_effort: 'medium',
             request_id: 'req-mock-1',
           },
         }),
@@ -52,14 +49,20 @@ test.describe('Playground FE (mocked API)', () => {
 
     await page.goto('/');
     await page.getByPlaceholder('API key').fill('test-key');
-    await page.getByPlaceholder('Prompt').fill('Explain edge runtimes briefly');
-    await page.selectOption('select[name="min_reasoning_level"]', 'medium');
-    await page.getByRole('button', { name: 'Send' }).click();
+    await page.getByPlaceholder('Imagine a spectral conduit bridging two realities...').fill('Explain edge runtimes briefly');
+    await page.getByRole('button', { name: 'Generate' }).click();
 
     await expect.poll(() => seenRequest).toBe(true);
-    await expect(page.locator('pre')).toContainText('Mocked answer from test');
-    await expect(page.locator('pre')).toContainText('"provider":"groq"');
-    await expect(page.getByRole('listitem').first()).toContainText('Explain edge runtimes briefly');
+
+    // Check output view
+    await expect(page.locator('section').filter({ hasText: 'Output' }).locator('pre')).toContainText('Mocked answer from test');
+    await expect(page.locator('section').filter({ hasText: 'Output' }).locator('pre')).toContainText('"provider":"groq"');
+
+    // Check request log
+    const requestLogEntry = page.locator('section').filter({ hasText: 'Request Log' }).locator('div > div').first();
+    await expect(requestLogEntry).toContainText('Explain edge runtimes briefly');
+    await expect(requestLogEntry.getByText('200')).toBeVisible();
+    await expect(requestLogEntry.getByText('groq')).toBeVisible();
   });
 
   test('renders mocked auth error from API', async ({ page }) => {
@@ -78,9 +81,14 @@ test.describe('Playground FE (mocked API)', () => {
 
     await page.goto('/');
     await page.getByPlaceholder('API key').fill('bad-key');
-    await page.getByPlaceholder('Prompt').fill('test prompt');
-    await page.getByRole('button', { name: 'Send' }).click();
+    await page.getByPlaceholder('Imagine a spectral conduit bridging two realities...').fill('test prompt');
+    await page.getByRole('button', { name: 'Generate' }).click();
 
-    await expect(page.locator('pre')).toContainText('Unauthorized');
+    // Check output view for error
+    await expect(page.locator('section').filter({ hasText: 'Output' }).locator('pre')).toContainText('Unauthorized');
+    
+    // Check request log for error status
+    const requestLogEntry = page.locator('section').filter({ hasText: 'Request Log' }).locator('div > div').first();
+    await expect(requestLogEntry.getByText('401')).toBeVisible();
   });
 });

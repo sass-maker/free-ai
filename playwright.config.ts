@@ -1,3 +1,4 @@
+import { devices } from '@playwright/test';
 import { definePlaywrightConfig } from '@saas-maker/test-config/playwright';
 
 export default definePlaywrightConfig({
@@ -9,6 +10,9 @@ export default definePlaywrightConfig({
     fullyParallel: false,
     retries: process.env.CI ? 1 : 0,
     reporter: [['list'], ['html', { open: 'never' }]],
+    projects: [
+      { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    ],
     use: {
       baseURL: 'http://127.0.0.1:4173',
       trace: 'retain-on-failure',

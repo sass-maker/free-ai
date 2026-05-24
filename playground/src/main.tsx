@@ -3,16 +3,15 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
-import { ErrorBoundary } from './ErrorBoundary';
+// @ts-expect-error — CSS side-effect import, no type declarations needed
+import './index.css';
 
 const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </React.StrictMode>,
 );

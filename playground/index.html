@@ -2,10 +2,82 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gateway Playground App</title>
+    <title>Model Playground | free-ai</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-container": "#5700c9",
+              "surface-dim": "#131315",
+              "on-tertiary-fixed-variant": "#5700c9",
+              "surface-container-low": "#1c1b1e",
+              "on-background": "#e5e1e4",
+              "primary-container": "#004f54",
+              outline: "#919191",
+              secondary: "#fface8",
+              background: "#131315",
+              "surface-variant": "#353437",
+              "inverse-surface": "#e5e1e4",
+              "primary-fixed": "#7df4ff",
+              "surface-container-highest": "#353437",
+              "on-secondary-fixed-variant": "#840076",
+              "on-error": "#690005",
+              "primary-fixed-dim": "#00dbe9",
+              primary: "#00dbe9",
+              "on-primary-fixed-variant": "#004f54",
+              "outline-variant": "#474747",
+              "inverse-primary": "#006970",
+              "secondary-fixed": "#ffd7f0",
+              "tertiary-fixed": "#e9ddff",
+              error: "#ffb4ab",
+              "on-tertiary": "#3c0090",
+              "secondary-container": "#840076",
+              "on-error-container": "#ffdad6",
+              "on-secondary-container": "#ffd7f0",
+              "on-surface": "#e5e1e4",
+              "tertiary-fixed-dim": "#d1bcff",
+              "error-container": "#93000a",
+              "on-primary-fixed": "#002022",
+              surface: "#131315",
+              "surface-bright": "#39393b",
+              "on-primary": "#00363a",
+              "on-primary-container": "#7df4ff",
+              "on-secondary": "#5e0053",
+              "surface-container": "#201f22",
+              "on-secondary-fixed": "#3a0033",
+              "surface-tint": "#00dbe9",
+              "inverse-on-surface": "#313032",
+              "surface-container-lowest": "#0e0e10",
+              "secondary-fixed-dim": "#fface8",
+              "on-tertiary-fixed": "#23005b",
+              "on-tertiary-container": "#e9ddff",
+              "surface-container-high": "#2a2a2c",
+              "on-surface-variant": "#c6c6c6",
+              tertiary: "#d1bcff",
+            },
+            fontFamily: {
+              sans: ["Inter", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
   </head>
-  <body>
+  <body class="bg-surface">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
