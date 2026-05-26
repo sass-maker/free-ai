@@ -1,2 +1,8 @@
+packages:
+  - "."
+
+onlyBuiltDependencies:
+  - workerd
+
 allowBuilds:
   workerd: true
