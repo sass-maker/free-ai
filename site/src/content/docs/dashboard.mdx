@@ -18,10 +18,10 @@ A single self-contained HTML page that visualizes the gateway's live health and 
 ## What You See
 
 - **KPIs** — total requests today, overall success rate, active providers, models in cooldown.
-- **Timeline chart** — requests/min over the last ~1 hour (Chart.js line chart).
+- **Timeline chart** — weekly successful vs failed request volume from [`/v1/analytics`](/analytics).
 - **Provider breakdown** — success rate, throttle rate, and latency per provider, derived from [`/v1/stats/providers`](/provider-stats).
 - **Throttle heatmap** — which providers are hitting rate limits and how often.
-- **Live model health** — per-model success rate, latency, and cooldown expiry from [`/health`](/health).
+- **Live model health** — rolling per-model samples, success rate, avg/P90/P99 latency, usage, and cooldown expiry from [`/health`](/health).
 - **Top models** — the models actually serving traffic, ranked by request volume.
 - **Projects** — aggregate per-`project_id` usage from [`/v1/analytics`](/analytics).
 

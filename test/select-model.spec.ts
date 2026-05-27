@@ -47,6 +47,8 @@ function snapshot(key: string, successRate: number, avgLatencyMs: number, cooldo
     attempts: 10,
     successRate,
     avgLatencyMs,
+    p90LatencyMs: avgLatencyMs,
+    p99LatencyMs: avgLatencyMs,
     cooldownUntil,
     headroom: 0.9,
     dailyUsed: 10,

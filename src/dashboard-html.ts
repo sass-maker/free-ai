@@ -207,7 +207,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 
     <div class="grid grid-2" id="analyticsCharts">
       <div class="card" id="timelineCard">
-        <h2>Timeline — Successful vs Failed (per day)</h2>
+        <h2>Timeline — Successful vs Failed (weekly)</h2>
         <div class="chart-wrap"><canvas id="chartTimeline"></canvas></div>
       </div>
       <div class="card" id="providersCard">
@@ -274,7 +274,7 @@ export const DASHBOARD_HTML = `<!doctype html>
       <h2>Live model health</h2>
       <table>
         <thead><tr>
-          <th>Key</th><th>Attempts</th><th>Success</th><th>Avg latency</th>
+          <th>Key</th><th>Samples</th><th>Success</th><th>Avg</th><th>P90</th><th>P99</th>
           <th>Daily usage</th><th>Status</th>
         </tr></thead>
         <tbody id="healthBody"></tbody>
@@ -640,9 +640,10 @@ export const DASHBOARD_HTML = `<!doctype html>
   };
 
   function renderTimeline(daily) {
-    const labels = daily.map((d) => d.date);
-    const succ = daily.map((d) => d.successful || 0);
-    const fail = daily.map((d) => d.failed || 0);
+    const weekly = groupDailyByWeek(daily);
+    const labels = weekly.map((d) => d.week);
+    const succ = weekly.map((d) => d.successful || 0);
+    const fail = weekly.map((d) => d.failed || 0);
     const data = {
       labels,
       datasets: [
@@ -658,6 +659,25 @@ export const DASHBOARD_HTML = `<!doctype html>
     } else {
       state.charts.timeline = new Chart($('chartTimeline'), { type: 'bar', data, options: opts });
     }
+  }
+
+  function groupDailyByWeek(daily) {
+    const byWeek = new Map();
+    for (const day of daily || []) {
+      const week = weekLabel(day.date);
+      const current = byWeek.get(week) || { week, successful: 0, failed: 0 };
+      current.successful += day.successful || 0;
+      current.failed += day.failed || 0;
+      byWeek.set(week, current);
+    }
+    return [...byWeek.values()].sort((a, b) => a.week.localeCompare(b.week));
+  }
+
+  function weekLabel(dateString) {
+    const date = new Date(dateString + 'T00:00:00Z');
+    const day = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() - day + 1);
+    return date.toISOString().slice(0, 10);
   }
 
   function getActiveBreakdown(analytics) {
@@ -708,7 +728,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     const now = Date.now();
     const sorted = [...items].sort((a, b) => (b.attempts || 0) - (a.attempts || 0));
     if (sorted.length === 0) {
-      tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">No models registered</td></tr>';
+      tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">No models registered</td></tr>';
       return;
     }
     for (const m of sorted) {
@@ -731,6 +751,8 @@ export const DASHBOARD_HTML = `<!doctype html>
         '<td>' + fmt(m.attempts) + '</td>' +
         '<td><span class="badge ' + rateCls + '">' + (m.attempts > 0 ? pct(rate) : '—') + '</span></td>' +
         '<td>' + ms(m.avg_latency_ms) + '</td>' +
+        '<td>' + ms(m.p90_latency_ms) + '</td>' +
+        '<td>' + ms(m.p99_latency_ms) + '</td>' +
         '<td><div class="progress ' + barCls + '"><div style="width:' + Math.min(100, usageRatio * 100).toFixed(1) + '%"></div></div>' +
           '<div class="progress-label">' + usageLabel + '</div></td>' +
         '<td>' + statusBadge + '</td>';

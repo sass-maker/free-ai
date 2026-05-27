@@ -74,6 +74,9 @@ function toSnapshot(
   const successRate = attempts === 0 ? 0.5 : successful / attempts;
   const avgLatencyMs =
     attempts === 0 ? 1500 : state.history.reduce((sum, item) => sum + item.latencyMs, 0) / attempts;
+  const latencies = state.history.map((item) => item.latencyMs).sort((a, b) => a - b);
+  const p90LatencyMs = attempts === 0 ? 1500 : percentile(latencies, 0.9);
+  const p99LatencyMs = attempts === 0 ? 1500 : percentile(latencies, 0.99);
 
   const recent = state.history.slice(-SHORT_WINDOW);
   const shortRetriableFailures = recent.filter(
@@ -88,6 +91,8 @@ function toSnapshot(
     attempts,
     successRate,
     avgLatencyMs,
+    p90LatencyMs,
+    p99LatencyMs,
     cooldownUntil: Math.max(state.cooldownUntil, now > state.cooldownUntil ? 0 : state.cooldownUntil),
     headroom,
     dailyUsed: state.dailyUsed,
@@ -104,6 +109,12 @@ function median(sorted: number[]): number {
   if (sorted.length === 0) return 0;
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function percentile(sorted: number[], percentileRank: number): number {
+  if (sorted.length === 0) return 0;
+  const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * percentileRank) - 1);
+  return sorted[index];
 }
 
 interface ProviderAccumulator {

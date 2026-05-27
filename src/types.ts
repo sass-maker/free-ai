@@ -110,6 +110,8 @@ export interface ModelStateSnapshot {
   attempts: number;
   successRate: number;
   avgLatencyMs: number;
+  p90LatencyMs: number;
+  p99LatencyMs: number;
   cooldownUntil: number;
   headroom: number;
   dailyUsed: number;

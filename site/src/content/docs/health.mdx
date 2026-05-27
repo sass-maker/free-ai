@@ -23,39 +23,21 @@ GET https://your-gateway.workers.dev/health
 
 ```json
 {
-  "status": "ok",
-  "models": {
-    "gpt-4o": {
-      "provider": "openai",
-      "healthy": true,
+  "ok": true,
+  "models": [
+    {
+      "key": "groq:llama-3.3-70b-versatile",
+      "attempts": 100,
       "success_rate": 0.994,
       "avg_latency_ms": 820,
-      "in_cooldown": false,
-      "cooldown_until": null,
-      "daily_requests": 3100,
+      "p90_latency_ms": 1400,
+      "p99_latency_ms": 4200,
+      "cooldown_until": 0,
+      "headroom": 0.69,
+      "daily_used": 3100,
       "daily_limit": 10000
-    },
-    "claude-3-5-sonnet-20241022": {
-      "provider": "anthropic",
-      "healthy": true,
-      "success_rate": 0.964,
-      "avg_latency_ms": 1140,
-      "in_cooldown": false,
-      "cooldown_until": null,
-      "daily_requests": 2800,
-      "daily_limit": 5000
-    },
-    "llama-3.3-70b-versatile": {
-      "provider": "groq",
-      "healthy": false,
-      "success_rate": 0.621,
-      "avg_latency_ms": 490,
-      "in_cooldown": true,
-      "cooldown_until": "2024-11-15T11:00:00.000Z",
-      "daily_requests": 1600,
-      "daily_limit": 2000
     }
-  }
+  ]
 }
 ```
 
@@ -63,20 +45,22 @@ GET https://your-gateway.workers.dev/health
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | Top-level gateway status (`"ok"` or `"degraded"`) |
-| `models` | object | Health state keyed by model identifier |
+| `ok` | boolean | Whether the health endpoint responded successfully |
+| `models` | array | Rolling health state per tracked model |
 
 ### Per-Model Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `provider` | string | Backend provider for this model |
-| `healthy` | boolean | Whether the model is currently accepting traffic |
+| `key` | string | Provider and model identifier |
+| `attempts` | number | Number of rolling health samples retained for this model, capped at 100 |
 | `success_rate` | number | Rolling success rate (0–1) |
 | `avg_latency_ms` | number | Rolling average response latency in milliseconds |
-| `in_cooldown` | boolean | Whether the model is temporarily paused due to errors |
-| `cooldown_until` | string \| null | ISO 8601 timestamp when the cooldown expires, or null |
-| `daily_requests` | number | Requests made to this model today |
+| `p90_latency_ms` | number | Rolling p90 response latency in milliseconds |
+| `p99_latency_ms` | number | Rolling p99 response latency in milliseconds |
+| `cooldown_until` | number | Unix timestamp in milliseconds when cooldown expires, or 0 |
+| `headroom` | number | Remaining configured daily headroom from 0 to 1 |
+| `daily_used` | number | Successful requests routed to this model today |
 | `daily_limit` | number \| null | Configured daily limit for this model, or null if unlimited |
 
 ## Cooldown Behaviour

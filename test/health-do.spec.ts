@@ -50,4 +50,36 @@ describe('HealthStateDO', () => {
       headroom: 1,
     });
   });
+
+  it('reports average, p90, and p99 latency from the rolling attempt window', async () => {
+    const state = makeState();
+    const health = new HealthStateDO(state, {});
+    const latencies = [100, 200, 300, 400, 500, 600, 700, 800, 900, 10_000];
+
+    for (const [index, latencyMs] of latencies.entries()) {
+      await health.fetch(
+        new Request('https://internal.local/record', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            key: 'groq:test-model',
+            success: true,
+            latencyMs,
+            now: Date.UTC(2026, 4, 27) + index,
+          }),
+        }),
+      );
+    }
+
+    const res = await health.fetch(new Request('https://internal.local/snapshot'));
+    const body = (await res.json()) as {
+      snapshots: Array<{ avgLatencyMs: number; p90LatencyMs: number; p99LatencyMs: number }>;
+    };
+
+    expect(body.snapshots[0]).toMatchObject({
+      avgLatencyMs: 1450,
+      p90LatencyMs: 900,
+      p99LatencyMs: 10_000,
+    });
+  });
 });
