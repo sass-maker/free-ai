@@ -1,5 +1,5 @@
 import { isWorkersAiEnabled } from '../config';
-import { estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
+import { estimateChatInputChars, estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
 import type { ProviderCaller, ProviderEmbeddingCaller } from './types';
 
 class BudgetExhaustedError extends Error {
@@ -144,7 +144,10 @@ export const callWorkersAi: ProviderCaller = async (input) => {
 
   // Gate every Workers AI invocation through the daily Neuron budget so we
   // never exceed the 10k/day free quota.
-  const cost = estimateNeuronCost(input.model);
+  const cost = estimateNeuronCost(input.model, {
+    inputChars: estimateChatInputChars(input.messages),
+    outputTokens: input.max_tokens,
+  });
   const debit = await tryDebitNeurons(input.env, cost);
   if (!debit.allowed) {
     throw new BudgetExhaustedError(

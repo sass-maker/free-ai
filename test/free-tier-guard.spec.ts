@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { getModelRegistry, getTtsRegistry, isWorkersAiEnabled } from '../src/config';
 import { callWorkersAi } from '../src/providers/workers-ai';
-import { tryDebitNeurons } from '../src/state/neuron-budget';
+import { estimateChatInputChars, estimateNeuronCost, tryDebitNeurons } from '../src/state/neuron-budget';
 import type { Env } from '../src/types';
 
 function makeEnv(overrides: Partial<Env> = {}): Env {
@@ -35,6 +35,34 @@ describe('Workers AI free-tier guard', () => {
       allowed: false,
       remaining: 0,
     });
+  });
+
+  it('estimates Workers AI text neurons from approximate input and output tokens', () => {
+    const short = estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
+      inputChars: 400,
+      outputTokens: 100,
+    });
+    const long = estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
+      inputChars: 4_000,
+      outputTokens: 1_000,
+    });
+
+    expect(short).toBeGreaterThanOrEqual(2);
+    expect(long).toBeGreaterThan(short);
+  });
+
+  it('adds image parts to chat input estimates', () => {
+    const chars = estimateChatInputChars([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'describe this' },
+          { type: 'image_url', image_url: { url: 'https://example.com/image.png' } },
+        ],
+      },
+    ]);
+
+    expect(chars).toBeGreaterThan(1_000);
   });
 
   it('does not call Workers AI when the opt-in flag is absent', async () => {

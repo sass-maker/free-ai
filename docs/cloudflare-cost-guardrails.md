@@ -4,6 +4,7 @@ This gateway should run without surprise Cloudflare charges. The committed confi
 
 - Workers AI is enabled with `WORKERS_AI_ENABLED = "true"`, but automatic routing keeps it behind non-Cloudflare providers so it is a fallback source of compute.
 - Every Workers AI call path must pass through `NEURON_BUDGET`, which caps usage at 9,500 Neurons/day, 500 below Cloudflare's 10,000 Neurons/day free allocation.
+- Text and embedding debit estimates use Cloudflare's published per-model token pricing converted back into approximate neurons, plus a 20% buffer. Models without explicit pricing stay on fixed conservative estimates.
 - Workers Logs/observability sampling is disabled in committed config because Workers Logs can create paid overage on Workers Paid plans.
 - Worker CPU is capped at 10ms in committed config, matching the Workers Free per-invocation CPU limit.
 - The unused Cloudflare Rate Limiting binding is not configured; request throttling uses `IpRateLimitDO`.

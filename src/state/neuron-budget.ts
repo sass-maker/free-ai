@@ -5,13 +5,15 @@
  * Used by every code path that hits `env.AI.run(...)` so we never overshoot
  * the daily 9500-Neuron budget (500 below the 10k/day free quota).
  *
- * Cost reference (rough, conservative, per-call). Workers AI bills per-token
- * but Cloudflare publishes only Neuron coefficients per model, not stable
- * per-token formulae — so we round generously upward. See:
+ * Cost reference (rough, conservative). Cloudflare publishes model pricing in
+ * dollars per million tokens while overage is billed per 1,000 neurons. We
+ * convert those public token prices back into neuron estimates and add a small
+ * buffer because the gateway only knows requested output length before a call.
+ * See:
  *   https://developers.cloudflare.com/workers-ai/platform/pricing/
  */
 
-import type { Env } from '../types';
+import type { ChatMessage, ContentPart, Env } from '../types';
 
 const DO_ORIGIN = 'https://internal.local';
 
@@ -21,26 +23,40 @@ const DO_ORIGIN = 'https://internal.local';
  */
 const DEFAULT_NEURON_COST = 80;
 
-/**
- * Per-call Neuron estimates, keyed by Workers AI model id. Numbers are
- * intentionally rounded high. When a per-token figure is published we can
- * swap to a token-based estimator (input * inFactor + output * outFactor).
- */
-const NEURONS_BY_MODEL: Record<string, number> = {
-  // Text generation
-  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': 80,
-  '@cf/meta/llama-3.1-70b-instruct': 80,
-  '@cf/meta/llama-3.1-8b-instruct': 12,
-  '@cf/meta/llama-3-8b-instruct': 12,
-  '@cf/meta/llama-3.2-3b-instruct': 8,
-  '@cf/meta/llama-3.2-1b-instruct': 4,
-  '@cf/mistral/mistral-7b-instruct-v0.1': 12,
-  '@cf/qwen/qwen1.5-14b-chat-awq': 20,
+const NEURON_BUFFER = 1.2;
+const DEFAULT_OUTPUT_TOKENS = 512;
 
-  // Embeddings
-  '@cf/baai/bge-base-en-v1.5': 1,
-  '@cf/baai/bge-small-en-v1.5': 1,
-  '@cf/baai/bge-large-en-v1.5': 2,
+interface TokenPricing {
+  inputNeuronsPerMillion: number;
+  outputNeuronsPerMillion: number;
+}
+
+const TEXT_TOKEN_PRICING: Record<string, TokenPricing> = {
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': { inputNeuronsPerMillion: 26_668, outputNeuronsPerMillion: 204_805 },
+  '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b': { inputNeuronsPerMillion: 45_170, outputNeuronsPerMillion: 443_756 },
+  '@cf/meta/llama-3.1-8b-instruct': { inputNeuronsPerMillion: 25_608, outputNeuronsPerMillion: 75_147 },
+  '@cf/meta/llama-3-8b-instruct': { inputNeuronsPerMillion: 25_608, outputNeuronsPerMillion: 75_147 },
+  '@cf/meta/llama-3.2-3b-instruct': { inputNeuronsPerMillion: 4_625, outputNeuronsPerMillion: 30_475 },
+  '@cf/meta/llama-3.2-1b-instruct': { inputNeuronsPerMillion: 2_457, outputNeuronsPerMillion: 18_252 },
+  '@cf/mistral/mistral-7b-instruct-v0.1': { inputNeuronsPerMillion: 10_000, outputNeuronsPerMillion: 17_300 },
+};
+
+const EMBEDDING_NEURONS_PER_MILLION_TOKENS: Record<string, number> = {
+  '@cf/baai/bge-base-en-v1.5': 3_109,
+  '@cf/baai/bge-small-en-v1.5': 3_109,
+  '@cf/baai/bge-large-en-v1.5': 14_000,
+};
+
+/**
+ * Per-call Neuron estimates for models where preflight inputs do not map
+ * cleanly to priced text tokens or the pricing page does not list the model.
+ */
+const FIXED_NEURONS_BY_MODEL: Record<string, number> = {
+  // Text generation fallbacks
+  '@cf/meta/llama-3.1-70b-instruct': 80,
+  '@cf/qwen/qwen1.5-14b-chat-awq': 20,
+  '@cf/google/gemma-7b-it-lora': 12,
+  '@cf/microsoft/phi-2': 8,
 
   // Images (per generation)
   '@cf/black-forest-labs/flux-1-schnell': 200,
@@ -62,18 +78,43 @@ export interface DebitResult {
   dayKey: string;
 }
 
-export function estimateNeuronCost(model: string, params?: { inputChars?: number }): number {
-  const base = NEURONS_BY_MODEL[model] ?? DEFAULT_NEURON_COST;
+function estimateTokensFromChars(chars: number): number {
+  return Math.max(1, Math.ceil(chars / 4));
+}
 
-  // Embedding models scale with input volume — bump cost for long batches.
-  if (model.includes('/baai/') && params?.inputChars) {
-    // ~4 chars/token, 1 Neuron per ~3k tokens. Round up.
-    const estimatedTokens = Math.ceil(params.inputChars / 4);
-    const overhead = Math.ceil(estimatedTokens / 3000);
-    return base + overhead;
+export function estimateChatInputChars(messages: ChatMessage[]): number {
+  return messages.reduce((sum, message) => {
+    if (typeof message.content === 'string') {
+      return sum + message.content.length;
+    }
+
+    return sum + message.content.reduce((partSum, part: ContentPart) => {
+      if (part.type === 'text') {
+        return partSum + part.text.length;
+      }
+
+      return partSum + 1_000;
+    }, 0);
+  }, 0);
+}
+
+export function estimateNeuronCost(model: string, params?: { inputChars?: number; outputTokens?: number }): number {
+  const tokenPricing = TEXT_TOKEN_PRICING[model];
+  if (tokenPricing) {
+    const inputTokens = params?.inputChars ? estimateTokensFromChars(params.inputChars) : 1;
+    const outputTokens = Math.max(1, params?.outputTokens ?? DEFAULT_OUTPUT_TOKENS);
+    const inputNeurons = (inputTokens * tokenPricing.inputNeuronsPerMillion) / 1_000_000;
+    const outputNeurons = (outputTokens * tokenPricing.outputNeuronsPerMillion) / 1_000_000;
+    return Math.max(1, Math.ceil((inputNeurons + outputNeurons) * NEURON_BUFFER));
   }
 
-  return base;
+  const embeddingRate = EMBEDDING_NEURONS_PER_MILLION_TOKENS[model];
+  if (embeddingRate) {
+    const inputTokens = params?.inputChars ? estimateTokensFromChars(params.inputChars) : 1;
+    return Math.max(1, Math.ceil((inputTokens * embeddingRate * NEURON_BUFFER) / 1_000_000));
+  }
+
+  return FIXED_NEURONS_BY_MODEL[model] ?? DEFAULT_NEURON_COST;
 }
 
 function getBudgetStub(env: Env) {
