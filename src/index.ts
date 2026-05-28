@@ -555,7 +555,7 @@ app.use('/v1/*', async (c, next) => {
         distinctId: 'free-ai',
         event: 'foundry_auth_failure',
         properties: {
-          project_slug: 'free-ai',
+          project_id: 'free-ai',
           route: new URL(c.req.url).pathname,
           stage: 'signin',
           reason: 'GATEWAY_API_KEY missing',
@@ -579,7 +579,7 @@ app.use('/v1/*', async (c, next) => {
         distinctId: 'free-ai',
         event: 'foundry_auth_failure',
         properties: {
-          project_slug: 'free-ai',
+          project_id: 'free-ai',
           route: new URL(c.req.url).pathname,
           stage: 'signin',
           reason: 'Invalid API key',
@@ -3271,7 +3271,7 @@ app.onError((err, c) => {
     distinctId: 'free-ai',
     event: 'error_captured',
     properties: {
-      project_slug: 'free-ai',
+      project_id: 'free-ai',
       route: new URL(c.req.url).pathname,
       method: c.req.method,
       type,

@@ -322,7 +322,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   function capturePageCrash(error, source) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn('foundry_page_crash', {
-      project_slug: 'free-ai',
+      project_id: 'free-ai',
       route: location.origin + location.pathname,
       source,
       message,
