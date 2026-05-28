@@ -1299,21 +1299,47 @@ function hasProviderKey(env: Env, provider: TextProvider): boolean {
   }
 }
 
+function modelHasNativeReasoning(candidate: ModelCandidate): boolean {
+  const id = `${candidate.id} ${candidate.model}`.toLowerCase();
+  return [
+    'deepseek-r1',
+    'qwq',
+    'qwen3',
+    'qwen-3',
+    'gpt-oss',
+    'openai/gpt-5',
+    'openai/o3',
+    'openai/o4',
+    'phi-4-reasoning',
+    'deepseek-reasoning',
+    'thinking',
+    'reasoning',
+  ].some((marker) => id.includes(marker));
+}
+
 export function getModelRegistry(env: Env): ModelCandidate[] {
   const configured = safeParse<ModelCandidate[]>(env.MODEL_REGISTRY_JSON);
   const base = configured && configured.length > 0 ? configured : DEFAULT_MODELS;
 
-  return base.filter((candidate) => {
-    if (!candidate.enabled) {
-      return false;
-    }
+  return base
+    .filter((candidate) => {
+      if (!candidate.enabled) {
+        return false;
+      }
 
-    if (PROVIDER_KEY_REQUIRED[candidate.provider] && !hasProviderKey(env, candidate.provider)) {
-      return false;
-    }
+      if (PROVIDER_KEY_REQUIRED[candidate.provider] && !hasProviderKey(env, candidate.provider)) {
+        return false;
+      }
 
-    return true;
-  });
+      return true;
+    })
+    .map((candidate) => ({
+      ...candidate,
+      capabilities: {
+        ...candidate.capabilities,
+        nativeReasoning: candidate.capabilities.nativeReasoning ?? modelHasNativeReasoning(candidate),
+      },
+    }));
 }
 
 export function getProviderLimits(env: Env): Record<string, ProviderLimitConfig> {

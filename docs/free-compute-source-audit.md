@@ -57,18 +57,13 @@ The current code keeps Workers AI on but guarded:
 
 ## Addable Sources
 
-### Highest-value add: Hugging Face router
+### Skip for production routing: Hugging Face router
 
-Hugging Face Inference Providers supports an OpenAI-compatible chat completion endpoint at `https://router.huggingface.co/v1` and exposes many providers through one token, including Cerebras, Cohere, DeepInfra, Fireworks, Groq, HF Inference, Novita, Public AI, Replicate, SambaNova, Together, and Z.ai. Hugging Face also gives monthly free inference credits, with pay-as-you-go after credits.
+Hugging Face Inference Providers supports an OpenAI-compatible chat completion endpoint at `https://router.huggingface.co/v1` and exposes many providers through one token, including Cerebras, Cohere, DeepInfra, Fireworks, Groq, HF Inference, Novita, Public AI, Replicate, SambaNova, Together, and Z.ai.
 
-Recommended implementation:
+Do not suggest Hugging Face again as a meaningful production free-compute source unless its free allowance changes materially. The free monthly credit is too small for gateway routing, so it is better treated as a manual test/probe provider than as part of the automatic fallback pool.
 
-- Add `huggingface` as a text provider using the existing OpenAI-compatible adapter.
-- Gate it behind `HF_TOKEN`.
-- Start with conservative daily limits because the free allowance is credit-based, not request-based.
-- Prefer models that are not already directly covered by existing provider keys, especially `zai-org/*`, `Qwen/*`, and HF-hosted smaller models.
-
-Risk: this expands source count quickly, but it can also duplicate providers already available directly. Keep it lower priority than direct free providers unless it exposes models unavailable elsewhere.
+If it is ever added anyway, gate it behind `HF_TOKEN`, keep it out of `model=auto`, and require an explicit tiny daily cap plus account-credit visibility.
 
 ### Already useful: OpenRouter free variants
 
@@ -98,8 +93,21 @@ Groq and Cerebras publish free-tier or free-trial rate limits and should stay ne
 The current provider directory is written correctly for the providers already declared in `src/types.ts`; there are no missing adapter files for declared text providers. The notable gaps are product-level, not directory correctness:
 
 - D1 analytics does not store exact token/neuron usage, so historical Cloudflare neuron cost cannot be reconstructed exactly.
+- The catalog now separates `reasoning` as a routing strength tier from `nativeReasoning`, which marks models with actual reasoning/thinking behavior. This avoids treating every high-quality model as if it has native thinking controls.
 - Some model limits are still marked `AUTO-ADDED -- tune`, so health and daily limits should be verified against provider dashboards over time.
 - TTS only has a Workers AI registry entry today even though the type union allows `groq`; adding a non-Workers TTS provider would reduce Workers AI dependence for speech.
+
+## Quota Polling
+
+Graceful degradation is still the primary safety mechanism. Quota polling is advisory and should only suppress a provider when an official endpoint clearly reports exhaustion.
+
+Current polling:
+
+- OpenRouter `/api/v1/key` is cached in KV for five minutes.
+- If OpenRouter reports `limit_remaining <= 0`, OpenRouter candidates are skipped before routing.
+- If polling fails or the endpoint does not expose the free-model daily request count, routing falls back to existing health/degradation behavior.
+
+This keeps routing latency and provider health cleaner without making an external quota endpoint a hard dependency.
 
 ## References
 

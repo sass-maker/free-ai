@@ -46,6 +46,7 @@ export interface ModelCapabilities {
   toolCalling: boolean;
   jsonMode: boolean;
   vision: boolean;
+  nativeReasoning?: boolean;
   contextWindow: number;
   maxOutputTokens: number;
 }
@@ -212,4 +213,18 @@ export interface Env {
   RATE_LIMIT_CONFIG_JSON?: string;
   DOCS_SITE_URL?: string;
   POSTHOG_API_KEY?: string;
+}
+
+export interface ProviderQuotaStatus {
+  provider: TextProvider;
+  status: 'ok' | 'exhausted' | 'unknown';
+  source: 'openrouter_key' | 'not_supported' | 'unconfigured' | 'error';
+  checkedAt: string;
+  reason?: string;
+  limitRemaining?: number | null;
+  limit?: number | null;
+  usage?: number;
+  usageDaily?: number;
+  isFreeTier?: boolean;
+  freeDailyLimit?: number;
 }

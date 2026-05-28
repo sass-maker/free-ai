@@ -27,6 +27,7 @@ export interface FakeEnvOverrides {
   GEMINI_API_KEY?: string;
   GROQ_API_KEY?: string;
   NVIDIA_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_WORKERS_AI_API_KEY?: string;
   WORKERS_AI_ENABLED?: string;
@@ -118,6 +119,7 @@ export function makeTestEnv(overrides: FakeEnvOverrides = {}) {
     GEMINI_API_KEY: overrides.GEMINI_API_KEY,
     GROQ_API_KEY: overrides.GROQ_API_KEY,
     NVIDIA_API_KEY: overrides.NVIDIA_API_KEY,
+    OPENROUTER_API_KEY: overrides.OPENROUTER_API_KEY,
     CLOUDFLARE_ACCOUNT_ID: overrides.CLOUDFLARE_ACCOUNT_ID,
     CLOUDFLARE_WORKERS_AI_API_KEY: overrides.CLOUDFLARE_WORKERS_AI_API_KEY,
     WORKERS_AI_ENABLED: overrides.WORKERS_AI_ENABLED,

@@ -428,3 +428,20 @@ describe('default registry vision coverage', () => {
     expect(models).not.toContain('openai/o4-mini');
   });
 });
+
+describe('default registry catalog metadata', () => {
+  it('separates native reasoning support from the routing reasoning tier', () => {
+    const registry = getModelRegistry({
+      GROQ_API_KEY: 'test',
+      GITHUB_TOKEN: 'test',
+    } as Env);
+
+    const nativeReasoning = registry.filter((candidate) => candidate.capabilities.nativeReasoning);
+    const highTierWithoutNativeReasoning = registry.filter(
+      (candidate) => candidate.reasoning === 'high' && !candidate.capabilities.nativeReasoning,
+    );
+
+    expect(nativeReasoning.some((candidate) => candidate.model.includes('gpt-oss'))).toBe(true);
+    expect(highTierWithoutNativeReasoning.length).toBeGreaterThan(0);
+  });
+});

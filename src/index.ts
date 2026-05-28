@@ -28,6 +28,7 @@ import {
   ttsProviderCallers,
   videoProviderCallers,
 } from './providers';
+import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './providers/quota';
 import { classifyError, isRetriableFailure } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
 import { deriveRequiredCapabilities, selectCandidates } from './router/select-model';
@@ -46,6 +47,7 @@ import type {
   NormalizedChatRequest,
   Provider,
   ProviderLimitConfig,
+  ProviderQuotaStatus,
   ResponseFormat,
   TextProvider,
   Tool,
@@ -69,6 +71,8 @@ const TEXT_PROVIDER_VALUES = [
   'cohere',
   'mistral',
 ] as const;
+
+const QUOTA_POLLING_PROVIDERS: readonly TextProvider[] = ['openrouter'];
 
 const contentPartTextSchema = z.object({
   type: z.literal('text'),
@@ -271,6 +275,12 @@ const modelItemSchema = z.object({
   provider: z.string(),
   model: z.string(),
   reasoning: z.string(),
+  native_reasoning: z.boolean(),
+  tool_calling: z.boolean(),
+  json_mode: z.boolean(),
+  vision: z.boolean(),
+  context_window: z.number(),
+  max_output_tokens: z.number(),
   supports_streaming: z.boolean(),
   cooldown_until: z.number(),
   success_rate: z.number(),
@@ -300,6 +310,7 @@ const routingStatusSchema = z.object({
       provider: z.string(),
       model: z.string(),
       reasoning: z.string(),
+      native_reasoning: z.boolean(),
       status: z.enum(['available', 'degraded', 'cooldown', 'exhausted']),
       success_rate: z.number(),
       headroom: z.number(),
@@ -309,6 +320,7 @@ const routingStatusSchema = z.object({
       cooldown_until: z.number(),
       daily_used: z.number(),
       daily_limit: z.number().nullable(),
+      quota_status: z.string().optional(),
       reasons: z.array(z.string()),
     }),
   ),
@@ -349,6 +361,20 @@ const routingConfigSchema = z.object({
     degraded_latency_ms: z.number(),
     degraded_short_retriable_failures: z.number(),
   }),
+});
+
+const providerQuotaSchema = z.object({
+  provider: z.string(),
+  status: z.enum(['ok', 'exhausted', 'unknown']),
+  source: z.enum(['openrouter_key', 'not_supported', 'unconfigured', 'error']),
+  checkedAt: z.string(),
+  reason: z.string().optional(),
+  limitRemaining: z.number().nullable().optional(),
+  limit: z.number().nullable().optional(),
+  usage: z.number().optional(),
+  usageDaily: z.number().optional(),
+  isFreeTier: z.boolean().optional(),
+  freeDailyLimit: z.number().optional(),
 });
 
 const healthSchema = z.object({
@@ -475,6 +501,7 @@ const RATE_LIMIT_EXEMPT_GET = new Set([
   '/v1/stats/providers',
   '/v1/routing/status',
   '/v1/routing/config',
+  '/v1/provider-quotas',
   '/v1/models',
   '/v1/dashboard',
 ]);
@@ -513,6 +540,7 @@ const AUTH_EXEMPT_GET = new Set([
   '/v1/stats/providers',
   '/v1/routing/status',
   '/v1/routing/config',
+  '/v1/provider-quotas',
   '/v1/models',
   '/v1/dashboard',
   '/v1/budget',
@@ -636,6 +664,20 @@ function sortFallbackLast<T extends { provider: Provider; priority: number }>(it
 
     return b.priority - a.priority;
   });
+}
+
+async function getRoutingQuotaStatuses(env: Env, registry: ModelCandidate[]): Promise<Map<TextProvider, ProviderQuotaStatus>> {
+  const providers = new Set(
+    registry
+      .map((candidate) => candidate.provider)
+      .filter((provider): provider is TextProvider => (QUOTA_POLLING_PROVIDERS as readonly string[]).includes(provider)),
+  );
+
+  if (providers.size === 0) {
+    return new Map();
+  }
+
+  return getProviderQuotaStatuses(env, providers);
 }
 
 function workersAiEmbeddingAvailable(env: Env): boolean {
@@ -1065,6 +1107,22 @@ app.openapi(chatRoute, async (c) => {
         error: {
           message: 'No provider credentials or models configured',
           type: 'configuration_error',
+        },
+      },
+      503,
+    );
+  }
+
+  const quotaStatuses = await getRoutingQuotaStatuses(c.env, registry);
+  registry = registry.filter((candidate) => providerQuotaAllowsCandidate(candidate, quotaStatuses));
+
+  if (registry.length === 0) {
+    return c.json(
+      {
+        error: {
+          message: 'No provider credentials or quota available',
+          type: 'service_unavailable',
+          code: 'provider_quota_exhausted',
         },
       },
       503,
@@ -2802,6 +2860,12 @@ app.openapi(modelsRoute, async (c) => {
           provider: candidate.provider,
           model: candidate.model,
           reasoning: candidate.reasoning,
+          native_reasoning: candidate.capabilities.nativeReasoning ?? false,
+          tool_calling: candidate.capabilities.toolCalling,
+          json_mode: candidate.capabilities.jsonMode,
+          vision: candidate.capabilities.vision,
+          context_window: candidate.capabilities.contextWindow,
+          max_output_tokens: candidate.capabilities.maxOutputTokens,
           supports_streaming: candidate.supportsStreaming,
           cooldown_until: snapshot?.cooldownUntil ?? 0,
           success_rate: snapshot?.successRate ?? 0.5,
@@ -2897,6 +2961,7 @@ app.openapi(routingStatusRoute, async (c) => {
 
   const stateMap = await healthLookup(c.env, keys, lookupLimits, now);
   const evaluationMap = parseEvaluationWeights(c.env.MODEL_EVALUATIONS_JSON);
+  const quotaStatuses = await getRoutingQuotaStatuses(c.env, registry);
   const selected = selectCandidates(registry, stateMap, {
     stream: false,
     now,
@@ -2916,7 +2981,8 @@ app.openapi(routingStatusRoute, async (c) => {
   const fallbackOrder = fallbackCandidates.map((candidate, index) => {
     const key = getModelKey(candidate.provider, candidate.model);
     const snapshot = stateMap.get(key);
-    const status = routingModelStatus(snapshot, now);
+    const quotaStatus = quotaStatuses.get(candidate.provider);
+    const status = quotaStatus?.status === 'exhausted' ? 'exhausted' : routingModelStatus(snapshot, now);
     const provider = providers[candidate.provider] ?? {
       configured_models: 0,
       available_models: 0,
@@ -2946,6 +3012,7 @@ app.openapi(routingStatusRoute, async (c) => {
       provider: candidate.provider,
       model: candidate.model,
       reasoning: candidate.reasoning,
+      native_reasoning: candidate.capabilities.nativeReasoning ?? false,
       status,
       success_rate: snapshot?.successRate ?? 0.5,
       headroom: snapshot?.headroom ?? 1,
@@ -2955,7 +3022,11 @@ app.openapi(routingStatusRoute, async (c) => {
       cooldown_until: snapshot?.cooldownUntil ?? 0,
       daily_used: snapshot?.dailyUsed ?? 0,
       daily_limit: snapshot?.dailyLimit ?? lookupLimits[key]?.requestsPerDay ?? 200,
-      reasons: routingReasons(snapshot, status),
+      quota_status: quotaStatus?.status,
+      reasons: [
+        ...routingReasons(snapshot, status),
+        ...(quotaStatus?.status === 'exhausted' ? ['provider_quota_exhausted'] : []),
+      ],
     };
   });
 
@@ -3020,6 +3091,29 @@ app.openapi(routingConfigRoute, (c) => {
       degraded_short_retriable_failures: 1,
     },
   });
+});
+
+const providerQuotasRoute = createRoute({
+  method: 'get',
+  path: '/v1/provider-quotas',
+  responses: {
+    200: {
+      description: 'Advisory provider quota status from official provider endpoints',
+      content: {
+        'application/json': {
+          schema: z.object({
+            ok: z.literal(true),
+            quotas: z.record(z.string(), providerQuotaSchema),
+          }),
+        },
+      },
+    },
+  },
+});
+
+app.openapi(providerQuotasRoute, async (c) => {
+  const quotas = Object.fromEntries(await getProviderQuotaStatuses(c.env, QUOTA_POLLING_PROVIDERS));
+  return c.json({ ok: true as const, quotas });
 });
 
 const healthRoute = createRoute({
@@ -3139,7 +3233,8 @@ app.openapi(analyticsRoute, async (c) => {
 
 app.get('/v1/stats/providers', async (c) => {
   const stats = await providerStats(c.env);
-  return c.json({ stats });
+  const quotas = Object.fromEntries(await getProviderQuotaStatuses(c.env, QUOTA_POLLING_PROVIDERS));
+  return c.json({ stats, quotas });
 });
 
 // Workers AI daily Neuron budget — sole chokepoint for Fleet-wide AI traffic.
