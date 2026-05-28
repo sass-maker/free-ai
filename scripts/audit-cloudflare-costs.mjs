@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DEFAULT_WRANGLER_PATH = resolve(process.cwd(), 'wrangler.toml');
+const DEFAULT_NEURON_BUDGET_PATH = resolve(process.cwd(), 'src/state/neuron-budget-do.ts');
 
 function getBlock(toml, header) {
   const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -21,7 +22,13 @@ function getStringValue(raw) {
   return match ? match[1] : raw;
 }
 
-export function auditCloudflareCostConfig(toml, source = 'wrangler.toml') {
+function readDailyNeuronCap(path = DEFAULT_NEURON_BUDGET_PATH) {
+  const source = readFileSync(path, 'utf8');
+  const match = source.match(/DAILY_NEURON_CAP\s*=\s*(\d+)/);
+  return match ? Number(match[1]) : Number.NaN;
+}
+
+export function auditCloudflareCostConfig(toml, source = 'wrangler.toml', options = {}) {
   const failures = [];
   const warnings = [];
 
@@ -46,11 +53,8 @@ export function auditCloudflareCostConfig(toml, source = 'wrangler.toml') {
 
   const vars = getBlock(toml, 'vars');
   const workersAiEnabled = getStringValue(getScalar(vars, 'WORKERS_AI_ENABLED'));
-  if (workersAiEnabled === 'true') {
-    failures.push(
-      'WORKERS_AI_ENABLED is true in committed config. Keep Workers AI disabled by default; opt in only after confirming the Cloudflare plan cannot bill overages.',
-    );
-  }
+  const hasAiBinding = /^\[ai\]\s*$/m.test(toml);
+  const hasNeuronBudget = /name\s*=\s*"NEURON_BUDGET"/.test(toml);
 
   if (/^\[\[unsafe\.bindings\]\][\s\S]*?type\s*=\s*"ratelimit"/m.test(toml)) {
     failures.push(
@@ -58,11 +62,24 @@ export function auditCloudflareCostConfig(toml, source = 'wrangler.toml') {
     );
   }
 
-  if (/^\[ai\]\s*$/m.test(toml) && !/name\s*=\s*"NEURON_BUDGET"/.test(toml)) {
+  if (hasAiBinding && !hasNeuronBudget) {
     failures.push('Workers AI binding exists without the NEURON_BUDGET Durable Object guard.');
   }
 
-  if (/^\[ai\]\s*$/m.test(toml) && !/WORKERS_AI_ENABLED\s*=\s*"false"/.test(toml)) {
+  if (hasAiBinding && workersAiEnabled === 'true') {
+    const neuronCap = options.dailyNeuronCap ?? readDailyNeuronCap(options.neuronBudgetPath);
+    if (!Number.isFinite(neuronCap)) {
+      failures.push('Workers AI is enabled, but the DAILY_NEURON_CAP guard could not be read.');
+    } else if (neuronCap > 9_500) {
+      failures.push(
+        `Workers AI is enabled with DAILY_NEURON_CAP=${neuronCap}. Keep the committed cap at or below 9500 neurons/day.`,
+      );
+    } else {
+      warnings.push(
+        `Workers AI is enabled as a fallback; NEURON_BUDGET caps committed usage at ${neuronCap} neurons/day.`,
+      );
+    }
+  } else if (hasAiBinding) {
     warnings.push('Workers AI binding is present; runtime calls must remain gated by WORKERS_AI_ENABLED and NEURON_BUDGET.');
   }
 

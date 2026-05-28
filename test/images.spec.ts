@@ -169,6 +169,34 @@ describe('POST /v1/images/generations', () => {
     expect(togetherImageMock).not.toHaveBeenCalled();
   });
 
+  it('keeps Workers AI image generation behind other providers for auto routing', async () => {
+    nvidiaImageMock.mockResolvedValueOnce({
+      created: 84,
+      data: [{ url: 'https://img.example/nvidia.png' }],
+    });
+
+    const { env } = makeTestEnv({ NVIDIA_API_KEY: 'n', WORKERS_AI_ENABLED: 'true' });
+    (env as unknown as { AI: unknown }).AI = { run: vi.fn() };
+
+    const req = new Request('https://gateway.test/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
+        'x-gateway-project-id': 'test-proj',
+      },
+      body: JSON.stringify({ model: 'auto', prompt: 'moon' }),
+    });
+
+    const res = await app.fetch(req, env, makeCtx());
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { x_gateway: { provider: string } };
+    expect(body.x_gateway.provider).toBe('nvidia');
+    expect(nvidiaImageMock).toHaveBeenCalledOnce();
+    expect(workersAiImageMock).not.toHaveBeenCalled();
+  });
+
   it('rejects invalid prompts with a 400 (zod validation)', async () => {
     const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k' });
     const req = new Request('https://gateway.test/v1/images/generations', {

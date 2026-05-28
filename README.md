@@ -24,7 +24,7 @@ This gateway is built to be hyper-scalable, stateless, and 100% free using the C
 
 ## Cloudflare Cost Posture
 
-The committed Cloudflare config is free-first. Workers AI is bound but disabled by default, Workers Logs sampling is off, CPU is capped to the Workers Free limit, and the unused Cloudflare Rate Limiting binding is not configured. Run `pnpm audit:cloudflare-costs` before deployment prep; `pnpm check` runs it automatically. See [docs/cloudflare-cost-guardrails.md](docs/cloudflare-cost-guardrails.md) for the current guardrails.
+The committed Cloudflare config is free-first. Workers AI is enabled only as a fallback behind non-Cloudflare providers and is capped by `NEURON_BUDGET` at 9,500 neurons/day. Workers Logs sampling is off, CPU is capped to the Workers Free limit, and the unused Cloudflare Rate Limiting binding is not configured. Run `pnpm audit:cloudflare-costs` before deployment prep; `pnpm check` runs it automatically. See [docs/cloudflare-cost-guardrails.md](docs/cloudflare-cost-guardrails.md) for the current guardrails.
 
 ## Authentication & Project ID
 

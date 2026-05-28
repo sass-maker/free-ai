@@ -143,6 +143,54 @@ describe('selectCandidates', () => {
     expect(selected[0]?.provider).toBe('gemini');
   });
 
+  it('keeps Workers AI behind non-Cloudflare providers for automatic routing', () => {
+    const selected = selectCandidates(
+      [
+        {
+          id: 'external-low',
+          provider: 'groq',
+          model: 'external-low',
+          reasoning: 'low',
+          supportsStreaming: true,
+          enabled: true,
+          priority: 0.2,
+          capabilities: defaultCaps,
+        },
+        {
+          id: 'cf-high',
+          provider: 'workers_ai',
+          model: 'cf-high',
+          reasoning: 'high',
+          supportsStreaming: true,
+          enabled: true,
+          priority: 0.99,
+          capabilities: defaultCaps,
+        },
+      ],
+      new Map([
+        ['groq:external-low', snapshot('groq:external-low', 0.65, 2_500, 0)],
+        ['workers_ai:cf-high', snapshot('workers_ai:cf-high', 1, 250, 0)],
+      ]),
+      {
+        stream: false,
+        now: Date.now(),
+      },
+    );
+
+    expect(selected.map((candidate) => candidate.provider)).toEqual(['groq', 'workers_ai']);
+  });
+
+  it('allows Workers AI when explicitly requested by model', () => {
+    const selected = selectCandidates(registry, new Map(), {
+      stream: false,
+      now: Date.now(),
+      modelOverride: 'model-c',
+    });
+
+    expect(selected).toHaveLength(1);
+    expect(selected[0]?.provider).toBe('workers_ai');
+  });
+
   it('filters out models without tool calling when tools are required', () => {
     const selected = selectCandidates(registry, new Map(), {
       min_reasoning_level: 'medium',

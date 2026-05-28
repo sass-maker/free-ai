@@ -625,6 +625,19 @@ function getForcedEmbeddingProvider(
   return undefined;
 }
 
+function sortFallbackLast<T extends { provider: Provider; priority: number }>(items: T[], useFallbackOrder: boolean): T[] {
+  return [...items].sort((a, b) => {
+    if (useFallbackOrder) {
+      const fallbackDiff = Number(a.provider === 'workers_ai') - Number(b.provider === 'workers_ai');
+      if (fallbackDiff !== 0) {
+        return fallbackDiff;
+      }
+    }
+
+    return b.priority - a.priority;
+  });
+}
+
 function workersAiEmbeddingAvailable(env: Env): boolean {
   if (!isWorkersAiEnabled(env)) {
     return false;
@@ -2050,7 +2063,7 @@ app.post('/v1/audio/transcriptions', async (c) => {
     );
   }
 
-  const sorted = [...registry].sort((a, b) => b.priority - a.priority);
+  const sorted = sortFallbackLast(registry, !forcedProvider && requestedModel === 'auto');
 
   let lastError = 'Unknown error';
   let chosenProvider: string | undefined;
@@ -2397,7 +2410,7 @@ app.openapi(imagesGenRoute, async (c) => {
     );
   }
 
-  const sorted = [...registry].sort((a, b) => b.priority - a.priority);
+  const sorted = sortFallbackLast(registry, !forcedProvider && requestedLower === 'auto');
   let lastError = 'Unknown error';
   let attempts = 0;
   let chosenProvider: string | undefined;
@@ -2701,7 +2714,7 @@ app.openapi(audioSpeechRoute, async (c) => {
     );
   }
 
-  const sorted = [...registry].sort((a, b) => b.priority - a.priority);
+  const sorted = sortFallbackLast(registry, !forcedProvider && requestedLower === 'auto');
   let lastError = 'Unknown error';
   let chosenProvider: string | undefined;
   let chosenModel: string | undefined;

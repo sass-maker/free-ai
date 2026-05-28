@@ -137,6 +137,14 @@ const reasoningRank: Record<ReasoningTier, number> = {
   high: 2,
 };
 
+function fallbackRank(candidate: ModelCandidate, options: SelectOptions): number {
+  if (options.modelOverride) {
+    return 0;
+  }
+
+  return candidate.provider === 'workers_ai' ? 1 : 0;
+}
+
 export function selectCandidates(
   registry: ModelCandidate[],
   stateMap: Map<string, ModelStateSnapshot>,
@@ -212,6 +220,11 @@ export function selectCandidates(
   }
 
   ranked.sort((a, b) => {
+    const fallbackDiff = fallbackRank(a.candidate, options) - fallbackRank(b.candidate, options);
+    if (fallbackDiff !== 0) {
+      return fallbackDiff;
+    }
+
     if (a.tierIndex !== b.tierIndex) {
       return a.tierIndex - b.tierIndex;
     }
