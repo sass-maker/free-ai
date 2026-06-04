@@ -36,7 +36,7 @@ src/
     sse.ts              # SSE streaming helpers
 playground/             # Vite + React 19 demo SPA (served via ASSETS binding)
 site/                   # Astro docs/marketing (separate package.json)
-migrations/             # D1 SQL migrations (0001–0005)
+migrations/             # D1 SQL migrations (0001–0006)
 scripts/                # Deploy, env sync, model ID validation
 test/                   # Vitest unit tests
 e2e/                    # Playwright e2e (mock server)

@@ -11,6 +11,7 @@ Last updated: 2026-06-04
 - Aggregate anonymous D1 analytics, public dashboard, Durable Object health/rate-limit state, and Workers AI Neuron budget guard.
 - Browser-first operator health and searchable model catalog surfaces on top of the existing `/health` and `/v1/models` JSON endpoints.
 - Operator key-ring helper at `scripts/gateway-key-ring.mjs` for hash-only key provisioning.
+- Anonymous routing experiment ledger (`routing_ledger_rollup` D1 table) with public `GET /v1/routing/ledger` and operator health UI rollup (no prompt text stored).
 
 ## Current Observations
 

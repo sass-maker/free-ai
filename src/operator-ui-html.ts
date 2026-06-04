@@ -102,6 +102,14 @@ export const OPERATOR_HEALTH_HTML = `<!doctype html>
     </div>
   </section>
   <section class="card">
+    <h2>Routing experiment ledger (7d)</h2>
+    <p class="muted">Anonymous aggregates from <code>/v1/routing/ledger</code>. Prompt text is never stored.</p>
+    <table>
+      <thead><tr><th>Prompt class</th><th>Requests</th><th>Success</th><th>Avg latency</th><th>Fallback rate</th></tr></thead>
+      <tbody id="ledger"></tbody>
+    </table>
+  </section>
+  <section class="card">
     <h2>Live model health</h2>
     <table>
       <thead><tr><th>Model key</th><th>Status</th><th>Attempts</th><th>Success</th><th>Avg</th><th>P90</th><th>Daily</th></tr></thead>
@@ -134,12 +142,13 @@ async function readJson(path) {
 async function load() {
   $('error').className = 'banner';
   try {
-    const [health, routing, providerStats] = await Promise.all([
+    const [health, routing, providerStats, ledger] = await Promise.all([
       readJson('/health'),
       readJson('/v1/routing/status').catch(() => null),
       readJson('/v1/stats/providers').catch(() => null),
+      readJson('/v1/routing/ledger?days=7').catch(() => null),
     ]);
-    render(health, routing, providerStats);
+    render(health, routing, providerStats, ledger);
     $('updated').textContent = 'Updated ' + new Date().toLocaleString();
   } catch (err) {
     $('error').textContent = err.message || String(err);
@@ -148,7 +157,7 @@ async function load() {
   }
 }
 
-function render(health, routing, providerStats) {
+function render(health, routing, providerStats, ledger) {
   const models = health.models || [];
   const statuses = models.map(modelStatus);
   const risky = statuses.filter((s) => s[0] === 'cooldown' || s[0] === 'exhausted' || s[0] === 'degraded').length;
@@ -165,7 +174,15 @@ function render(health, routing, providerStats) {
   renderProviders(routing);
   renderFallback(routing);
   renderQuotas(providerStats);
+  renderLedger(ledger);
   renderModels(models);
+}
+
+function renderLedger(ledger) {
+  const rows = ledger && ledger.by_prompt_class ? ledger.by_prompt_class.slice(0, 12) : [];
+  $('ledger').innerHTML = rows.length ? rows.map((row) => {
+    return '<tr><td class="mono">' + esc(row.key) + '</td><td>' + fmt(row.requests) + '</td><td>' + pct(row.success_rate) + '</td><td>' + ms(row.avg_latency_ms) + '</td><td>' + pct(row.fallback_rate) + '</td></tr>';
+  }).join('') : '<tr><td colspan="5" class="muted">No routing ledger data yet.</td></tr>';
 }
 
 function renderProviders(routing) {

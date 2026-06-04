@@ -33,6 +33,8 @@ import {
 import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './providers/quota';
 import { classifyError, isRetriableFailure } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
+import { buildChatLedgerRecord, queryRoutingLedger, recordRoutingLedger } from './routing/ledger';
+import type { FallbackHop, RoutingOutcome } from './routing/ledger';
 import { deriveRequiredCapabilities, selectCandidates } from './router/select-model';
 import { consumeIpRateLimit, healthLookup, healthRecord, healthSnapshot, nextRoundRobinOffset, providerStats } from './state/client';
 import { HealthStateDO } from './state/health-do';
@@ -421,6 +423,50 @@ const analyticsResponseSchema = z.object({
   ),
 });
 
+const routingLedgerBreakdownSchema = z.object({
+  key: z.string(),
+  requests: z.number(),
+  successful: z.number(),
+  failed: z.number(),
+  success_rate: z.number(),
+  avg_latency_ms: z.number(),
+  avg_attempts: z.number(),
+  fallback_rate: z.number(),
+});
+
+const routingLedgerResponseSchema = z.object({
+  ok: z.literal(true),
+  generated_at: z.string(),
+  days: z.number(),
+  project_id: z.string().optional(),
+  privacy: z.object({
+    stores_prompt_text: z.literal(false),
+    stores_request_ids: z.literal(false),
+  }),
+  summary: z.object({
+    total_requests: z.number(),
+    successful_requests: z.number(),
+    failed_requests: z.number(),
+    success_rate: z.number(),
+    avg_latency_ms: z.number(),
+    avg_attempts: z.number(),
+    fallback_rate: z.number(),
+  }),
+  by_prompt_class: z.array(routingLedgerBreakdownSchema),
+  by_outcome: z.array(routingLedgerBreakdownSchema),
+  by_model: z.array(routingLedgerBreakdownSchema),
+  by_quota_signature: z.array(routingLedgerBreakdownSchema),
+  top_fallback_signatures: z.array(
+    z.object({
+      signature: z.string(),
+      requests: z.number(),
+      success_rate: z.number(),
+      avg_latency_ms: z.number(),
+      fallback_rate: z.number(),
+    }),
+  ),
+});
+
 const replayRequestSchema = chatRequestSchema
   .extend({
     provider: z.enum(TEXT_PROVIDER_VALUES).optional(),
@@ -500,6 +546,7 @@ const EMBEDDING_MODEL_ALIASES: Record<string, string> = {
 // Paths exempt from IP rate limiting — public read-only endpoints
 const RATE_LIMIT_EXEMPT_GET = new Set([
   '/v1/analytics',
+  '/v1/routing/ledger',
   '/v1/stats/providers',
   '/v1/routing/status',
   '/v1/routing/config',
@@ -539,6 +586,7 @@ app.use('*', async (c, next) => {
 //
 const AUTH_EXEMPT_GET = new Set([
   '/v1/analytics',
+  '/v1/routing/ledger',
   '/v1/stats/providers',
   '/v1/routing/status',
   '/v1/routing/config',
@@ -830,6 +878,30 @@ function resolveProjectId(headerValue: string | undefined, bodyValue: string | u
   return projectIdSchema.safeParse(candidate).success ? candidate : undefined;
 }
 
+function scheduleChatRoutingLedger(
+  ctx: ExecutionContext,
+  db: D1Database,
+  params: {
+    endpoint: string;
+    projectId: string;
+    normalized: NormalizedChatRequest;
+    requestedModel: string;
+    quotaStatuses: Map<TextProvider, ProviderQuotaStatus>;
+    fallbackHops: FallbackHop[];
+    chosenMeta?: GatewayMeta;
+    outcome: RoutingOutcome;
+    requestStartedAt: number;
+    errorClass?: string;
+  },
+) {
+  ctx.waitUntil(
+    recordRoutingLedger(
+      db,
+      buildChatLedgerRecord(params),
+    ),
+  );
+}
+
 async function recordAnalytics(params: {
   db: D1Database;
   projectId?: string;
@@ -1063,6 +1135,17 @@ app.openapi(chatRoute, async (c) => {
   registry = registry.filter((candidate) => providerQuotaAllowsCandidate(candidate, quotaStatuses));
 
   if (registry.length === 0) {
+    scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, {
+      endpoint,
+      projectId,
+      normalized,
+      requestedModel: normalized.model,
+      quotaStatuses,
+      fallbackHops: [],
+      outcome: 'quota_exhausted',
+      requestStartedAt,
+    });
+
     return c.json(
       {
         error: {
@@ -1130,6 +1213,16 @@ app.openapi(chatRoute, async (c) => {
         outcome: 'error',
       })
     );
+    scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, {
+      endpoint,
+      projectId,
+      normalized,
+      requestedModel: normalized.model,
+      quotaStatuses,
+      fallbackHops: [],
+      outcome: 'no_candidate',
+      requestStartedAt,
+    });
 
     return c.json(
       {
@@ -1143,6 +1236,7 @@ app.openapi(chatRoute, async (c) => {
     );
   }
 
+  const routingFallbackHops: FallbackHop[] = [];
   let attemptCounter = 0;
   let chosenMeta: GatewayMeta | undefined;
   let finalResponse: Record<string, unknown> | null = null;
@@ -1181,6 +1275,13 @@ app.openapi(chatRoute, async (c) => {
 
         const latencyMs = Date.now() - startedAt;
         const key = getModelKey(candidate.provider, candidate.model);
+
+        routingFallbackHops.push({
+          provider: candidate.provider,
+          model: candidate.model,
+          outcome: 'ok',
+          latency_ms: latencyMs,
+        });
 
         await healthRecord(c.env, {
           key,
@@ -1354,6 +1455,13 @@ app.openapi(chatRoute, async (c) => {
         lastErrorClass = failureClass;
         lastErrorMessage = getErrorMessage(error);
 
+        routingFallbackHops.push({
+          provider: candidate.provider,
+          model: candidate.model,
+          outcome: 'failed',
+          latency_ms: Date.now() - startedAt,
+        });
+
         await healthRecord(c.env, {
           key: getModelKey(candidate.provider, candidate.model),
           success: false,
@@ -1386,6 +1494,17 @@ app.openapi(chatRoute, async (c) => {
         model: chosenMeta?.model,
       })
     );
+    scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, {
+      endpoint,
+      projectId,
+      normalized,
+      requestedModel: normalized.model,
+      quotaStatuses,
+      fallbackHops: routingFallbackHops,
+      chosenMeta,
+      outcome: 'ok',
+      requestStartedAt,
+    });
 
     return streamResponse;
   }
@@ -1400,6 +1519,17 @@ app.openapi(chatRoute, async (c) => {
         model: chosenMeta.model,
       })
     );
+    scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, {
+      endpoint,
+      projectId,
+      normalized,
+      requestedModel: normalized.model,
+      quotaStatuses,
+      fallbackHops: routingFallbackHops,
+      chosenMeta,
+      outcome: 'ok',
+      requestStartedAt,
+    });
 
     return c.json(finalResponse as never, 200);
   }
@@ -1415,6 +1545,18 @@ app.openapi(chatRoute, async (c) => {
       model: chosenMeta?.model,
     })
   );
+  scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, {
+    endpoint,
+    projectId,
+    normalized,
+    requestedModel: normalized.model,
+    quotaStatuses,
+    fallbackHops: routingFallbackHops,
+    chosenMeta,
+    outcome: 'error',
+    requestStartedAt,
+    errorClass: lastErrorClass,
+  });
 
   return c.json(
     {
@@ -3153,6 +3295,59 @@ app.get('/health/', (c) => {
   }
 
   return c.redirect('/health');
+});
+
+const routingLedgerRoute = createRoute({
+  method: 'get',
+  path: '/v1/routing/ledger',
+  request: {
+    query: z.object({
+      project_id: z.string().optional(),
+      days: z.coerce.number().int().min(1).max(90).default(7),
+    }),
+  },
+  responses: {
+    200: {
+      description: 'Anonymous routing experiment ledger (no prompt text)',
+      content: { 'application/json': { schema: routingLedgerResponseSchema } },
+    },
+  },
+});
+
+app.openapi(routingLedgerRoute, async (c) => {
+  const query = c.req.valid('query');
+  try {
+    const payload = await queryRoutingLedger(c.env.GATEWAY_DB, {
+      days: query.days,
+      project_id: query.project_id,
+    });
+    return c.json(payload);
+  } catch {
+    return c.json({
+      ok: true as const,
+      generated_at: new Date().toISOString(),
+      days: query.days,
+      project_id: query.project_id,
+      privacy: {
+        stores_prompt_text: false as const,
+        stores_request_ids: false as const,
+      },
+      summary: {
+        total_requests: 0,
+        successful_requests: 0,
+        failed_requests: 0,
+        success_rate: 0,
+        avg_latency_ms: 0,
+        avg_attempts: 0,
+        fallback_rate: 0,
+      },
+      by_prompt_class: [],
+      by_outcome: [],
+      by_model: [],
+      by_quota_signature: [],
+      top_fallback_signatures: [],
+    });
+  }
 });
 
 const analyticsRoute = createRoute({
