@@ -2,7 +2,11 @@
 
 Last updated: 2026-06-04
 
-## Shipped
+## Current Scope
+
+Free AI Gateway is an OpenAI-compatible Cloudflare Worker gateway that routes authenticated project-scoped requests across configured free-tier AI providers with health-aware model selection, capability filtering, aggregate analytics, and operator-facing health surfaces.
+
+## Done
 
 - OpenAI-compatible Cloudflare Worker gateway at `free-ai-gateway`.
 - Authenticated token-spending `/v1/*` endpoints with public read-only status, model, analytics, dashboard, provider-quota, and budget endpoints.
@@ -28,7 +32,7 @@ Last updated: 2026-06-04
 - Add more provider quota pollers only where providers expose official cheap/free quota status without requiring paid account state.
 - Decide whether `/access/request-key` should exist. Until a real approval and abuse-control policy exists, examples must require an operator-provisioned key.
 
-## Deferred
+## Deferred / Parked
 
 - Public self-serve key issuance.
 - Any stricter gateway rate limiter changes without endpoint-specific evidence.
