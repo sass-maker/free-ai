@@ -181,6 +181,10 @@ async function main() {
       // Walk back to opening `{`
       let start = idIdx;
       while (start > 0 && source[start] !== '{') start--;
+      // Include the line's leading indentation so removal doesn't orphan it
+      let lineStart = start;
+      while (lineStart > 0 && (source[lineStart - 1] === ' ' || source[lineStart - 1] === '\t')) lineStart--;
+      if (lineStart === 0 || source[lineStart - 1] === '\n') start = lineStart;
       // Walk forward matching braces
       let depth = 0;
       let end = start;
