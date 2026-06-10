@@ -421,9 +421,10 @@ describe('default registry vision coverage', () => {
     const models = selected.map((candidate) => candidate.model);
 
     expect(selected.every((candidate) => candidate.reasoning === 'high')).toBe(true);
-    expect(selected.length).toBeGreaterThanOrEqual(5);
-    expect(highTier.length).toBeGreaterThanOrEqual(5);
-    expect(providers.size).toBeGreaterThanOrEqual(4);
+    // Pool shrank 2026-06: dead vision models (gemini-2.5-pro/2.0-*, nvidia) removed from registry
+    expect(selected.length).toBeGreaterThanOrEqual(3);
+    expect(highTier.length).toBeGreaterThanOrEqual(3);
+    expect(providers.size).toBeGreaterThanOrEqual(3);
     expect(models).not.toContain('openai/gpt-5-mini');
     expect(models).not.toContain('openai/o4-mini');
   });
