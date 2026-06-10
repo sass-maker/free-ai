@@ -54,7 +54,7 @@ async function fetchOpenRouterModels() {
   };
   const isTextChat = (m) => {
     const id = String(m.id).toLowerCase();
-    if (/image|audio|tts|search-preview|deep-research|moderation|guard|palmyra|embed|speech|voxtral|lyria|reka-edge/.test(id)) return false;
+    if (/image|audio|tts|search-preview|deep-research|moderation|guard|content-safety|palmyra|embed|speech|voxtral|lyria|reka-edge/.test(id)) return false;
     if (m.architecture && m.architecture.output_modalities) {
       if (!m.architecture.output_modalities.includes('text')) return false;
     }
