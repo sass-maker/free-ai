@@ -4,6 +4,9 @@ import type { ProviderCaller, ProviderEmbeddingCaller } from './types';
 
 class BudgetExhaustedError extends Error {
   readonly code = 'neuron_budget_exhausted';
+  // Classified as usage_retriable (429) so routing falls back to the next
+  // provider and cools this model down instead of aborting the request.
+  readonly status = 429;
   readonly retryAfter: number;
   constructor(message: string, retryAfter: number) {
     super(message);

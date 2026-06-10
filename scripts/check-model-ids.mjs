@@ -174,7 +174,8 @@ async function main() {
 
     // Remove stale — uses brace-counter (regex alone fails on nested `capabilities: {...}`)
     const removeBlockById = (source, id) => {
-      const idRe = new RegExp(`id:\\s*'${id.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}'`);
+      const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const idRe = new RegExp(`id:\\s*'${escapedId}'`);
       const idIdx = source.search(idRe);
       if (idIdx === -1) return source;
       // Walk back to opening `{`

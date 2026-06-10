@@ -1932,6 +1932,13 @@ app.openapi(responsesRoute, async (c) => {
     headers.set('x-api-key', apiKey);
   }
 
+  // Forward the caller IP so the proxied chat request is rate-limited per
+  // client instead of collapsing all callers into one shared "unknown" bucket.
+  const clientIp = c.req.header('cf-connecting-ip');
+  if (clientIp) {
+    headers.set('cf-connecting-ip', clientIp);
+  }
+
   const forceProvider = c.req.header('x-gateway-force-provider');
   if (forceProvider) {
     headers.set('x-gateway-force-provider', forceProvider);

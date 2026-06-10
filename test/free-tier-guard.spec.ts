@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { getModelRegistry, getTtsRegistry, isWorkersAiEnabled } from '../src/config';
 import { callWorkersAi } from '../src/providers/workers-ai';
+import { classifyError, isRetriableFailure } from '../src/router/classify-error';
 import { estimateChatInputChars, estimateNeuronCost, tryDebitNeurons } from '../src/state/neuron-budget';
 import type { Env } from '../src/types';
 
@@ -97,5 +98,24 @@ describe('Workers AI free-tier guard', () => {
     ).rejects.toThrow('Daily Workers AI Neuron budget exhausted');
 
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it('classifies budget exhaustion as retriable so routing falls back to other providers', async () => {
+    const run = vi.fn();
+    const env = makeEnv({ AI: { run }, WORKERS_AI_ENABLED: 'true' });
+
+    const error = await callWorkersAi({
+      env,
+      provider: 'workers_ai',
+      model: '@cf/meta/llama-3.2-1b-instruct',
+      messages: [{ role: 'user', content: 'hello' }],
+      stream: false,
+    }).then(
+      () => null,
+      (err: unknown) => err,
+    );
+
+    expect(error).toBeInstanceOf(Error);
+    expect(isRetriableFailure(classifyError(error))).toBe(true);
   });
 });
