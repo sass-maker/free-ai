@@ -898,16 +898,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
   },
   {
-    id: 'openrouter-nvidia-nemotron-3-5-content-safety-free',
-    provider: 'openrouter',
-    model: 'nvidia/nemotron-3.5-content-safety:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
-  },
-  {
     id: 'openrouter-nvidia-nemotron-3-ultra-550b-a55b-free',
     provider: 'openrouter',
     model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
@@ -1031,7 +1021,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // AUTO-ADDED limits
   // AUTO-ADDED limits
   'openrouter:nex-agi/nex-n2-pro:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:nvidia/nemotron-3.5-content-safety:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'cerebras:zai-glm-4.7': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
