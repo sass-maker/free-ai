@@ -259,16 +259,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     priority: 0.77,
     capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
   },
-  {
-    id: 'cerebras-llama-8b',
-    provider: 'cerebras',
-    model: 'llama3.1-8b',
-    reasoning: 'low',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.72,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
-  },
 
   // ── SambaNova (free tier, needs SAMBANOVA_API_KEY) ─────────────────
   {
@@ -853,16 +843,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
     capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
   },
-  {
-    id: 'cerebras-qwen-3-235b-a22b-instruct-2507',
-    provider: 'cerebras',
-    model: 'qwen-3-235b-a22b-instruct-2507',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
-  },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
   {
@@ -905,6 +885,48 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
     capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
   },
+
+  // ── Auto-added by weekly model check (review priority + capabilities) ──
+  {
+    id: 'openrouter-nex-agi-nex-n2-pro-free',
+    provider: 'openrouter',
+    model: 'nex-agi/nex-n2-pro:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
+  {
+    id: 'openrouter-nvidia-nemotron-3-5-content-safety-free',
+    provider: 'openrouter',
+    model: 'nvidia/nemotron-3.5-content-safety:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
+  {
+    id: 'openrouter-nvidia-nemotron-3-ultra-550b-a55b-free',
+    provider: 'openrouter',
+    model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
+  {
+    id: 'cerebras-zai-glm-4-7',
+    provider: 'cerebras',
+    model: 'zai-glm-4.7',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
 ];
 
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
@@ -936,7 +958,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:meta-llama/llama-3.2-3b-instruct:free': { requestsPerDay: 100 },
   // Cerebras
   'cerebras:gpt-oss-120b': { requestsPerDay: 300 },
-  'cerebras:llama3.1-8b': { requestsPerDay: 1000 },
   // SambaNova (free tier, 10-20 RPM)
   'sambanova:Meta-Llama-3.3-70B-Instruct': { requestsPerDay: 500 },
   'sambanova:DeepSeek-V3-0324': { requestsPerDay: 300 },
@@ -1001,13 +1022,18 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:nvidia/nemotron-nano-9b-v2:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:openai/gpt-oss-20b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'cerebras:qwen-3-235b-a22b-instruct-2507': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+ // AUTO-ADDED — tune
   // AUTO-ADDED limits
   'openrouter:openrouter/owl-alpha': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:poolside/laguna-xs.2:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:poolside/laguna-m.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   // AUTO-ADDED limits
+  // AUTO-ADDED limits
+  'openrouter:nex-agi/nex-n2-pro:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:nvidia/nemotron-3.5-content-safety:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'cerebras:zai-glm-4.7': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
 
 export interface RateLimitConfig {
