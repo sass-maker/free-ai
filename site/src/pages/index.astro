@@ -1,6 +1,6 @@
 ---
-const title = 'sass-maker / AI Gateway';
-const description = 'OpenAI-compatible routing across free-tier AI providers with health-aware selection.';
+const title = 'Free AI Gateway — One API key, 8 free LLM providers';
+const description = 'OpenAI-compatible gateway that routes across Groq, Gemini, Cerebras, SambaNova, NVIDIA, OpenRouter, Voyage, and Workers AI — auto-failover, no credit card, $0 per request.';
 const gw = 'https://free-ai-gateway.sarthakagrawal927.workers.dev';
 const lb = '{';
 const rb = '}';
@@ -12,6 +12,13 @@ const rb = '}';
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={gw} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -179,39 +186,35 @@ const rb = '}';
           </span>
           sass-maker module &mdash; v1.0
         </div>
-        <h1 class="afu d2">One API for <em>every</em><br/>free AI provider</h1>
+        <h1 class="afu d2">Call <em>40+ free</em> LLMs<br/>from one OpenAI key</h1>
         <p class="hero-sub afu d3">
-          Drop-in OpenAI-compatible gateway. Health-aware routing across
-          Workers AI, Groq, Gemini, Cerebras, and more &mdash; one base URL
-          for 30+ models, with automatic failover.
+          Drop-in OpenAI-compatible gateway across 8 free providers &mdash;
+          Groq, Gemini, Cerebras, SambaNova, NVIDIA, OpenRouter, Voyage,
+          and Workers AI. Auto-failover when one provider throttles.
         </p>
         <div class="hero-actions afu d4">
           <a class="btn btn-primary" href="/getting-started">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 3.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/><path d="M5.5 6.5l-2 4 4.5 4.5 4-2-2-2-2.5-2.5z"/></svg>
-            Get Your Free API Key
+            Get my free API key
           </a>
-          <a class="btn btn-ghost" href={`${gw}/health`} target="_blank">
+          <a class="btn btn-ghost" href={`${gw}/v1/routing/status`} target="_blank">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
-            Health status
-          </a>
-          <a class="btn btn-ghost" href="/dashboard">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 13V7l4-4 3 3 5-5"/><path d="M10 2h4v4"/></svg>
-            Dashboard
+            See live provider status
           </a>
         </div>
       </div>
       <div class="stat-bar afu d5">
         <div class="stat">
-          <div class="stat-value"><span class="accent">8+</span></div>
-          <div class="stat-label">Providers</div>
+          <div class="stat-value"><span class="accent">8</span></div>
+          <div class="stat-label">Free Providers</div>
         </div>
         <div class="stat">
-          <div class="stat-value">30<span class="accent">+</span></div>
+          <div class="stat-value">40<span class="accent">+</span></div>
           <div class="stat-label">Chat Models</div>
         </div>
         <div class="stat">
-          <div class="stat-value"><span class="accent">OpenAI</span></div>
-          <div class="stat-label">Compatible API</div>
+          <div class="stat-value"><span class="accent">$0</span></div>
+          <div class="stat-label">Per Request</div>
         </div>
         <div class="stat">
           <div class="stat-value"><span class="accent">SSE</span></div>
@@ -229,7 +232,7 @@ const rb = '}';
         </div>
         <div class="proof-divider"></div>
         <div class="proof-item">
-          <div class="proof-num"><span class="proof-accent">8+</span></div>
+          <div class="proof-num"><span class="proof-accent">8</span></div>
           <div class="proof-label">Provider fallback chain</div>
           <div class="proof-sub">Auto-skips throttled or failed providers</div>
         </div>
@@ -244,7 +247,7 @@ const rb = '}';
 
     <section class="features-section">
       <div class="section-label afu d1">Capabilities</div>
-      <div class="section-title afu d2">Everything you need for resilient AI inference</div>
+      <div class="section-title afu d2">One endpoint. 8 providers. Auto-failover when one breaks.</div>
       <div class="features-grid">
         <div class="feature afu d3">
           <div class="feature-icon blue">
@@ -411,7 +414,7 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
           </svg>
           sass-maker / AI Gateway
         </div>
-        <div class="footer-copy">Open-source AI inference gateway</div>
+        <div class="footer-copy">Stop paying OpenAI for "hello world" prompts.</div>
       </div>
       <div class="footer-links">
         <div class="footer-col">
