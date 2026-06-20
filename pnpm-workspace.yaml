@@ -1,8 +1,11 @@
 packages:
   - "."
+  - "site"
 
 onlyBuiltDependencies:
   - workerd
+  - esbuild
+  - sharp
 
 allowBuilds:
   workerd: true
