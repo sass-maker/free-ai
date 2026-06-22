@@ -1209,6 +1209,28 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     priority: 0.66,
     capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
   },
+
+  // ── Auto-added by weekly model check (review priority + capabilities) ──
+  {
+    id: 'groq-qwen-qwen3-6-27b',
+    provider: 'groq',
+    model: 'qwen/qwen3.6-27b',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
+  {
+    id: 'openrouter-cohere-north-mini-code-free',
+    provider: 'openrouter',
+    model: 'cohere/north-mini-code:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },
 ];
 
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
@@ -1345,6 +1367,9 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'command_code:google/gemini-3.5-flash': { requestsPerDay: 20 },
   'command_code:google/gemini-3.1-flash-lite': { requestsPerDay: 20 },
   'command_code:nvidia/nemotron-3-ultra-550b-a55b': { requestsPerDay: 20 },
+  // AUTO-ADDED limits
+  'groq:qwen/qwen3.6-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:cohere/north-mini-code:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
 
 export interface RateLimitConfig {
