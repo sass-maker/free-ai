@@ -282,6 +282,7 @@ const errorSchema = z
 
 const modelItemSchema = z.object({
   id: z.string(),
+  type: z.enum(['chat', 'embedding']),
   provider: z.string(),
   model: z.string(),
   reasoning: z.string(),
@@ -299,6 +300,10 @@ const modelItemSchema = z.object({
   evaluation_sample_count: z.number(),
   evaluated_at: z.string().nullable(),
   enabled: z.boolean(),
+  dimensions: z.number().optional(),
+  supports_dimensions: z.boolean().optional(),
+  aliases: z.array(z.string()).optional(),
+  priority: z.number().optional(),
 });
 
 const routingStatusSchema = z.object({
@@ -581,6 +586,9 @@ const replayResponseSchema = z
 interface EmbeddingCandidate {
   provider: EmbeddingProvider;
   model: string;
+  dimensions: number;
+  supportsDimensions?: boolean;
+  aliases?: string[];
   priority: number;
 }
 
@@ -588,31 +596,39 @@ const EMBEDDING_CANDIDATES: EmbeddingCandidate[] = [
   {
     provider: 'gemini',
     model: 'gemini-embedding-001',
+    dimensions: 1536,
+    supportsDimensions: true,
+    aliases: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-004'],
     priority: 0.95,
   },
   {
     provider: 'voyage_ai',
     model: 'voyage-3.5-lite',
+    dimensions: 1024,
     priority: 0.91,
   },
   {
     provider: 'voyage_ai',
     model: 'voyage-3-lite',
+    dimensions: 1024,
     priority: 0.88,
   },
   {
     provider: 'workers_ai',
     model: '@cf/baai/bge-large-en-v1.5',
+    dimensions: 1024,
     priority: 0.87,
   },
   {
     provider: 'workers_ai',
     model: '@cf/baai/bge-base-en-v1.5',
+    dimensions: 768,
     priority: 0.85,
   },
   {
     provider: 'workers_ai',
     model: '@cf/baai/bge-small-en-v1.5',
+    dimensions: 384,
     priority: 0.80,
   },
 ];
@@ -826,6 +842,22 @@ function workersAiEmbeddingAvailable(env: Env): boolean {
   }
 
   return Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY);
+}
+
+function embeddingCandidateEnabled(env: Env, candidate: EmbeddingCandidate): boolean {
+  if (candidate.provider === 'gemini') {
+    return Boolean(env.GEMINI_API_KEY);
+  }
+
+  if (candidate.provider === 'workers_ai') {
+    return workersAiEmbeddingAvailable(env);
+  }
+
+  if (candidate.provider === 'voyage_ai') {
+    return Boolean(env.VOYAGE_API_KEY);
+  }
+
+  return false;
 }
 
 function normalizeEmbeddingInput(input: string | string[]): string[] {
@@ -3057,6 +3089,7 @@ async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
         const evaluation = evaluationMap.get(key) ?? evaluationMap.get(candidate.id);
         return {
           id: candidate.id,
+          type: 'chat' as const,
           provider: candidate.provider,
           model: candidate.model,
           reasoning: candidate.reasoning,
@@ -3079,7 +3112,33 @@ async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
     ),
   );
 
-  return { data };
+  const embeddings = EMBEDDING_CANDIDATES.map((candidate) => ({
+    id: candidate.model,
+    type: 'embedding' as const,
+    provider: candidate.provider,
+    model: candidate.model,
+    reasoning: 'none',
+    native_reasoning: false,
+    tool_calling: false,
+    json_mode: false,
+    vision: false,
+    context_window: 0,
+    max_output_tokens: 0,
+    supports_streaming: false,
+    cooldown_until: 0,
+    success_rate: 1,
+    headroom: embeddingCandidateEnabled(env, candidate) ? 1 : 0,
+    evaluation_weight: 1,
+    evaluation_sample_count: 0,
+    evaluated_at: null,
+    enabled: embeddingCandidateEnabled(env, candidate),
+    dimensions: candidate.dimensions,
+    supports_dimensions: candidate.supportsDimensions ?? false,
+    aliases: candidate.aliases ?? [],
+    priority: candidate.priority,
+  }));
+
+  return { data: [...data, ...embeddings] };
 }
 
 app.use('/v1/models', async (c, next) => {

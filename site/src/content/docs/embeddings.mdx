@@ -28,11 +28,11 @@ Unlike the chat endpoint, `model` has no `"auto"` default for embeddings. You mu
 
 | Provider | Example Models | Notes |
 |---|---|---|
-| **Cloudflare Workers AI** | `@cf/baai/bge-base-en-v1.5`, `@cf/baai/bge-large-en-v1.5` | General-purpose English embeddings |
-| **Google Gemini** | `text-embedding-004`, `embedding-001` | Multilingual, supports `dimensions` |
-| **Voyage AI** | `voyage-3`, `voyage-3-lite`, `voyage-code-3`, `voyage-finance-2` | Domain-specialised, high accuracy |
+| **Cloudflare Workers AI** | `@cf/baai/bge-small-en-v1.5`, `@cf/baai/bge-base-en-v1.5`, `@cf/baai/bge-large-en-v1.5` | General-purpose English embeddings |
+| **Google Gemini** | `gemini-embedding-001` (`text-embedding-004`, `text-embedding-3-small`, and `text-embedding-3-large` aliases) | Multilingual, supports requested dimensions |
+| **Voyage AI** | `voyage-3.5-lite`, `voyage-3-lite` | Domain-specialised embeddings |
 
-Use [`GET /v1/models`](/models) to get the full current list with provider metadata.
+Use [`GET /v1/models`](/models) to get the full current list with provider metadata, dimensions, aliases, and `enabled` availability based on configured provider credentials/bindings.
 
 ## Response
 

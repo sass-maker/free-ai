@@ -11,7 +11,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 GET /v1/models
 ```
 
-Returns the list of models currently registered in the gateway in OpenAI-compatible format. Each model entry includes gateway-specific metadata such as provider, reasoning tier, and streaming support.
+Returns the list of models currently registered in the gateway in OpenAI-compatible format. Each model entry includes gateway-specific metadata such as provider, model type, reasoning tier, streaming support, and embedding dimensions where relevant.
 
 ## Response
 
@@ -24,6 +24,7 @@ Returns the list of models currently registered in the gateway in OpenAI-compati
       "object": "model",
       "created": 1714000000,
       "owned_by": "groq",
+      "type": "chat",
       "provider": "groq",
       "reasoning_tier": null,
       "supports_streaming": true
@@ -60,9 +61,12 @@ Returns the list of models currently registered in the gateway in OpenAI-compati
       "object": "model",
       "created": 1714000000,
       "owned_by": "voyage_ai",
+      "type": "embedding",
       "provider": "voyage_ai",
       "reasoning_tier": null,
-      "supports_streaming": false
+      "supports_streaming": false,
+      "dimensions": 1024,
+      "enabled": true
     }
   ]
 }
@@ -76,15 +80,21 @@ Returns the list of models currently registered in the gateway in OpenAI-compati
 | `object` | string | Always `"model"`. |
 | `created` | number | Unix timestamp when the model was registered. |
 | `owned_by` | string | The provider that owns/hosts the model. |
+| `type` | string | `"chat"` or `"embedding"`. |
 | `provider` | string | Gateway provider key. One of `groq`, `gemini`, `workers_ai`, `openrouter`, `cerebras`, `sambanova`, `nvidia`, `voyage_ai`. |
 | `reasoning_tier` | string \| null | Reasoning capability tier (`"low"`, `"medium"`, `"high"`), or `null` for standard models. |
 | `supports_streaming` | boolean | Whether the model supports SSE streaming. |
 | `evaluation_weight` | number | Continuous eval routing multiplier derived from `MODEL_EVALUATIONS_JSON`; `1` means no eval nudge. |
 | `evaluation_sample_count` | number | Number of recent eval samples behind the current weight. |
 | `evaluated_at` | string \| null | Timestamp for the current eval snapshot, when supplied. |
+| `dimensions` | number | Embedding vector dimensions. Present on `type: "embedding"` rows. |
+| `supports_dimensions` | boolean | Whether the embedding model can accept a requested output dimension. Present on embedding rows. |
+| `aliases` | string[] | Compatible model aliases, such as OpenAI embedding names mapped to gateway providers. Present on embedding rows. |
+| `enabled` | boolean | Whether the provider credential/binding needed for the row is currently configured. |
 
 Continuous evals are optional and never bypass hard filters. The router still excludes unhealthy,
 rate-limited, incompatible, or capability-mismatched models before applying eval weights.
+Embedding rows are included so RAG services can choose vector models from the live gateway catalog. Embedding vector spaces are not interchangeable; persist the selected model with each index.
 
 ## Model Capabilities
 
@@ -155,7 +165,7 @@ const models = await client.models.list();
 
 // Filter to only streaming-capable chat models
 const chatModels = models.data.filter(
-  (m) => m.supports_streaming && m.provider !== 'voyage_ai',
+  (m) => m.type === 'chat' && m.supports_streaming,
 );
 
 console.log('Available chat models:');

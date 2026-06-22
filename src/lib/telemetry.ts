@@ -41,6 +41,7 @@ export async function flushPostHog(): Promise<void> {
 
 export interface TraceOptions {
   silent?: boolean;
+  context?: Record<string, unknown>;
 }
 
 export async function trace<T>(

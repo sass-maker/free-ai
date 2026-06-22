@@ -8,6 +8,11 @@ async function fetchRoute(path: string, headers: HeadersInit = {}) {
   return app.fetch(new Request(`https://gateway.test${path}`, { headers }), env, makeCtx());
 }
 
+async function fetchRouteWithEnv(path: string, overrides: Parameters<typeof makeTestEnv>[0], headers: HeadersInit = {}) {
+  const { env } = makeTestEnv(overrides);
+  return app.fetch(new Request(`https://gateway.test${path}`, { headers }), env, makeCtx());
+}
+
 describe('Operator browser UI routes', () => {
   it('keeps /health JSON as the default API response', async () => {
     const res = await fetchRoute('/health');
@@ -42,10 +47,60 @@ describe('Operator browser UI routes', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type') ?? '').toContain('application/json');
-    const body = (await res.json()) as { data: Array<{ id: string; provider: string }> };
+    const body = (await res.json()) as { data: Array<{ id: string; provider: string; type: string }> };
     expect(body.data.length).toBeGreaterThan(0);
     expect(body.data[0]).toHaveProperty('id');
     expect(body.data[0]).toHaveProperty('provider');
+    expect(body.data[0]).toHaveProperty('type');
+  });
+
+  it('includes embedding models with dimensions and provider availability', async () => {
+    const res = await fetchRouteWithEnv('/v1/models', {
+      GEMINI_API_KEY: 'gemini-test-key',
+      VOYAGE_API_KEY: 'voyage-test-key',
+      CLOUDFLARE_ACCOUNT_ID: 'account-id',
+      CLOUDFLARE_WORKERS_AI_API_KEY: 'workers-ai-key',
+      WORKERS_AI_ENABLED: 'true',
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{
+        id: string;
+        type: string;
+        provider: string;
+        dimensions?: number;
+        aliases?: string[];
+        supports_dimensions?: boolean;
+        enabled: boolean;
+      }>;
+    };
+    const embeddings = body.data.filter((model) => model.type === 'embedding');
+
+    expect(embeddings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'gemini-embedding-001',
+          provider: 'gemini',
+          dimensions: 1536,
+          supports_dimensions: true,
+          enabled: true,
+          aliases: expect.arrayContaining(['text-embedding-3-small']),
+        }),
+        expect.objectContaining({
+          id: '@cf/baai/bge-small-en-v1.5',
+          provider: 'workers_ai',
+          dimensions: 384,
+          enabled: true,
+        }),
+        expect.objectContaining({
+          id: 'voyage-3.5-lite',
+          provider: 'voyage_ai',
+          dimensions: 1024,
+          enabled: true,
+        }),
+      ]),
+    );
   });
 
   it.each([['/v1/models'], ['/models']])(

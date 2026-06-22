@@ -192,7 +192,7 @@ Embeddings require an explicit model — `auto` is not supported.
 | `gemini-embedding-001` | Gemini | Default, highest priority |
 | `voyage-3.5-lite` | Voyage AI | Fallback #1 |
 | `voyage-3-lite` | Voyage AI | Fallback #2 |
-| `@cf/baai/bge-large-en-v1.5` | Workers AI | 768-dim, largest |
+| `@cf/baai/bge-large-en-v1.5` | Workers AI | 1024-dim, largest |
 | `@cf/baai/bge-base-en-v1.5` | Workers AI | 768-dim, balanced |
 | `@cf/baai/bge-small-en-v1.5` | Workers AI | 384-dim, fastest |
 
@@ -210,6 +210,13 @@ curl https://free-ai-gateway.sarthakagrawal927.workers.dev/v1/routing/status
 ```
 
 A healthy response lists providers with their `latency`, `headroom`, and `cooldown` status. Any provider with `"degraded": false` is ready to route to. If all providers show `"degraded": true`, check back in a few minutes — the gateway auto-recovers as provider rate limits reset.
+
+Before deploying downstream RAG services that choose embeddings from this
+gateway, prove the live catalog exposes embedding rows:
+
+```bash
+pnpm run smoke:embedding-models -- --model gemini-embedding-001
+```
 
 ### What to expect on the free tier
 

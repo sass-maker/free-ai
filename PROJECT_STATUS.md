@@ -1,5 +1,5 @@
 # free-ai — PROJECT STATUS
-Last updated: 2026-06-20
+Last updated: 2026-06-22
 
 ## Why / What
 
@@ -40,6 +40,7 @@ Last updated: 2026-06-20
 | `pnpm deploy` | Cost audit + docs build + `wrangler deploy` |
 | `pnpm check` | audit + typecheck + vitest |
 | `pnpm audit:cloudflare-costs` | Pre-deploy cost guardrail check |
+| `pnpm run smoke:embedding-models -- --model gemini-embedding-001` | Read-only live `/v1/models` embedding catalog smoke |
 | `pnpm typecheck` / `pnpm test` | TS + Vitest |
 | `pnpm test:e2e` | Playwright (local) |
 | `pnpm test:e2e:live` | Live prod smoke |
@@ -51,6 +52,8 @@ Last updated: 2026-06-20
 ## Timeline
 
 - **2026-06-03** — Live smoke verified: `model: "auto"` → `mistral-small-latest`; `/v1/budget` 2 used / 9,498 remaining; OpenRouter reported exhausted — routing ranks routable providers first.
+- **2026-06-21** — `/v1/models` now includes `type: "embedding"` rows for Gemini, Voyage, and Workers AI embeddings with dimensions, aliases, and `enabled` availability. This is the catalog knowledgebase uses to choose/persist vector embedding models safely. Local validation passes: `pnpm run typecheck`, `pnpm test`, and `pnpm run lint` (warnings only). After deploy, run `pnpm run smoke:embedding-models -- --model gemini-embedding-001` before deploying downstream RAG consumers.
+- **2026-06-22** — Local embedding catalog rollout remains ready: `pnpm run check` passes (cost audit, typecheck, 18 Vitest files / 108 tests) and targeted embedding catalog tests pass. The deployed gateway is still stale for this rollout: `pnpm run smoke:embedding-models -- --json --model gemini-embedding-001` returns status 200 with `embedding_model_count: 0`, so downstream knowledgebase selected-model readiness must wait for a `free-ai` deploy.
 - **Shipped** — Gateway core `/v1/*` routes, health-aware routing, operator dashboards, Astro/Starlight docs site, cost guardrails, benchmark optimizer UI, fleet service binding integration.
 - **Ongoing** — CI `.github/workflows/cloudflare-deploy.yml` auto-deploy on push to `main`.
 
@@ -68,7 +71,7 @@ Last updated: 2026-06-20
 
 - `POST /v1/chat/completions` — OpenAI-compatible chat; `model: "auto"` or explicit; streaming SSE; tools, JSON mode, vision capability filtering.
 - `POST /v1/responses` — OpenAI Responses API compatible (non-streaming; proxies to chat completions).
-- `POST /v1/embeddings` — explicit model required (no auto); 6 models across Gemini/Voyage/Workers AI; aliases for OpenAI embedding names.
+- `POST /v1/embeddings` — explicit model required (no auto); 6 models across Gemini/Voyage/Workers AI; aliases for OpenAI embedding names. `GET /v1/models` exposes the same embedding models with dimensions and provider availability.
 - `POST /v1/images/generations` — image generation routing.
 - `POST /v1/videos/generations` — async video submit; `GET /v1/videos/generations/{id}` poll.
 - `POST /v1/audio/speech` — TTS standalone.
