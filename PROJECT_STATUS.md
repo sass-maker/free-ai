@@ -155,6 +155,7 @@ Last updated: 2026-06-22
 ### Tests
 
 - Vitest with `@cloudflare/vitest-pool-workers`.
+- v8 coverage thresholds gate core logic modules (`src/router/select-model.ts`, `src/router/classify-error.ts`, `src/auth/gateway.ts`, `src/state/client.ts`, `src/providers/quota.ts`): 80% lines/functions/statements, 70% branches. Run via `pnpm test:coverage`; enforced in CI. UI/config/test files are excluded from the gate.
 - Playwright e2e (local + live config `playwright.live.config.ts`).
 - Live smoke (2026-06-03): `model: "auto"` → `mistral-small-latest`; `/v1/budget` 2 used / 9,498 remaining.
 
@@ -172,6 +173,7 @@ Last updated: 2026-06-22
 2. Split `src/index.ts` by low-risk route families: dashboard/status first (`operator-ui-html.ts`), then auth helpers, then provider-specific generation routes.
 3. Add more provider quota pollers only where providers expose official cheap/free quota status (`src/index.ts` `/v1/provider-quotas`).
 4. Decide whether `/access/request-key` should exist — until real approval/abuse policy, examples require operator-provisioned keys.
+5. Bring remaining core modules up to 80/80/80/70 and add them to the coverage gate: `src/router/evaluation-weights.ts`, `src/utils/sse.ts`, `src/utils/request.ts`, `src/routing/ledger.ts`, `src/lib/telemetry.ts`, `src/state/health-do.ts`, `src/state/neuron-budget.ts`.
 
 ### Deferred
 
