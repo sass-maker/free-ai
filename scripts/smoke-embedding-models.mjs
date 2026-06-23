@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-const DEFAULT_BASE_URL = process.env.FREE_AI_BASE_URL || 'https://free-ai-gateway.sarthakagrawal927.workers.dev';
+const DEFAULT_BASE_URL =
+  process.env.FREE_AI_BASE_URL || 'https://free-ai-gateway.sarthakagrawal927.workers.dev';
 const DEFAULT_MODEL = process.env.FREE_AI_SMOKE_EMBEDDING_MODEL || 'gemini-embedding-001';
 
 function usage() {
@@ -64,8 +65,13 @@ export async function runEmbeddingModelCatalogSmoke(options = {}) {
     });
     const payload = await res.json().catch(() => ({}));
     const embeddings = embeddingRows(payload);
-    const selected = embeddings.find((item) => item.id === model || item.aliases?.includes?.(model)) ?? null;
-    const ok = res.ok && embeddings.length > 0 && Boolean(selected) && (!requireEnabled || selected.enabled !== false);
+    const selected =
+      embeddings.find((item) => item.id === model || item.aliases?.includes?.(model)) ?? null;
+    const ok =
+      res.ok &&
+      embeddings.length > 0 &&
+      Boolean(selected) &&
+      (!requireEnabled || selected.enabled !== false);
 
     return {
       ok,
@@ -73,22 +79,26 @@ export async function runEmbeddingModelCatalogSmoke(options = {}) {
       model,
       status: res.status,
       embedding_model_count: embeddings.length,
-      selected: selected ? {
-        id: selected.id,
-        provider: selected.provider ?? null,
-        dimensions: typeof selected.dimensions === 'number' ? selected.dimensions : null,
-        supports_dimensions: selected.supports_dimensions === true,
-        aliases: Array.isArray(selected.aliases) ? selected.aliases : [],
-        priority: typeof selected.priority === 'number' ? selected.priority : null,
-        enabled: selected.enabled !== false,
-      } : null,
-      error: ok ? null : selected && selected.enabled === false && requireEnabled
-        ? 'embedding model is disabled'
-        : embeddings.length === 0
-          ? 'no embedding models returned'
-          : selected
-            ? null
-            : 'required embedding model not found',
+      selected: selected
+        ? {
+            id: selected.id,
+            provider: selected.provider ?? null,
+            dimensions: typeof selected.dimensions === 'number' ? selected.dimensions : null,
+            supports_dimensions: selected.supports_dimensions === true,
+            aliases: Array.isArray(selected.aliases) ? selected.aliases : [],
+            priority: typeof selected.priority === 'number' ? selected.priority : null,
+            enabled: selected.enabled !== false,
+          }
+        : null,
+      error: ok
+        ? null
+        : selected && selected.enabled === false && requireEnabled
+          ? 'embedding model is disabled'
+          : embeddings.length === 0
+            ? 'no embedding models returned'
+            : selected
+              ? null
+              : 'required embedding model not found',
     };
   } catch (error) {
     return {
@@ -107,7 +117,9 @@ function printHuman(report) {
   const selected = report.selected
     ? ` provider=${report.selected.provider} dimensions=${report.selected.dimensions} supports_dimensions=${report.selected.supports_dimensions} enabled=${report.selected.enabled}`
     : '';
-  console.log(`${report.ok ? 'PASS' : 'FAIL'} embedding-model-catalog model=${report.model} count=${report.embedding_model_count}${selected}`);
+  console.log(
+    `${report.ok ? 'PASS' : 'FAIL'} embedding-model-catalog model=${report.model} count=${report.embedding_model_count}${selected}`
+  );
   if (report.error) console.log(`error=${report.error}`);
   console.log(`\n${report.ok ? 'READY' : 'NOT READY'} ${report.base_url}`);
 }

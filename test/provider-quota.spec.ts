@@ -12,7 +12,13 @@ const candidate: ModelCandidate = {
   supportsStreaming: true,
   enabled: true,
   priority: 0.5,
-  capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 8192, maxOutputTokens: 1024 },
+  capabilities: {
+    toolCalling: false,
+    jsonMode: true,
+    vision: false,
+    contextWindow: 8192,
+    maxOutputTokens: 1024,
+  },
 };
 
 describe('provider quota polling', () => {
@@ -32,8 +38,8 @@ describe('provider quota polling', () => {
             usage_daily: 0,
             is_free_tier: true,
           },
-        }),
-      ),
+        })
+      )
     );
 
     const { env } = makeTestEnv({ OPENROUTER_API_KEY: 'or-key' });
@@ -49,7 +55,10 @@ describe('provider quota polling', () => {
   });
 
   it('allows routing when OpenRouter polling fails', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('bad gateway', { status: 502 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('bad gateway', { status: 502 }))
+    );
 
     const { env } = makeTestEnv({ OPENROUTER_API_KEY: 'or-key' });
     const statuses = await getProviderQuotaStatuses(env as Env, ['openrouter']);

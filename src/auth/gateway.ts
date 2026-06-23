@@ -1,7 +1,9 @@
 import type { Env } from '../types';
 
 export function isGatewayAuthConfigured(env: Env): boolean {
-  return Boolean(env.GATEWAY_API_KEY || parseGatewayApiKeyHashes(env.GATEWAY_API_KEY_HASHES).length > 0);
+  return Boolean(
+    env.GATEWAY_API_KEY || parseGatewayApiKeyHashes(env.GATEWAY_API_KEY_HASHES).length > 0
+  );
 }
 
 export async function isValidGatewayApiKey(providedKey: string, env: Env): Promise<boolean> {
@@ -10,7 +12,11 @@ export async function isValidGatewayApiKey(providedKey: string, env: Env): Promi
   }
 
   const legacyKey = env.GATEWAY_API_KEY;
-  if (legacyKey && providedKey.length === legacyKey.length && isConstantTimeEqual(providedKey, legacyKey)) {
+  if (
+    legacyKey &&
+    providedKey.length === legacyKey.length &&
+    isConstantTimeEqual(providedKey, legacyKey)
+  ) {
     return true;
   }
 

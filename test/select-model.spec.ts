@@ -1,12 +1,34 @@
 import { describe, expect, it } from 'vitest';
 
 import { getModelRegistry } from '../src/config';
-import { computeScore, deriveRequiredCapabilities, selectCandidates } from '../src/router/select-model';
+import {
+  computeScore,
+  deriveRequiredCapabilities,
+  selectCandidates,
+} from '../src/router/select-model';
 import type { Env, ModelCandidate, ModelStateSnapshot } from '../src/types';
 
-const defaultCaps = { toolCalling: false, jsonMode: false, vision: false, contextWindow: 8192, maxOutputTokens: 4096 };
-const agentCaps = { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 };
-const visionCaps = { toolCalling: true, jsonMode: true, vision: true, contextWindow: 131072, maxOutputTokens: 8192 };
+const defaultCaps = {
+  toolCalling: false,
+  jsonMode: false,
+  vision: false,
+  contextWindow: 8192,
+  maxOutputTokens: 4096,
+};
+const agentCaps = {
+  toolCalling: true,
+  jsonMode: true,
+  vision: false,
+  contextWindow: 131072,
+  maxOutputTokens: 8192,
+};
+const visionCaps = {
+  toolCalling: true,
+  jsonMode: true,
+  vision: true,
+  contextWindow: 131072,
+  maxOutputTokens: 8192,
+};
 
 const registry: ModelCandidate[] = [
   {
@@ -41,7 +63,12 @@ const registry: ModelCandidate[] = [
   },
 ];
 
-function snapshot(key: string, successRate: number, avgLatencyMs: number, cooldownUntil = 0): ModelStateSnapshot {
+function snapshot(
+  key: string,
+  successRate: number,
+  avgLatencyMs: number,
+  cooldownUntil = 0
+): ModelStateSnapshot {
   return {
     key,
     attempts: 10,
@@ -59,13 +86,28 @@ function snapshot(key: string, successRate: number, avgLatencyMs: number, cooldo
 
 describe('computeScore', () => {
   it('prefers higher success rate over lower latency when close', () => {
-    const highSuccess = computeScore('medium', registry[0], snapshot('groq:model-a', 0.95, 1800), undefined);
-    const lowSuccessFast = computeScore('medium', registry[1], snapshot('gemini:model-b', 0.55, 300), undefined);
+    const highSuccess = computeScore(
+      'medium',
+      registry[0],
+      snapshot('groq:model-a', 0.95, 1800),
+      undefined
+    );
+    const lowSuccessFast = computeScore(
+      'medium',
+      registry[1],
+      snapshot('gemini:model-b', 0.55, 300),
+      undefined
+    );
     expect(highSuccess).toBeGreaterThan(lowSuccessFast);
   });
 
   it('uses continuous evaluation as a routing weight', () => {
-    const baseline = computeScore('medium', registry[0], snapshot('groq:model-a', 0.8, 900), undefined);
+    const baseline = computeScore(
+      'medium',
+      registry[0],
+      snapshot('groq:model-a', 0.8, 900),
+      undefined
+    );
     const evaluated = computeScore('medium', registry[0], snapshot('groq:model-a', 0.8, 900), {
       qualityScore: 1,
       taskSuccessRate: 1,
@@ -100,7 +142,7 @@ describe('selectCandidates', () => {
         min_reasoning_level: 'medium',
         stream: false,
         now,
-      },
+      }
     );
 
     expect(selected[0]?.provider).toBe('gemini');
@@ -137,7 +179,7 @@ describe('selectCandidates', () => {
             },
           ],
         ]),
-      },
+      }
     );
 
     expect(selected[0]?.provider).toBe('gemini');
@@ -174,7 +216,7 @@ describe('selectCandidates', () => {
       {
         stream: false,
         now: Date.now(),
-      },
+      }
     );
 
     expect(selected.map((candidate) => candidate.provider)).toEqual(['groq', 'workers_ai']);
@@ -357,7 +399,13 @@ describe('selectCandidates — context window filtering', () => {
     supportsStreaming: true,
     enabled: true,
     priority: 0.9,
-    capabilities: { toolCalling: false, jsonMode: false, vision: false, contextWindow: 2048, maxOutputTokens: 1024 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: false,
+      vision: false,
+      contextWindow: 2048,
+      maxOutputTokens: 1024,
+    },
   };
 
   const largeCtxModel: ModelCandidate = {
@@ -368,7 +416,13 @@ describe('selectCandidates — context window filtering', () => {
     supportsStreaming: true,
     enabled: true,
     priority: 0.8,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   };
 
   it('filters out models with insufficient context window', () => {
@@ -439,7 +493,7 @@ describe('default registry catalog metadata', () => {
 
     const nativeReasoning = registry.filter((candidate) => candidate.capabilities.nativeReasoning);
     const highTierWithoutNativeReasoning = registry.filter(
-      (candidate) => candidate.reasoning === 'high' && !candidate.capabilities.nativeReasoning,
+      (candidate) => candidate.reasoning === 'high' && !candidate.capabilities.nativeReasoning
     );
 
     expect(nativeReasoning.some((candidate) => candidate.model.includes('gpt-oss'))).toBe(true);

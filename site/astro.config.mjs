@@ -63,7 +63,8 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             name: 'description',
-            content: 'OpenAI-compatible AI gateway routing across free-tier providers with health-aware selection.',
+            content:
+              'OpenAI-compatible AI gateway routing across free-tier providers with health-aware selection.',
           },
         },
       ],

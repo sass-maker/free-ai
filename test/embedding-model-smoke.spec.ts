@@ -17,16 +17,18 @@ describe('embedding model catalog smoke', () => {
       fetchImpl: async (url: RequestInfo | URL) => {
         expect(String(url)).toBe('https://gateway.test/v1/models');
         return jsonResponse({
-          data: [{
-            id: 'gemini-embedding-001',
-            type: 'embedding',
-            provider: 'gemini',
-            dimensions: 1536,
-            supports_dimensions: true,
-            enabled: true,
-            aliases: ['text-embedding-3-small', 'text-embedding-3-large'],
-            priority: 0.95,
-          }],
+          data: [
+            {
+              id: 'gemini-embedding-001',
+              type: 'embedding',
+              provider: 'gemini',
+              dimensions: 1536,
+              supports_dimensions: true,
+              enabled: true,
+              aliases: ['text-embedding-3-small', 'text-embedding-3-large'],
+              priority: 0.95,
+            },
+          ],
         });
       },
     });
@@ -52,14 +54,16 @@ describe('embedding model catalog smoke', () => {
       model: 'text-embedding-3-small',
       fetchImpl: async () =>
         jsonResponse({
-          data: [{
-            id: 'gemini-embedding-001',
-            type: 'embedding',
-            provider: 'gemini',
-            dimensions: 1536,
-            enabled: true,
-            aliases: ['text-embedding-3-small'],
-          }],
+          data: [
+            {
+              id: 'gemini-embedding-001',
+              type: 'embedding',
+              provider: 'gemini',
+              dimensions: 1536,
+              enabled: true,
+              aliases: ['text-embedding-3-small'],
+            },
+          ],
         }),
     });
 
@@ -74,13 +78,15 @@ describe('embedding model catalog smoke', () => {
       model: 'voyage-3.5-lite',
       fetchImpl: async () =>
         jsonResponse({
-          data: [{
-            id: 'voyage-3.5-lite',
-            type: 'embedding',
-            provider: 'voyage_ai',
-            dimensions: 1024,
-            enabled: false,
-          }],
+          data: [
+            {
+              id: 'voyage-3.5-lite',
+              type: 'embedding',
+              provider: 'voyage_ai',
+              dimensions: 1024,
+              enabled: false,
+            },
+          ],
         }),
     });
 

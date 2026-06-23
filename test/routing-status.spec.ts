@@ -50,21 +50,38 @@ describe('GET /v1/routing/status', () => {
       ],
     });
 
-    const res = await app.fetch(new Request('https://gateway.test/v1/routing/status'), healthEnv, makeCtx());
+    const res = await app.fetch(
+      new Request('https://gateway.test/v1/routing/status'),
+      healthEnv,
+      makeCtx()
+    );
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       summary: { configured_models: number; fallback_ready: boolean; top_provider: string | null };
       fallback_order: Array<{ id: string; status: string; reasons: string[] }>;
-      providers: Record<string, { configured_models: number; available_models: number; best_model: string | null }>;
+      providers: Record<
+        string,
+        { configured_models: number; available_models: number; best_model: string | null }
+      >;
     };
 
     expect(body.summary.configured_models).toBeGreaterThan(1);
     expect(body.summary.fallback_ready).toBe(true);
     expect(body.summary.top_provider).toBeTruthy();
-    expect(body.fallback_order.some((item) => item.id === healthyCandidate.id && item.status === 'available')).toBe(true);
-    expect(body.fallback_order.some((item) => item.id === cooldownCandidate.id && item.status === 'cooldown')).toBe(true);
-    expect(body.fallback_order.find((item) => item.id === cooldownCandidate.id)?.reasons).toContain('in_cooldown');
+    expect(
+      body.fallback_order.some(
+        (item) => item.id === healthyCandidate.id && item.status === 'available'
+      )
+    ).toBe(true);
+    expect(
+      body.fallback_order.some(
+        (item) => item.id === cooldownCandidate.id && item.status === 'cooldown'
+      )
+    ).toBe(true);
+    expect(body.fallback_order.find((item) => item.id === cooldownCandidate.id)?.reasons).toContain(
+      'in_cooldown'
+    );
     expect(body.providers[healthyCandidate.provider]?.configured_models).toBeGreaterThan(0);
     expect(body.providers[healthyCandidate.provider]?.best_model).toBeTruthy();
   });
@@ -81,8 +98,8 @@ describe('GET /v1/routing/status', () => {
             usage_daily: 0,
             is_free_tier: true,
           },
-        }),
-      ),
+        })
+      )
     );
 
     const { env } = makeTestEnv({
@@ -90,7 +107,11 @@ describe('GET /v1/routing/status', () => {
       GROQ_API_KEY: 'groq-test-key',
     });
 
-    const res = await app.fetch(new Request('https://gateway.test/v1/routing/status'), env, makeCtx());
+    const res = await app.fetch(
+      new Request('https://gateway.test/v1/routing/status'),
+      env,
+      makeCtx()
+    );
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
@@ -100,11 +121,15 @@ describe('GET /v1/routing/status', () => {
 
     expect(body.summary.top_provider).not.toBe('openrouter');
     expect(body.fallback_order[0]?.provider).not.toBe('openrouter');
-    expect(body.fallback_order.some((item) => item.provider === 'openrouter' && item.status === 'exhausted')).toBe(true);
+    expect(
+      body.fallback_order.some(
+        (item) => item.provider === 'openrouter' && item.status === 'exhausted'
+      )
+    ).toBe(true);
     expect(
       body.fallback_order
         .filter((item) => item.provider === 'openrouter')
-        .every((item) => item.reasons.includes('provider_quota_exhausted')),
+        .every((item) => item.reasons.includes('provider_quota_exhausted'))
     ).toBe(true);
   });
 });

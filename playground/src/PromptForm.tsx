@@ -49,7 +49,9 @@ export function PromptForm({ onSubmit, isSubmitting }: PromptFormProps) {
         className="bg-primary text-on-primary font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2 group transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
       >
         {isSubmitting ? 'Sending...' : 'Generate'}
-        <span className="material-symbols-outlined text-on-primary text-sm group-hover:translate-x-1 transition-transform">auto_fix_high</span>
+        <span className="material-symbols-outlined text-on-primary text-sm group-hover:translate-x-1 transition-transform">
+          auto_fix_high
+        </span>
       </button>
     </form>
   );

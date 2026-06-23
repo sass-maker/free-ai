@@ -16,7 +16,7 @@ interface OpenAICompatibleConfig<TProvider extends TextProvider | EmbeddingProvi
 }
 
 function createClient<TProvider extends TextProvider | EmbeddingProvider>(
-  config: OpenAICompatibleConfig<TProvider>,
+  config: OpenAICompatibleConfig<TProvider>
 ): OpenAI {
   return new OpenAI({
     apiKey: config.apiKey,
@@ -28,7 +28,7 @@ function createClient<TProvider extends TextProvider | EmbeddingProvider>(
 
 export async function runOpenAICompatibleRequest(
   input: ProviderCallInput,
-  config: OpenAICompatibleConfig<TextProvider>,
+  config: OpenAICompatibleConfig<TextProvider>
 ): Promise<ProviderCallResult> {
   const client = createClient(config);
 
@@ -44,7 +44,9 @@ export async function runOpenAICompatibleRequest(
       ...(input.response_format && { response_format: input.response_format }),
     };
 
-    const stream = (await client.chat.completions.create(streamBody as never)) as unknown as AsyncIterable<unknown>;
+    const stream = (await client.chat.completions.create(
+      streamBody as never
+    )) as unknown as AsyncIterable<unknown>;
     return {
       provider: config.provider,
       model: input.model,
@@ -65,7 +67,7 @@ export async function runOpenAICompatibleRequest(
   };
 
   const completion = (await client.chat.completions.create(
-    completionBody as never,
+    completionBody as never
   )) as ProviderCallResult['completion'];
   return {
     provider: config.provider,
@@ -77,7 +79,7 @@ export async function runOpenAICompatibleRequest(
 
 export async function runOpenAICompatibleEmbeddingsRequest(
   input: ProviderEmbeddingInput,
-  config: OpenAICompatibleConfig<EmbeddingProvider>,
+  config: OpenAICompatibleConfig<EmbeddingProvider>
 ): Promise<ProviderEmbeddingResult> {
   const client = createClient(config);
   const response = (await client.embeddings.create({

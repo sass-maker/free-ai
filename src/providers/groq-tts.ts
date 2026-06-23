@@ -29,7 +29,9 @@ export async function callGroqTts(input: GroqTtsInput): Promise<GroqTtsOutput> {
   }
 
   const format = input.response_format ?? 'mp3';
-  const voice = input.voice ? (VOICE_ALIASES[input.voice.toLowerCase()] ?? input.voice) : 'Aaliyah-PlayAI';
+  const voice = input.voice
+    ? (VOICE_ALIASES[input.voice.toLowerCase()] ?? input.voice)
+    : 'Aaliyah-PlayAI';
 
   const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
     method: 'POST',
@@ -53,7 +55,13 @@ export async function callGroqTts(input: GroqTtsInput): Promise<GroqTtsOutput> {
 
   const audio = await response.arrayBuffer();
   const contentType =
-    format === 'mp3' ? 'audio/mpeg' : format === 'wav' ? 'audio/wav' : format === 'opus' ? 'audio/opus' : 'audio/flac';
+    format === 'mp3'
+      ? 'audio/mpeg'
+      : format === 'wav'
+        ? 'audio/wav'
+        : format === 'opus'
+          ? 'audio/opus'
+          : 'audio/flac';
 
   return { audio, contentType };
 }

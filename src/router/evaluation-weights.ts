@@ -21,7 +21,9 @@ export function evaluationWeight(snapshot: ModelEvaluationSnapshot | undefined):
   return 0.8 + blended * 0.4;
 }
 
-export function parseEvaluationWeights(raw: string | undefined): Map<string, ModelEvaluationSnapshot> {
+export function parseEvaluationWeights(
+  raw: string | undefined
+): Map<string, ModelEvaluationSnapshot> {
   if (!raw) {
     return new Map();
   }
@@ -40,11 +42,11 @@ export function parseEvaluationWeights(raw: string | undefined): Map<string, Mod
 
       const row = value as Record<string, unknown>;
       result.set(key, {
-        qualityScore: clamp(finiteOr(row['qualityScore'], 0.5)),
-        taskSuccessRate: clamp(finiteOr(row['taskSuccessRate'], 0.5)),
-        freshness: clamp(finiteOr(row['freshness'], 0.5)),
-        sampleCount: Math.max(0, Math.floor(finiteOr(row['sampleCount'], 0))),
-        evaluatedAt: typeof row['evaluatedAt'] === 'string' ? row['evaluatedAt'] : undefined,
+        qualityScore: clamp(finiteOr(row.qualityScore, 0.5)),
+        taskSuccessRate: clamp(finiteOr(row.taskSuccessRate, 0.5)),
+        freshness: clamp(finiteOr(row.freshness, 0.5)),
+        sampleCount: Math.max(0, Math.floor(finiteOr(row.sampleCount, 0))),
+        evaluatedAt: typeof row.evaluatedAt === 'string' ? row.evaluatedAt : undefined,
       });
     }
 

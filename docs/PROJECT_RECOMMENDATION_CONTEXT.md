@@ -67,19 +67,15 @@ Direct dependencies:
 - `zustand`
 
 Development dependencies:
+- `@biomejs/biome`
 - `@cloudflare/vitest-pool-workers`
 - `@cloudflare/workers-types`
 - `@playwright/test`
-- `@saas-maker/eslint-config`
-- `@saas-maker/prettier-config`
 - `@saas-maker/test-config`
 - `@saas-maker/tsconfig`
 - `@types/react`
 - `@types/react-dom`
-- `eslint`
 - `husky`
-- `prettier`
-- `prettier-plugin-tailwindcss`
 - `typescript`
 - `vite`
 - `vitest`

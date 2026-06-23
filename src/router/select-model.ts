@@ -1,5 +1,15 @@
 import { getTierOrder } from '../config';
-import type { ChatMessage, ContentPart, ModelCandidate, ModelEvaluationSnapshot, ModelStateSnapshot, ReasoningEffort, ReasoningTier, ResponseFormat, Tool } from '../types';
+import type {
+  ChatMessage,
+  ContentPart,
+  ModelCandidate,
+  ModelEvaluationSnapshot,
+  ModelStateSnapshot,
+  ReasoningEffort,
+  ReasoningTier,
+  ResponseFormat,
+  Tool,
+} from '../types';
 import { evaluationWeight } from './evaluation-weights';
 
 export interface RequiredCapabilities {
@@ -33,7 +43,10 @@ function supportsVisionInput(candidate: ModelCandidate): boolean {
 
   // GitHub Models exposes these through chat completions, but the endpoint
   // rejects OpenAI image_url message parts for them.
-  if (candidate.provider === 'github_models' && GITHUB_MODELS_IMAGE_INCOMPATIBLE.has(candidate.model)) {
+  if (
+    candidate.provider === 'github_models' &&
+    GITHUB_MODELS_IMAGE_INCOMPATIBLE.has(candidate.model)
+  ) {
     return false;
   }
 
@@ -102,7 +115,7 @@ export function computeScore(
   requested: ReasoningEffort,
   candidate: ModelCandidate,
   state: ModelStateSnapshot | undefined,
-  evaluation: ModelEvaluationSnapshot | undefined,
+  evaluation: ModelEvaluationSnapshot | undefined
 ): number {
   const successRate = state ? state.successRate : 0.5;
   const headroom = state ? state.headroom : 1;
@@ -148,7 +161,7 @@ function fallbackRank(candidate: ModelCandidate, options: SelectOptions): number
 export function selectCandidates(
   registry: ModelCandidate[],
   stateMap: Map<string, ModelStateSnapshot>,
-  options: SelectOptions,
+  options: SelectOptions
 ): ModelCandidate[] {
   const scoringReasoning: ReasoningEffort = options.min_reasoning_level ?? 'auto';
   const order = getTierOrder(scoringReasoning);
@@ -161,11 +174,18 @@ export function selectCandidates(
       return false;
     }
 
-    if (options.modelOverride && candidate.model !== options.modelOverride && candidate.id !== options.modelOverride) {
+    if (
+      options.modelOverride &&
+      candidate.model !== options.modelOverride &&
+      candidate.id !== options.modelOverride
+    ) {
       return false;
     }
 
-    if (options.min_reasoning_level && reasoningRank[candidate.reasoning] < reasoningRank[options.min_reasoning_level]) {
+    if (
+      options.min_reasoning_level &&
+      reasoningRank[candidate.reasoning] < reasoningRank[options.min_reasoning_level]
+    ) {
       return false;
     }
 

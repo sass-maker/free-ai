@@ -35,7 +35,7 @@ describe('HealthStateDO', () => {
           latencyMs: 1234,
           now: Date.UTC(2026, 4, 27),
         }),
-      }),
+      })
     );
 
     const res = await health.fetch(new Request('https://internal.local/snapshot'));
@@ -67,7 +67,7 @@ describe('HealthStateDO', () => {
             latencyMs,
             now: Date.UTC(2026, 4, 27) + index,
           }),
-        }),
+        })
       );
     }
 

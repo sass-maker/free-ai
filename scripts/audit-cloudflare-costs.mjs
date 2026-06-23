@@ -7,7 +7,9 @@ const DEFAULT_NEURON_BUDGET_PATH = resolve(process.cwd(), 'src/state/neuron-budg
 
 function getBlock(toml, header) {
   const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = toml.match(new RegExp(`^\\[${escaped}\\]\\n([\\s\\S]*?)(?=^\\[|(?![\\s\\S]))`, 'm'));
+  const match = toml.match(
+    new RegExp(`^\\[${escaped}\\]\\n([\\s\\S]*?)(?=^\\[|(?![\\s\\S]))`, 'm')
+  );
   return match?.[1] ?? '';
 }
 
@@ -38,7 +40,7 @@ export function auditCloudflareCostConfig(toml, source = 'wrangler.toml', option
     const sampling = Number(getScalar(observability, 'head_sampling_rate') ?? 0);
     if (enabled === 'true' || sampling > 0) {
       failures.push(
-        'Workers Logs/observability sampling is enabled. Workers Logs can create paid overage on Workers Paid plans; keep it off in committed config.',
+        'Workers Logs/observability sampling is enabled. Workers Logs can create paid overage on Workers Paid plans; keep it off in committed config.'
       );
     }
   }
@@ -47,7 +49,7 @@ export function auditCloudflareCostConfig(toml, source = 'wrangler.toml', option
   const cpuMs = Number(getScalar(limits, 'cpu_ms') ?? 10);
   if (Number.isFinite(cpuMs) && cpuMs > 10) {
     failures.push(
-      `Worker cpu_ms is ${cpuMs}. The free-plan CPU limit is 10ms per invocation, so committed config must not request a higher paid-plan limit.`,
+      `Worker cpu_ms is ${cpuMs}. The free-plan CPU limit is 10ms per invocation, so committed config must not request a higher paid-plan limit.`
     );
   }
 
@@ -58,7 +60,7 @@ export function auditCloudflareCostConfig(toml, source = 'wrangler.toml', option
 
   if (/^\[\[unsafe\.bindings\]\][\s\S]*?type\s*=\s*"ratelimit"/m.test(toml)) {
     failures.push(
-      'An unsafe Rate Limiting binding is configured. The gateway already uses IpRateLimitDO, so remove unused paid/plan-sensitive bindings.',
+      'An unsafe Rate Limiting binding is configured. The gateway already uses IpRateLimitDO, so remove unused paid/plan-sensitive bindings.'
     );
   }
 
@@ -72,15 +74,17 @@ export function auditCloudflareCostConfig(toml, source = 'wrangler.toml', option
       failures.push('Workers AI is enabled, but the DAILY_NEURON_CAP guard could not be read.');
     } else if (neuronCap > 9_500) {
       failures.push(
-        `Workers AI is enabled with DAILY_NEURON_CAP=${neuronCap}. Keep the committed cap at or below 9500 neurons/day.`,
+        `Workers AI is enabled with DAILY_NEURON_CAP=${neuronCap}. Keep the committed cap at or below 9500 neurons/day.`
       );
     } else {
       warnings.push(
-        `Workers AI is enabled as a fallback; NEURON_BUDGET caps committed usage at ${neuronCap} neurons/day.`,
+        `Workers AI is enabled as a fallback; NEURON_BUDGET caps committed usage at ${neuronCap} neurons/day.`
       );
     }
   } else if (hasAiBinding) {
-    warnings.push('Workers AI binding is present; runtime calls must remain gated by WORKERS_AI_ENABLED and NEURON_BUDGET.');
+    warnings.push(
+      'Workers AI binding is present; runtime calls must remain gated by WORKERS_AI_ENABLED and NEURON_BUDGET.'
+    );
   }
 
   return {
@@ -92,7 +96,9 @@ export function auditCloudflareCostConfig(toml, source = 'wrangler.toml', option
 }
 
 function main() {
-  const configPath = process.argv[2] ? resolve(process.cwd(), process.argv[2]) : DEFAULT_WRANGLER_PATH;
+  const configPath = process.argv[2]
+    ? resolve(process.cwd(), process.argv[2])
+    : DEFAULT_WRANGLER_PATH;
   const toml = readFileSync(configPath, 'utf8');
   const result = auditCloudflareCostConfig(toml, configPath);
 

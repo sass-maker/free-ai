@@ -180,7 +180,7 @@ describe('GET /v1/videos/generations/{id} (poll)', () => {
     const kv = new Map<string, string>();
     kv.set(
       'video_job:job-known',
-      JSON.stringify({ provider: 'together', model: 'google/veo-2.0', project_id: 'proj-p' }),
+      JSON.stringify({ provider: 'together', model: 'google/veo-2.0', project_id: 'proj-p' })
     );
 
     const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k', kv });

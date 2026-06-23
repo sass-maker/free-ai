@@ -42,7 +42,11 @@ describe('/v1 authentication', () => {
 
   it('accepts x-api-key as an alternative to Bearer auth', async () => {
     const { env } = makeTestEnv({ GATEWAY_API_KEY: 'secret-key' });
-    const res = await app.fetch(chatRequest({ 'x-api-key': 'secret-key' }, { project_id: '' }), env, makeCtx());
+    const res = await app.fetch(
+      chatRequest({ 'x-api-key': 'secret-key' }, { project_id: '' }),
+      env,
+      makeCtx()
+    );
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.not.toMatchObject({
@@ -53,9 +57,14 @@ describe('/v1 authentication', () => {
   it('accepts additional hashed gateway API keys', async () => {
     const { env } = makeTestEnv({
       GATEWAY_API_KEY: 'legacy-key',
-      GATEWAY_API_KEY_HASHES: 'test-secondary:7964817d0f3d4ec2eb13f3671edd285fbef0a9d3e5d8f2bf426f4540e5954c1e',
+      GATEWAY_API_KEY_HASHES:
+        'test-secondary:7964817d0f3d4ec2eb13f3671edd285fbef0a9d3e5d8f2bf426f4540e5954c1e',
     });
-    const res = await app.fetch(chatRequest({ authorization: 'Bearer secondary-key' }, { project_id: '' }), env, makeCtx());
+    const res = await app.fetch(
+      chatRequest({ authorization: 'Bearer secondary-key' }, { project_id: '' }),
+      env,
+      makeCtx()
+    );
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.not.toMatchObject({
@@ -68,7 +77,11 @@ describe('/v1 authentication', () => {
       GATEWAY_API_KEY: '',
       GATEWAY_API_KEY_HASHES: '7964817d0f3d4ec2eb13f3671edd285fbef0a9d3e5d8f2bf426f4540e5954c1e',
     });
-    const res = await app.fetch(chatRequest({ authorization: 'Bearer secondary-key' }, { project_id: '' }), env, makeCtx());
+    const res = await app.fetch(
+      chatRequest({ authorization: 'Bearer secondary-key' }, { project_id: '' }),
+      env,
+      makeCtx()
+    );
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.not.toMatchObject({
@@ -113,7 +126,7 @@ describe('/v1/analytics authentication', () => {
     const res = await app.fetch(
       analyticsRequest({ authorization: 'Bearer wrong-key' }),
       env,
-      makeCtx(),
+      makeCtx()
     );
 
     expect(res.status).toBe(200);

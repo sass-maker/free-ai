@@ -22,7 +22,11 @@ function cacheKey(provider: TextProvider): string {
   return `provider-quota:${provider}`;
 }
 
-function fallbackStatus(provider: TextProvider, source: ProviderQuotaStatus['source'], reason?: string): ProviderQuotaStatus {
+function fallbackStatus(
+  provider: TextProvider,
+  source: ProviderQuotaStatus['source'],
+  reason?: string
+): ProviderQuotaStatus {
   return {
     provider,
     status: source === 'unconfigured' ? 'unknown' : 'ok',
@@ -32,7 +36,10 @@ function fallbackStatus(provider: TextProvider, source: ProviderQuotaStatus['sou
   };
 }
 
-async function readCachedQuota(env: Env, provider: TextProvider): Promise<ProviderQuotaStatus | null> {
+async function readCachedQuota(
+  env: Env,
+  provider: TextProvider
+): Promise<ProviderQuotaStatus | null> {
   try {
     return await env.HEALTH_KV.get<ProviderQuotaStatus>(cacheKey(provider), 'json');
   } catch {
@@ -68,7 +75,11 @@ async function fetchOpenRouterQuota(env: Env): Promise<ProviderQuotaStatus> {
     });
 
     if (!response.ok) {
-      const status = fallbackStatus('openrouter', 'error', `OpenRouter key status returned ${response.status}`);
+      const status = fallbackStatus(
+        'openrouter',
+        'error',
+        `OpenRouter key status returned ${response.status}`
+      );
       await writeCachedQuota(env, status);
       return status;
     }
@@ -107,7 +118,7 @@ async function fetchOpenRouterQuota(env: Env): Promise<ProviderQuotaStatus> {
 
 export async function getProviderQuotaStatuses(
   env: Env,
-  providers: Iterable<TextProvider>,
+  providers: Iterable<TextProvider>
 ): Promise<Map<TextProvider, ProviderQuotaStatus>> {
   const unique = new Set(providers);
   const entries = await Promise.all(
@@ -116,8 +127,11 @@ export async function getProviderQuotaStatuses(
         return [provider, await fetchOpenRouterQuota(env)];
       }
 
-      return [provider, fallbackStatus(provider, 'not_supported', 'No official cheap quota polling configured')];
-    }),
+      return [
+        provider,
+        fallbackStatus(provider, 'not_supported', 'No official cheap quota polling configured'),
+      ];
+    })
   );
 
   return new Map(entries);
@@ -125,7 +139,7 @@ export async function getProviderQuotaStatuses(
 
 export function providerQuotaAllowsCandidate(
   candidate: ModelCandidate,
-  quotas: Map<TextProvider, ProviderQuotaStatus>,
+  quotas: Map<TextProvider, ProviderQuotaStatus>
 ): boolean {
   return quotas.get(candidate.provider)?.status !== 'exhausted';
 }

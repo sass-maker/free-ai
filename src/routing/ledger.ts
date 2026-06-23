@@ -160,7 +160,7 @@ export function buildChatLedgerRecord(params: {
 }
 
 export function compactQuotaState(
-  quotas: Map<TextProvider, ProviderQuotaStatus>,
+  quotas: Map<TextProvider, ProviderQuotaStatus>
 ): Record<string, { status: string; limit_remaining?: number | null }> {
   return Object.fromEntries(
     [...quotas.entries()].map(([provider, status]) => [
@@ -169,11 +169,14 @@ export function compactQuotaState(
         status: status.status,
         limit_remaining: status.limitRemaining ?? null,
       },
-    ]),
+    ])
   );
 }
 
-export async function recordRoutingLedger(db: D1Database, record: RoutingLedgerRecord): Promise<void> {
+export async function recordRoutingLedger(
+  db: D1Database,
+  record: RoutingLedgerRecord
+): Promise<void> {
   const date = new Date().toISOString().slice(0, 10);
   const projectId = record.project_id ?? '';
   const chosenProvider = record.chosen_provider ?? '';
@@ -195,7 +198,7 @@ export async function recordRoutingLedger(db: D1Database, record: RoutingLedgerR
           request_count = request_count + 1,
           sum_latency_ms = sum_latency_ms + excluded.sum_latency_ms,
           sum_attempts = sum_attempts + excluded.sum_attempts,
-          with_fallback = with_fallback + excluded.with_fallback`,
+          with_fallback = with_fallback + excluded.with_fallback`
       )
       .bind(
         date,
@@ -208,7 +211,7 @@ export async function recordRoutingLedger(db: D1Database, record: RoutingLedgerR
         quotaSignature,
         Math.max(0, Math.round(record.latency_ms)),
         Math.max(1, record.attempts),
-        withFallback,
+        withFallback
       )
       .run();
   } catch {
@@ -216,9 +219,7 @@ export async function recordRoutingLedger(db: D1Database, record: RoutingLedgerR
   }
 }
 
-function buildQuotaSignatureFromState(
-  quotaState: Record<string, { status: string }>,
-): string {
+function buildQuotaSignatureFromState(quotaState: Record<string, { status: string }>): string {
   const exhausted = Object.entries(quotaState)
     .filter(([, value]) => value.status === 'exhausted')
     .map(([provider]) => provider)
@@ -243,7 +244,7 @@ interface RollupRow {
 function rowFromAggregate(
   row: RollupRow,
   key: string,
-  successfulRequests = 0,
+  successfulRequests = 0
 ): RoutingLedgerBreakdownRow {
   const requests = row.request_count;
   const successful = Math.min(requests, successfulRequests);
@@ -263,7 +264,7 @@ function rowFromAggregate(
 
 export async function queryRoutingLedger(
   db: D1Database,
-  options: { days: number; project_id?: string },
+  options: { days: number; project_id?: string }
 ): Promise<RoutingLedgerResponse> {
   const days = options.days;
   const filters = [`date >= date('now', ?)`];
@@ -285,7 +286,7 @@ export async function queryRoutingLedger(
         SUM(sum_latency_ms) as sum_latency_ms,
         SUM(sum_attempts) as sum_attempts,
         SUM(with_fallback) as with_fallback
-      FROM routing_ledger_rollup ${where}`,
+      FROM routing_ledger_rollup ${where}`
     )
     .bind(...params)
     .first<{
@@ -307,7 +308,7 @@ export async function queryRoutingLedger(
         SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests
       FROM routing_ledger_rollup ${where}
       GROUP BY prompt_class
-      ORDER BY request_count DESC`,
+      ORDER BY request_count DESC`
     )
     .bind(...params)
     .all<RollupRow & { prompt_class: string; successful_requests: number }>();
@@ -321,7 +322,7 @@ export async function queryRoutingLedger(
         SUM(with_fallback) as with_fallback
       FROM routing_ledger_rollup ${where}
       GROUP BY outcome
-      ORDER BY request_count DESC`,
+      ORDER BY request_count DESC`
     )
     .bind(...params)
     .all<RollupRow & { outcome: string }>();
@@ -337,10 +338,12 @@ export async function queryRoutingLedger(
       FROM routing_ledger_rollup ${where}
       GROUP BY chosen_provider, chosen_model
       ORDER BY request_count DESC
-      LIMIT 40`,
+      LIMIT 40`
     )
     .bind(...params)
-    .all<RollupRow & { chosen_provider: string; chosen_model: string; successful_requests: number }>();
+    .all<
+      RollupRow & { chosen_provider: string; chosen_model: string; successful_requests: number }
+    >();
 
   const byQuota = await db
     .prepare(
@@ -352,7 +355,7 @@ export async function queryRoutingLedger(
         SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests
       FROM routing_ledger_rollup ${where}
       GROUP BY quota_signature
-      ORDER BY request_count DESC`,
+      ORDER BY request_count DESC`
     )
     .bind(...params)
     .all<RollupRow & { quota_signature: string; successful_requests: number }>();
@@ -368,7 +371,7 @@ export async function queryRoutingLedger(
       FROM routing_ledger_rollup ${where}
       GROUP BY fallback_signature
       ORDER BY request_count DESC
-      LIMIT 20`,
+      LIMIT 20`
     )
     .bind(...params)
     .all<RollupRow & { fallback_signature: string; successful_requests: number }>();
@@ -399,7 +402,7 @@ export async function queryRoutingLedger(
       fallback_rate: totalRequests > 0 ? withFallback / totalRequests : 0,
     },
     by_prompt_class: (byPromptClass.results ?? []).map((row) =>
-      rowFromAggregate(row, row.prompt_class, row.successful_requests),
+      rowFromAggregate(row, row.prompt_class, row.successful_requests)
     ),
     by_outcome: (byOutcome.results ?? []).map((row) => {
       const successful = row.outcome === 'ok' ? row.request_count : 0;
@@ -411,11 +414,11 @@ export async function queryRoutingLedger(
         row.chosen_provider && row.chosen_model
           ? `${row.chosen_provider}:${row.chosen_model}`
           : '(none)',
-        row.successful_requests,
-      ),
+        row.successful_requests
+      )
     ),
     by_quota_signature: (byQuota.results ?? []).map((row) =>
-      rowFromAggregate(row, row.quota_signature, row.successful_requests),
+      rowFromAggregate(row, row.quota_signature, row.successful_requests)
     ),
     top_fallback_signatures: (fallbackSignatures.results ?? []).map((row) => ({
       signature: row.fallback_signature,

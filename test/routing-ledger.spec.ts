@@ -52,7 +52,7 @@ describe('routing ledger helpers', () => {
       derivePromptClass({
         messages: [{ role: 'user', content: 'secret prompt text' }],
         stream: true,
-      }),
+      })
     ).toBe('stream+text');
 
     expect(
@@ -67,7 +67,7 @@ describe('routing ledger helpers', () => {
           },
         ],
         tools: [{ type: 'function', function: { name: 'lookup' } }],
-      }),
+      })
     ).toBe('text+tools+vision');
   });
 
@@ -76,7 +76,7 @@ describe('routing ledger helpers', () => {
       buildFallbackSignature([
         { provider: 'groq', model: 'llama', outcome: 'failed' },
         { provider: 'workers_ai', model: 'mistral', outcome: 'ok', latency_ms: 120 },
-      ]),
+      ])
     ).toBe('groq/llama:failed>workers_ai/mistral:ok');
 
     const quotas = new Map<TextProvider, ProviderQuotaStatus>([
@@ -152,7 +152,9 @@ describe('chat completions routing ledger smoke', () => {
       stream: false,
       completion: {
         id: 'chatcmpl-ledger',
-        choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' },
+        ],
       },
     });
 
@@ -183,7 +185,9 @@ describe('chat completions routing ledger smoke', () => {
     await Promise.all(pending);
     expect(res.status).toBe(200);
 
-    const ledgerInsert = prepare.mock.calls.find(([sql]) => String(sql).includes('routing_ledger_rollup'));
+    const ledgerInsert = prepare.mock.calls.find(([sql]) =>
+      String(sql).includes('routing_ledger_rollup')
+    );
     expect(ledgerInsert).toBeTruthy();
     expect(mocks.groqMock).toHaveBeenCalledOnce();
   });
@@ -229,7 +233,7 @@ describe('recordRoutingLedger', () => {
     const bound = bind.mock.results[0]?.value as { args?: unknown[] };
     expect(JSON.stringify(bound.args ?? [])).not.toContain('super secret prompt');
     expect(bound.args).toEqual(
-      expect.arrayContaining(['text', 'ok', 'groq', 'llama', 'groq/llama:ok', 'all_ok']),
+      expect.arrayContaining(['text', 'ok', 'groq', 'llama', 'groq/llama:ok', 'all_ok'])
     );
   });
 });

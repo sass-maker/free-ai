@@ -54,7 +54,13 @@ export async function callTogetherImages(input: TogetherImageInput): Promise<Tog
   }
 
   const json = (await response.json()) as {
-    data?: Array<{ url?: string; b64_json?: string; base64?: string; image_base64?: string; revised_prompt?: string }>;
+    data?: Array<{
+      url?: string;
+      b64_json?: string;
+      base64?: string;
+      image_base64?: string;
+      revised_prompt?: string;
+    }>;
   };
 
   const data = (json.data ?? []).map((item) => {

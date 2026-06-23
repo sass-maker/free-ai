@@ -4,7 +4,10 @@ export function createRequestId(): string {
   return crypto.randomUUID();
 }
 
-export function normalizeMessages(messages: ChatMessage[] | undefined, prompt: string | undefined): ChatMessage[] {
+export function normalizeMessages(
+  messages: ChatMessage[] | undefined,
+  prompt: string | undefined
+): ChatMessage[] {
   if (messages && messages.length > 0) {
     return messages;
   }

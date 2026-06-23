@@ -34,7 +34,10 @@
     "test:e2e:live:update": "playwright test -c playwright.live.config.ts --update-snapshots",
     "test:all": "pnpm run check && pnpm run test:e2e",
     "prepare": "husky",
-    "lint": "eslint ."
+    "lint": "biome check .",
+    "lint:fix": "biome check . --write --unsafe",
+    "format": "biome format . --write",
+    "format:check": "biome format ."
   },
   "dependencies": {
     "@hono/swagger-ui": "0.6.1",
@@ -52,22 +55,15 @@
     "zustand": "5.0.13"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.1",
     "@cloudflare/vitest-pool-workers": "0.16.3",
     "@cloudflare/workers-types": "4.20260509.1",
-    "@eslint/js": "9.39.4",
     "@playwright/test": "1.59.1",
     "@types/react": "19",
     "@types/react-dom": "19",
     "@vitest/coverage-v8": "^4.1.5",
-    "eslint": "9.39.4",
-    "eslint-plugin-react-hooks": "7.1.1",
-    "eslint-plugin-react-refresh": "0.5.2",
-    "globals": "17.5.0",
     "husky": "9.1.7",
-    "prettier": "3.8.3",
-    "prettier-plugin-tailwindcss": "0.8.0",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.59.0",
     "vite": "8.0.11",
     "vitest": "4.1.5",
     "wrangler": "4.90.0"

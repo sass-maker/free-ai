@@ -48,7 +48,9 @@ describe('POST /v1/debug/replay', () => {
       stream: false,
       completion: {
         id: 'chatcmpl-replay',
-        choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' },
+        ],
       },
     });
 
@@ -70,11 +72,13 @@ describe('POST /v1/debug/replay', () => {
       selected: { provider: 'groq', model: 'llama-3.1-8b-instant' },
       completion: { id: 'chatcmpl-replay' },
     });
-    expect(mocks.groqMock).toHaveBeenCalledWith(expect.objectContaining({
-      provider: 'groq',
-      model: 'llama-3.1-8b-instant',
-      stream: false,
-    }));
+    expect(mocks.groqMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'groq',
+        model: 'llama-3.1-8b-instant',
+        stream: false,
+      })
+    );
   });
 
   it('requires API key auth because replay spends provider quota', async () => {

@@ -74,7 +74,10 @@ export async function callGeminiImages(input: GeminiImageInput): Promise<GeminiI
     predictions?: Array<{ bytesBase64Encoded?: string; mimeType?: string }>;
     candidates?: Array<{
       content?: {
-        parts?: Array<{ inlineData?: { data?: string; mimeType?: string }; inline_data?: { data?: string } }>;
+        parts?: Array<{
+          inlineData?: { data?: string; mimeType?: string };
+          inline_data?: { data?: string };
+        }>;
       };
     }>;
   };

@@ -32,13 +32,34 @@ interface TokenPricing {
 }
 
 const TEXT_TOKEN_PRICING: Record<string, TokenPricing> = {
-  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': { inputNeuronsPerMillion: 26_668, outputNeuronsPerMillion: 204_805 },
-  '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b': { inputNeuronsPerMillion: 45_170, outputNeuronsPerMillion: 443_756 },
-  '@cf/meta/llama-3.1-8b-instruct': { inputNeuronsPerMillion: 25_608, outputNeuronsPerMillion: 75_147 },
-  '@cf/meta/llama-3-8b-instruct': { inputNeuronsPerMillion: 25_608, outputNeuronsPerMillion: 75_147 },
-  '@cf/meta/llama-3.2-3b-instruct': { inputNeuronsPerMillion: 4_625, outputNeuronsPerMillion: 30_475 },
-  '@cf/meta/llama-3.2-1b-instruct': { inputNeuronsPerMillion: 2_457, outputNeuronsPerMillion: 18_252 },
-  '@cf/mistral/mistral-7b-instruct-v0.1': { inputNeuronsPerMillion: 10_000, outputNeuronsPerMillion: 17_300 },
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': {
+    inputNeuronsPerMillion: 26_668,
+    outputNeuronsPerMillion: 204_805,
+  },
+  '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b': {
+    inputNeuronsPerMillion: 45_170,
+    outputNeuronsPerMillion: 443_756,
+  },
+  '@cf/meta/llama-3.1-8b-instruct': {
+    inputNeuronsPerMillion: 25_608,
+    outputNeuronsPerMillion: 75_147,
+  },
+  '@cf/meta/llama-3-8b-instruct': {
+    inputNeuronsPerMillion: 25_608,
+    outputNeuronsPerMillion: 75_147,
+  },
+  '@cf/meta/llama-3.2-3b-instruct': {
+    inputNeuronsPerMillion: 4_625,
+    outputNeuronsPerMillion: 30_475,
+  },
+  '@cf/meta/llama-3.2-1b-instruct': {
+    inputNeuronsPerMillion: 2_457,
+    outputNeuronsPerMillion: 18_252,
+  },
+  '@cf/mistral/mistral-7b-instruct-v0.1': {
+    inputNeuronsPerMillion: 10_000,
+    outputNeuronsPerMillion: 17_300,
+  },
 };
 
 const EMBEDDING_NEURONS_PER_MILLION_TOKENS: Record<string, number> = {
@@ -88,17 +109,23 @@ export function estimateChatInputChars(messages: ChatMessage[]): number {
       return sum + message.content.length;
     }
 
-    return sum + message.content.reduce((partSum, part: ContentPart) => {
-      if (part.type === 'text') {
-        return partSum + part.text.length;
-      }
+    return (
+      sum +
+      message.content.reduce((partSum, part: ContentPart) => {
+        if (part.type === 'text') {
+          return partSum + part.text.length;
+        }
 
-      return partSum + 1_000;
-    }, 0);
+        return partSum + 1_000;
+      }, 0)
+    );
   }, 0);
 }
 
-export function estimateNeuronCost(model: string, params?: { inputChars?: number; outputTokens?: number }): number {
+export function estimateNeuronCost(
+  model: string,
+  params?: { inputChars?: number; outputTokens?: number }
+): number {
   const tokenPricing = TEXT_TOKEN_PRICING[model];
   if (tokenPricing) {
     const inputTokens = params?.inputChars ? estimateTokensFromChars(params.inputChars) : 1;
@@ -193,6 +220,6 @@ export function buildBudgetExhaustedResponse(result: DebitResult): Response {
         'cache-control': 'no-store',
         'retry-after': String(result.retryAfter || 60),
       },
-    },
+    }
   );
 }

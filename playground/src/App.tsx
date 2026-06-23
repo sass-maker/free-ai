@@ -21,8 +21,7 @@ type HistoryState = {
 
 const useHistoryStore = create<HistoryState>((set) => ({
   history: [],
-  push: (entry) =>
-    set((state) => ({ history: [entry, ...state.history].slice(0, 20) })),
+  push: (entry) => set((state) => ({ history: [entry, ...state.history].slice(0, 20) })),
 }));
 
 export function App() {
@@ -80,9 +79,7 @@ export function App() {
   };
 
   const networkError =
-    mutation.isError && mutation.error instanceof Error
-      ? mutation.error.message
-      : null;
+    mutation.isError && mutation.error instanceof Error ? mutation.error.message : null;
 
   const selectedRequest = useMemo(
     () => history.find((entry) => entry.id === selectedRequestId),
@@ -106,12 +103,8 @@ export function App() {
         <div>
           <PromptForm onSubmit={onSubmit} isSubmitting={mutation.isPending} />
           {networkError && (
-            <p
-              role="alert"
-              className="mt-4 p-4 rounded-lg bg-red-500/10 text-red-400"
-            >
-              Couldn't reach the gateway: {networkError}. Check your connection
-              and try again.
+            <p role="alert" className="mt-4 p-4 rounded-lg bg-red-500/10 text-red-400">
+              Couldn't reach the gateway: {networkError}. Check your connection and try again.
             </p>
           )}
           <OutputView output={output} error={networkError} />

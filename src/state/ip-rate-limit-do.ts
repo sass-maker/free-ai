@@ -41,9 +41,11 @@ export class IpRateLimitDO {
 
     const body = (await request.json()) as RateLimitBody;
 
-    const bucket: BucketState = this.bucketCache
-      ?? (await this.ctx.storage.get<BucketState>(STORAGE_KEY))
-      ?? { tokens: body.capacity, lastRefillAt: body.now };
+    const bucket: BucketState = this.bucketCache ??
+      (await this.ctx.storage.get<BucketState>(STORAGE_KEY)) ?? {
+        tokens: body.capacity,
+        lastRefillAt: body.now,
+      };
 
     const elapsedSec = Math.max(0, (body.now - bucket.lastRefillAt) / 1000);
     bucket.tokens = Math.min(body.capacity, bucket.tokens + elapsedSec * body.refillPerSecond);
@@ -64,7 +66,7 @@ export class IpRateLimitDO {
           remaining: Math.floor(bucket.tokens),
           retryAfter,
         },
-        429,
+        429
       );
     }
 

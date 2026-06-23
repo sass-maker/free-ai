@@ -7,14 +7,17 @@ import { vi } from 'vitest';
 // Minimal DurableObject stub. The rate-limit + health routes in the worker
 // call into HEALTH_DO / RATE_LIMIT_DO via `idFromName(...).fetch(path)`.
 // We route by pathname and return JSON shaped like the real implementations.
-function makeDoNamespace(handler: (path: string, init?: RequestInit) => Promise<Response> | Response) {
+function makeDoNamespace(
+  handler: (path: string, init?: RequestInit) => Promise<Response> | Response
+) {
   return {
     idFromName: (_name: string) => ({ name: _name }),
     idFromString: (_s: string) => ({ _s }),
     newUniqueId: () => ({}),
     get: (_id: unknown) => ({
       fetch: async (url: string | Request, init?: RequestInit) => {
-        const path = typeof url === 'string' ? new URL(url).pathname : new URL((url as Request).url).pathname;
+        const path =
+          typeof url === 'string' ? new URL(url).pathname : new URL((url as Request).url).pathname;
         return handler(path, init);
       },
     }),

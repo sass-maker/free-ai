@@ -24,5 +24,5 @@ export interface EmbeddingModelSmokeReport {
 }
 
 export function runEmbeddingModelCatalogSmoke(
-  options?: EmbeddingModelSmokeOptions,
+  options?: EmbeddingModelSmokeOptions
 ): Promise<EmbeddingModelSmokeReport>;

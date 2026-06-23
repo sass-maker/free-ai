@@ -1,4 +1,3 @@
-
 type OutputViewProps = {
   output: string;
   error?: string | null;

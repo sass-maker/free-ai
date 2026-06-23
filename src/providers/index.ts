@@ -21,14 +21,26 @@ import { callNvidia } from './nvidia';
 import { callNvidiaImages, type NvidiaImageInput, type NvidiaImageOutput } from './nvidia-images';
 import { callOpenRouter } from './openrouter';
 import { callPollinations } from './pollinations';
-import { callPollinationsImages, type PollinationsImageInput, type PollinationsImageOutput } from './pollinations-images';
+import {
+  callPollinationsImages,
+  type PollinationsImageInput,
+  type PollinationsImageOutput,
+} from './pollinations-images';
 import { callSambanova } from './sambanova';
-import { callTogetherImages, type TogetherImageInput, type TogetherImageOutput } from './together-images';
+import {
+  callTogetherImages,
+  type TogetherImageInput,
+  type TogetherImageOutput,
+} from './together-images';
 import { pollTogetherVideo, submitTogetherVideo } from './together-videos';
 import type { ProviderCaller, ProviderEmbeddingCaller } from './types';
 import { callVoyageEmbeddings } from './voyage';
 import { callWorkersAi, callWorkersAiEmbeddings } from './workers-ai';
-import { callWorkersAiImages, type WorkersAiImageInput, type WorkersAiImageOutput } from './workers-ai-images';
+import {
+  callWorkersAiImages,
+  type WorkersAiImageInput,
+  type WorkersAiImageOutput,
+} from './workers-ai-images';
 import { callWorkersAiStt } from './workers-ai-stt';
 import { callWorkersAiTts } from './workers-ai-tts';
 
@@ -68,10 +80,16 @@ export interface UnifiedImageOutput {
   data: Array<{ url?: string; b64_json?: string; revised_prompt?: string }>;
 }
 
-export const imageProviderCallers: Record<ImageProvider, (input: UnifiedImageInput) => Promise<UnifiedImageOutput>> = {
-  together: (input) => callTogetherImages(input as TogetherImageInput) as Promise<TogetherImageOutput>,
-  workers_ai: (input) => callWorkersAiImages(input as WorkersAiImageInput) as Promise<WorkersAiImageOutput>,
-  pollinations: (input) => callPollinationsImages(input as PollinationsImageInput) as Promise<PollinationsImageOutput>,
+export const imageProviderCallers: Record<
+  ImageProvider,
+  (input: UnifiedImageInput) => Promise<UnifiedImageOutput>
+> = {
+  together: (input) =>
+    callTogetherImages(input as TogetherImageInput) as Promise<TogetherImageOutput>,
+  workers_ai: (input) =>
+    callWorkersAiImages(input as WorkersAiImageInput) as Promise<WorkersAiImageOutput>,
+  pollinations: (input) =>
+    callPollinationsImages(input as PollinationsImageInput) as Promise<PollinationsImageOutput>,
   gemini: (input) => callGeminiImages(input as GeminiImageInput) as Promise<GeminiImageOutput>,
   nvidia: (input) => callNvidiaImages(input as NvidiaImageInput) as Promise<NvidiaImageOutput>,
 };
@@ -99,11 +117,15 @@ export interface UnifiedTtsOutput {
   contentType: string;
 }
 
-export const ttsProviderCallers: Record<AudioTtsProvider, (input: UnifiedTtsInput) => Promise<UnifiedTtsOutput>> = {
-  workers_ai: (input) => callWorkersAiTts({
-    ...input,
-    response_format: input.response_format === 'flac' ? 'mp3' : input.response_format,
-  }),
+export const ttsProviderCallers: Record<
+  AudioTtsProvider,
+  (input: UnifiedTtsInput) => Promise<UnifiedTtsOutput>
+> = {
+  workers_ai: (input) =>
+    callWorkersAiTts({
+      ...input,
+      response_format: input.response_format === 'flac' ? 'mp3' : input.response_format,
+    }),
   groq: (input) => callGroqTts(input),
 };
 

@@ -1,5 +1,9 @@
 import { isWorkersAiEnabled } from '../config';
-import { estimateChatInputChars, estimateNeuronCost, tryDebitNeurons } from '../state/neuron-budget';
+import {
+  estimateChatInputChars,
+  estimateNeuronCost,
+  tryDebitNeurons,
+} from '../state/neuron-budget';
 import type { ProviderCaller, ProviderEmbeddingCaller } from './types';
 
 class BudgetExhaustedError extends Error {
@@ -40,7 +44,7 @@ async function callWorkersAiRest(
   accountId: string,
   token: string,
   model: string,
-  payload: Record<string, unknown>,
+  payload: Record<string, unknown>
 ): Promise<{ response: string; usage?: Record<string, unknown> }> {
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
   const response = await fetch(url, {
@@ -64,8 +68,10 @@ async function callWorkersAiRest(
 
   if (!response.ok || !json.success) {
     const message =
-      json.errors?.map((item) => item.message).filter(Boolean).join('; ') ||
-      `Workers AI REST error (${response.status})`;
+      json.errors
+        ?.map((item) => item.message)
+        .filter(Boolean)
+        .join('; ') || `Workers AI REST error (${response.status})`;
     throw new Error(message);
   }
 
@@ -79,7 +85,7 @@ async function callWorkersAiRestRaw(
   accountId: string,
   token: string,
   model: string,
-  payload: Record<string, unknown>,
+  payload: Record<string, unknown>
 ): Promise<unknown> {
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
   const response = await fetch(url, {
@@ -100,8 +106,10 @@ async function callWorkersAiRestRaw(
 
   if (!response.ok || !json.success) {
     const message =
-      json.errors?.map((item) => item.message).filter(Boolean).join('; ') ||
-      `Workers AI REST error (${response.status})`;
+      json.errors
+        ?.map((item) => item.message)
+        .filter(Boolean)
+        .join('; ') || `Workers AI REST error (${response.status})`;
     throw new Error(message);
   }
 
@@ -114,7 +122,9 @@ function extractWorkersAiEmbeddingRows(result: unknown): number[][] {
   }
 
   if (Array.isArray(result) && Array.isArray(result[0])) {
-    return result.filter((row): row is number[] => Array.isArray(row) && row.every((item) => typeof item === 'number'));
+    return result.filter(
+      (row): row is number[] => Array.isArray(row) && row.every((item) => typeof item === 'number')
+    );
   }
 
   if (result && typeof result === 'object') {
@@ -122,17 +132,22 @@ function extractWorkersAiEmbeddingRows(result: unknown): number[][] {
 
     if (Array.isArray(record.data) && Array.isArray(record.data[0])) {
       return (record.data as unknown[]).filter(
-        (row): row is number[] => Array.isArray(row) && row.every((item) => typeof item === 'number'),
+        (row): row is number[] =>
+          Array.isArray(row) && row.every((item) => typeof item === 'number')
       );
     }
 
     if (Array.isArray(record.embeddings) && Array.isArray(record.embeddings[0])) {
       return (record.embeddings as unknown[]).filter(
-        (row): row is number[] => Array.isArray(row) && row.every((item) => typeof item === 'number'),
+        (row): row is number[] =>
+          Array.isArray(row) && row.every((item) => typeof item === 'number')
       );
     }
 
-    if (Array.isArray(record.embedding) && record.embedding.every((item) => typeof item === 'number')) {
+    if (
+      Array.isArray(record.embedding) &&
+      record.embedding.every((item) => typeof item === 'number')
+    ) {
       return [record.embedding as number[]];
     }
   }
@@ -155,7 +170,7 @@ export const callWorkersAi: ProviderCaller = async (input) => {
   if (!debit.allowed) {
     throw new BudgetExhaustedError(
       `Daily Workers AI Neuron budget exhausted (${debit.used}/9500)`,
-      debit.retryAfter,
+      debit.retryAfter
     );
   }
 
@@ -173,7 +188,9 @@ export const callWorkersAi: ProviderCaller = async (input) => {
     const token = input.env.CLOUDFLARE_WORKERS_AI_API_KEY;
 
     if (!accountId || !token) {
-      throw new Error('Workers AI is unavailable: missing AI binding and REST fallback credentials');
+      throw new Error(
+        'Workers AI is unavailable: missing AI binding and REST fallback credentials'
+      );
     }
 
     const restResult = await callWorkersAiRest(accountId, token, input.model, {
@@ -213,7 +230,11 @@ export const callWorkersAi: ProviderCaller = async (input) => {
             finish_reason: 'stop',
           },
         ],
-        usage: restResult.usage as { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number },
+        usage: restResult.usage as {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+        },
       },
     };
   }
@@ -271,7 +292,7 @@ export const callWorkersAiEmbeddings: ProviderEmbeddingCaller = async (input) =>
   if (!debit.allowed) {
     throw new BudgetExhaustedError(
       `Daily Workers AI Neuron budget exhausted (${debit.used}/9500)`,
-      debit.retryAfter,
+      debit.retryAfter
     );
   }
 
@@ -286,7 +307,9 @@ export const callWorkersAiEmbeddings: ProviderEmbeddingCaller = async (input) =>
     const accountId = input.env.CLOUDFLARE_ACCOUNT_ID;
     const token = input.env.CLOUDFLARE_WORKERS_AI_API_KEY;
     if (!accountId || !token) {
-      throw new Error('Workers AI embeddings unavailable: missing AI binding and REST fallback credentials');
+      throw new Error(
+        'Workers AI embeddings unavailable: missing AI binding and REST fallback credentials'
+      );
     }
     result = await callWorkersAiRestRaw(accountId, token, input.model, payload);
   }

@@ -36,8 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
         >
           <h1>Something went wrong</h1>
           <p style={{ color: '#334155' }}>
-            The playground hit an unexpected error. Reload the page to try
-            again.
+            The playground hit an unexpected error. Reload the page to try again.
           </p>
           <button type="button" onClick={() => window.location.reload()}>
             Reload

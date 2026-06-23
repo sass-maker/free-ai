@@ -32,10 +32,10 @@ describe('Cloudflare cost audit', () => {
     const result = auditCloudflareCostConfig(
       baseToml.replace(
         /\[\[durable_objects\.bindings\]\]\nname = "NEURON_BUDGET"\nclass_name = "NeuronBudgetDO"\n/,
-        '',
+        ''
       ),
       'test.toml',
-      { dailyNeuronCap: 9_500 },
+      { dailyNeuronCap: 9_500 }
     );
 
     expect(result.ok).toBe(false);
@@ -46,13 +46,19 @@ describe('Cloudflare cost audit', () => {
     const result = auditCloudflareCostConfig(baseToml, 'test.toml', { dailyNeuronCap: 10_000 });
 
     expect(result.ok).toBe(false);
-    expect(result.failures.join('\n')).toContain('Keep the committed cap at or below 9500 neurons/day');
+    expect(result.failures.join('\n')).toContain(
+      'Keep the committed cap at or below 9500 neurons/day'
+    );
   });
 
   it('still fails paid-plan CPU limits', () => {
-    const result = auditCloudflareCostConfig(baseToml.replace('cpu_ms = 10', 'cpu_ms = 50'), 'test.toml', {
-      dailyNeuronCap: 9_500,
-    });
+    const result = auditCloudflareCostConfig(
+      baseToml.replace('cpu_ms = 10', 'cpu_ms = 50'),
+      'test.toml',
+      {
+        dailyNeuronCap: 9_500,
+      }
+    );
 
     expect(result.ok).toBe(false);
     expect(result.failures.join('\n')).toContain('free-plan CPU limit is 10ms');

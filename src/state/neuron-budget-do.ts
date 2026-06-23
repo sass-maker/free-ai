@@ -99,7 +99,7 @@ export class NeuronBudgetDO {
             retryAfter: secondsUntilUtcMidnight(now),
             dayKey: state.dayKey,
           },
-          200,
+          200
         );
       }
 

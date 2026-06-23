@@ -35,7 +35,10 @@ const gatewayApiKey = process.env.GATEWAY_API_KEY ?? dotEnv.GATEWAY_API_KEY;
 const hasGroqKey = Boolean(process.env.GROQ_API_KEY ?? dotEnv.GROQ_API_KEY);
 
 test.describe('Live Playground Snapshot (real API data)', () => {
-  test.skip(!gatewayApiKey || !hasGroqKey, 'Live snapshot requires GATEWAY_API_KEY and GROQ_API_KEY in .env');
+  test.skip(
+    !gatewayApiKey || !hasGroqKey,
+    'Live snapshot requires GATEWAY_API_KEY and GROQ_API_KEY in .env'
+  );
 
   test('captures stable snapshot from real gateway response', async ({ page }) => {
     await page.goto('/playground');

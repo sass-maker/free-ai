@@ -1,4 +1,7 @@
-import { runOpenAICompatibleEmbeddingsRequest, runOpenAICompatibleRequest } from './openai-compatible';
+import {
+  runOpenAICompatibleEmbeddingsRequest,
+  runOpenAICompatibleRequest,
+} from './openai-compatible';
 import type { ProviderCaller, ProviderEmbeddingCaller } from './types';
 
 export const callGemini: ProviderCaller = async (input) => {

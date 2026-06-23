@@ -1,4 +1,9 @@
-import type { AttemptRecord, FailureClass, ModelStateSnapshot, ProviderLimitConfig } from '../types';
+import type {
+  AttemptRecord,
+  FailureClass,
+  ModelStateSnapshot,
+  ProviderLimitConfig,
+} from '../types';
 
 interface HealthDoEnv {
   HEALTH_KV?: KVNamespace;
@@ -67,7 +72,7 @@ function toSnapshot(
   key: string,
   state: ModelState,
   limitConfig: ProviderLimitConfig | undefined,
-  now: number,
+  now: number
 ): ModelStateSnapshot {
   const attempts = state.history.length;
   const successful = state.history.filter((item) => item.success).length;
@@ -80,7 +85,7 @@ function toSnapshot(
 
   const recent = state.history.slice(-SHORT_WINDOW);
   const shortRetriableFailures = recent.filter(
-    (item) => !item.success && item.failureClass === 'usage_retriable',
+    (item) => !item.success && item.failureClass === 'usage_retriable'
   ).length;
 
   const dailyLimit = limitConfig?.requestsPerDay ?? null;
@@ -93,7 +98,10 @@ function toSnapshot(
     avgLatencyMs,
     p90LatencyMs,
     p99LatencyMs,
-    cooldownUntil: Math.max(state.cooldownUntil, now > state.cooldownUntil ? 0 : state.cooldownUntil),
+    cooldownUntil: Math.max(
+      state.cooldownUntil,
+      now > state.cooldownUntil ? 0 : state.cooldownUntil
+    ),
     headroom,
     dailyUsed: state.dailyUsed,
     dailyLimit,
@@ -230,7 +238,7 @@ export class HealthStateDO {
 
   constructor(
     private readonly ctx: DurableObjectState,
-    private readonly env: HealthDoEnv,
+    private readonly env: HealthDoEnv
   ) {}
 
   private async ensureCacheLoaded(): Promise<void> {
@@ -254,7 +262,8 @@ export class HealthStateDO {
 
   private async loadRoundRobinState(): Promise<RoundRobinMap> {
     if (this.roundRobinCache !== null) return this.roundRobinCache;
-    this.roundRobinCache = (await this.ctx.storage.get<RoundRobinMap>(ROUND_ROBIN_STORAGE_KEY)) ?? {};
+    this.roundRobinCache =
+      (await this.ctx.storage.get<RoundRobinMap>(ROUND_ROBIN_STORAGE_KEY)) ?? {};
     return this.roundRobinCache;
   }
 
@@ -340,11 +349,14 @@ export class HealthStateDO {
 
       const recent = modelState.history.slice(-SHORT_WINDOW);
       const shortRetriableFailures = recent.filter(
-        (attempt) => !attempt.success && attempt.failureClass === 'usage_retriable',
+        (attempt) => !attempt.success && attempt.failureClass === 'usage_retriable'
       ).length;
 
       if (!body.success && body.failureClass === 'usage_retriable') {
-        modelState.cooldownUntil = Math.max(modelState.cooldownUntil, body.now + RETRIABLE_BASE_COOLDOWN_MS);
+        modelState.cooldownUntil = Math.max(
+          modelState.cooldownUntil,
+          body.now + RETRIABLE_BASE_COOLDOWN_MS
+        );
       }
 
       if (shortRetriableFailures >= SHORT_FAILURE_THRESHOLD) {
@@ -383,7 +395,7 @@ export class HealthStateDO {
       const now = Date.now();
       await this.ensureCacheLoaded();
       const snapshots = Array.from(this.cache.entries()).map(([key, modelState]) =>
-        toSnapshot(key, modelState, undefined, now),
+        toSnapshot(key, modelState, undefined, now)
       );
       return json({ snapshots });
     }

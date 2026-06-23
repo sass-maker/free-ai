@@ -107,7 +107,7 @@ function parseWorkerName(toml) {
 
 function parseHealthKvIds(toml) {
   const inline = toml.match(
-    /binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*"([^"]+)"\s*,\s*preview_id\s*=\s*"([^"]+)"/m,
+    /binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*"([^"]+)"\s*,\s*preview_id\s*=\s*"([^"]+)"/m
   );
 
   if (inline) {
@@ -118,7 +118,7 @@ function parseHealthKvIds(toml) {
   }
 
   const table = toml.match(
-    /\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"[\s\S]*?id\s*=\s*"([^"]+)"[\s\S]*?preview_id\s*=\s*"([^"]+)"/m,
+    /\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"[\s\S]*?id\s*=\s*"([^"]+)"[\s\S]*?preview_id\s*=\s*"([^"]+)"/m
   );
 
   if (!table) {
@@ -144,17 +144,19 @@ function escapeTomlString(value) {
 }
 
 function withKvIds(toml, id, previewId) {
-  if (/binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*"[^"]+"\s*,\s*preview_id\s*=\s*"[^"]+"/m.test(toml)) {
+  if (
+    /binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*"[^"]+"\s*,\s*preview_id\s*=\s*"[^"]+"/m.test(toml)
+  ) {
     return toml.replace(
       /(binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*")([^"]+)("\s*,\s*preview_id\s*=\s*")([^"]+)(")/m,
-      `$1${id}$3${previewId}$5`,
+      `$1${id}$3${previewId}$5`
     );
   }
 
   if (/\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"/m.test(toml)) {
     return toml.replace(
       /(\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"[\s\S]*?id\s*=\s*")([^"]+)("[\s\S]*?preview_id\s*=\s*")([^"]+)(")/m,
-      `$1${id}$3${previewId}$5`,
+      `$1${id}$3${previewId}$5`
     );
   }
 
@@ -167,21 +169,21 @@ function withVarsFromEnv(toml, env) {
   if (env.PLAYGROUND_ENABLED !== undefined) {
     next = next.replace(
       /^PLAYGROUND_ENABLED\s*=\s*"[^"]*"/m,
-      `PLAYGROUND_ENABLED = "${escapeTomlString(env.PLAYGROUND_ENABLED)}"`,
+      `PLAYGROUND_ENABLED = "${escapeTomlString(env.PLAYGROUND_ENABLED)}"`
     );
   }
 
   if (env.ENABLE_PHASE2 !== undefined) {
     next = next.replace(
       /^ENABLE_PHASE2\s*=\s*"[^"]*"/m,
-      `ENABLE_PHASE2 = "${escapeTomlString(env.ENABLE_PHASE2)}"`,
+      `ENABLE_PHASE2 = "${escapeTomlString(env.ENABLE_PHASE2)}"`
     );
   }
 
   if (env.AUTO_ISSUE_KEYS !== undefined) {
     next = next.replace(
       /^AUTO_ISSUE_KEYS\s*=\s*"[^"]*"/m,
-      `AUTO_ISSUE_KEYS = "${escapeTomlString(env.AUTO_ISSUE_KEYS)}"`,
+      `AUTO_ISSUE_KEYS = "${escapeTomlString(env.AUTO_ISSUE_KEYS)}"`
     );
   }
 
@@ -217,18 +219,20 @@ function listNamespaces() {
   return parseJsonArrayFromMixedOutput(raw);
 }
 
-function listDatabases() {
+function _listDatabases() {
   const raw = run('npx', ['wrangler', 'd1', 'list', '--json'], { capture: true });
   return parseJsonArrayFromMixedOutput(raw);
 }
 
-function parseD1IdFromCreateOutput(output) {
+function _parseD1IdFromCreateOutput(output) {
   const explicit = output.match(/database_id\s*=\s*"([^"]+)"/m);
   if (explicit) {
     return explicit[1];
   }
 
-  const uuid = output.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i);
+  const uuid = output.match(
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
+  );
   if (uuid) {
     return uuid[0];
   }
@@ -253,7 +257,13 @@ function resolveNamespaceIds(workerName, current) {
 
   if (!prod) {
     console.log('Creating KV namespace HEALTH_KV...');
-    const created = runCaptureAllowFailure('npx', ['wrangler', 'kv', 'namespace', 'create', 'HEALTH_KV']);
+    const created = runCaptureAllowFailure('npx', [
+      'wrangler',
+      'kv',
+      'namespace',
+      'create',
+      'HEALTH_KV',
+    ]);
 
     if (created.status === 0) {
       prod = parseIdFromCreateOutput(created.output);
@@ -267,7 +277,14 @@ function resolveNamespaceIds(workerName, current) {
 
   if (!preview) {
     console.log('Creating KV preview namespace HEALTH_KV...');
-    const created = runCaptureAllowFailure('npx', ['wrangler', 'kv', 'namespace', 'create', 'HEALTH_KV', '--preview']);
+    const created = runCaptureAllowFailure('npx', [
+      'wrangler',
+      'kv',
+      'namespace',
+      'create',
+      'HEALTH_KV',
+      '--preview',
+    ]);
 
     if (created.status === 0) {
       preview = parseIdFromCreateOutput(created.output);
@@ -362,7 +379,9 @@ function main() {
   }
 
   console.log('Deploying worker...');
-  const deployOutput = run('npx', ['wrangler', 'deploy', '--config', WRANGLER_GENERATED], { capture: true });
+  const deployOutput = run('npx', ['wrangler', 'deploy', '--config', WRANGLER_GENERATED], {
+    capture: true,
+  });
   process.stdout.write(deployOutput);
 
   const url = extractWorkersDevUrl(deployOutput);

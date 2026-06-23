@@ -94,7 +94,7 @@ export function getBenchmarkOptimizerFixture(): BenchmarkOptimizerResponse {
 }
 
 export function createBenchmarkExperimentEntry(
-  body: BenchmarkExperimentCreateBody,
+  body: BenchmarkExperimentCreateBody
 ): BenchmarkExperimentCreateResponse {
   const now = new Date();
   const entry: BenchmarkExperimentEntry = {

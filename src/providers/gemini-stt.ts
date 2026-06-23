@@ -54,10 +54,7 @@ export async function callGeminiStt(input: GeminiSttInput): Promise<GeminiSttOut
   const body = {
     contents: [
       {
-        parts: [
-          { text: promptText },
-          { inlineData: { mimeType: mime, data: base64 } },
-        ],
+        parts: [{ text: promptText }, { inlineData: { mimeType: mime, data: base64 } }],
       },
     ],
   };
@@ -78,7 +75,11 @@ export async function callGeminiStt(input: GeminiSttInput): Promise<GeminiSttOut
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   };
 
-  const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('').trim() ?? '';
+  const text =
+    json.candidates?.[0]?.content?.parts
+      ?.map((p) => p.text ?? '')
+      .join('')
+      .trim() ?? '';
   if (!text) {
     throw new Error('Gemini STT returned empty text');
   }

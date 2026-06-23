@@ -49,17 +49,27 @@ test.describe('Playground FE (mocked API)', () => {
 
     await page.goto('/');
     await page.getByPlaceholder('API key').fill('test-key');
-    await page.getByPlaceholder('Imagine a spectral conduit bridging two realities...').fill('Explain edge runtimes briefly');
+    await page
+      .getByPlaceholder('Imagine a spectral conduit bridging two realities...')
+      .fill('Explain edge runtimes briefly');
     await page.getByRole('button', { name: 'Generate' }).click();
 
     await expect.poll(() => seenRequest).toBe(true);
 
     // Check output view
-    await expect(page.locator('section').filter({ hasText: 'Output' }).locator('pre')).toContainText('Mocked answer from test');
-    await expect(page.locator('section').filter({ hasText: 'Output' }).locator('pre')).toContainText('"provider":"groq"');
+    await expect(
+      page.locator('section').filter({ hasText: 'Output' }).locator('pre')
+    ).toContainText('Mocked answer from test');
+    await expect(
+      page.locator('section').filter({ hasText: 'Output' }).locator('pre')
+    ).toContainText('"provider":"groq"');
 
     // Check request log
-    const requestLogEntry = page.locator('section').filter({ hasText: 'Request Log' }).locator('div > div').first();
+    const requestLogEntry = page
+      .locator('section')
+      .filter({ hasText: 'Request Log' })
+      .locator('div > div')
+      .first();
     await expect(requestLogEntry).toContainText('Explain edge runtimes briefly');
     await expect(requestLogEntry.getByText('200')).toBeVisible();
     await expect(requestLogEntry.getByText('groq')).toBeVisible();
@@ -81,14 +91,22 @@ test.describe('Playground FE (mocked API)', () => {
 
     await page.goto('/');
     await page.getByPlaceholder('API key').fill('bad-key');
-    await page.getByPlaceholder('Imagine a spectral conduit bridging two realities...').fill('test prompt');
+    await page
+      .getByPlaceholder('Imagine a spectral conduit bridging two realities...')
+      .fill('test prompt');
     await page.getByRole('button', { name: 'Generate' }).click();
 
     // Check output view for error
-    await expect(page.locator('section').filter({ hasText: 'Output' }).locator('pre')).toContainText('Unauthorized');
-    
+    await expect(
+      page.locator('section').filter({ hasText: 'Output' }).locator('pre')
+    ).toContainText('Unauthorized');
+
     // Check request log for error status
-    const requestLogEntry = page.locator('section').filter({ hasText: 'Request Log' }).locator('div > div').first();
+    const requestLogEntry = page
+      .locator('section')
+      .filter({ hasText: 'Request Log' })
+      .locator('div > div')
+      .first();
     await expect(requestLogEntry.getByText('401')).toBeVisible();
   });
 });

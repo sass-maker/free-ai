@@ -13,7 +13,7 @@ export function toSseComment(value: string): Uint8Array {
 }
 
 export function createSseStream(
-  producer: (writer: WritableStreamDefaultWriter<Uint8Array>) => Promise<void>,
+  producer: (writer: WritableStreamDefaultWriter<Uint8Array>) => Promise<void>
 ): ReadableStream<Uint8Array> {
   const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
   const writer = writable.getWriter();

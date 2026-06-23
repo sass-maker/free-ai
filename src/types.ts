@@ -1,4 +1,16 @@
-export type TextProvider = 'workers_ai' | 'groq' | 'gemini' | 'openrouter' | 'cerebras' | 'sambanova' | 'nvidia' | 'github_models' | 'pollinations' | 'cohere' | 'mistral' | 'command_code';
+export type TextProvider =
+  | 'workers_ai'
+  | 'groq'
+  | 'gemini'
+  | 'openrouter'
+  | 'cerebras'
+  | 'sambanova'
+  | 'nvidia'
+  | 'github_models'
+  | 'pollinations'
+  | 'cohere'
+  | 'mistral'
+  | 'command_code';
 
 export type EmbeddingProvider = 'workers_ai' | 'gemini' | 'voyage_ai';
 
@@ -10,7 +22,13 @@ export type AudioTtsProvider = 'workers_ai' | 'groq';
 
 export type AudioSttProvider = 'groq' | 'workers_ai' | 'gemini';
 
-export type Provider = TextProvider | EmbeddingProvider | ImageProvider | VideoProvider | AudioTtsProvider | AudioSttProvider;
+export type Provider =
+  | TextProvider
+  | EmbeddingProvider
+  | ImageProvider
+  | VideoProvider
+  | AudioTtsProvider
+  | AudioSttProvider;
 
 export type ReasoningEffort = 'auto' | 'low' | 'medium' | 'high';
 

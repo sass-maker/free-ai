@@ -120,7 +120,10 @@
       },
       "alternates": [
         { "id": "gemini/gemini-2.0-flash", "reason": "Higher success rate, slightly slower" },
-        { "id": "workers_ai/@cf/meta/llama-3.1-8b-instruct", "reason": "Neuron budget fallback when external quotas tighten" }
+        {
+          "id": "workers_ai/@cf/meta/llama-3.1-8b-instruct",
+          "reason": "Neuron budget fallback when external quotas tighten"
+        }
       ]
     },
     {
@@ -144,7 +147,10 @@
         "reason": "Vision-capable with best success rate in fixture"
       },
       "alternates": [
-        { "id": "workers_ai/@cf/meta/llama-3.1-8b-instruct", "reason": "Not vision-capable — excluded by capability filter" }
+        {
+          "id": "workers_ai/@cf/meta/llama-3.1-8b-instruct",
+          "reason": "Not vision-capable — excluded by capability filter"
+        }
       ]
     },
     {
@@ -156,7 +162,10 @@
         "reason": "json_mode capable with lowest latency among capable models"
       },
       "alternates": [
-        { "id": "gemini/gemini-2.0-flash", "reason": "Slightly higher reliability for long JSON payloads" }
+        {
+          "id": "gemini/gemini-2.0-flash",
+          "reason": "Slightly higher reliability for long JSON payloads"
+        }
       ]
     }
   ],

@@ -38,11 +38,21 @@ export function classifyError(error: unknown): FailureClass {
   const status = getStatus(error);
   const message = getMessage(error).toLowerCase();
 
-  if (message.includes('safety') || message.includes('content filter') || message.includes('refus')) {
+  if (
+    message.includes('safety') ||
+    message.includes('content filter') ||
+    message.includes('refus')
+  ) {
     return 'safety_refusal';
   }
 
-  if (status === 429 || status === 408 || status === 409 || status === 425 || (status !== undefined && status >= 500)) {
+  if (
+    status === 429 ||
+    status === 408 ||
+    status === 409 ||
+    status === 425 ||
+    (status !== undefined && status >= 500)
+  ) {
     return 'usage_retriable';
   }
 
@@ -54,7 +64,12 @@ export function classifyError(error: unknown): FailureClass {
     return 'provider_fatal';
   }
 
-  if (message.includes('rate limit') || message.includes('quota') || message.includes('timeout') || message.includes('overload')) {
+  if (
+    message.includes('rate limit') ||
+    message.includes('quota') ||
+    message.includes('timeout') ||
+    message.includes('overload')
+  ) {
     return 'usage_retriable';
   }
 

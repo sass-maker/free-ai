@@ -83,13 +83,16 @@ export async function pollTogetherVideo(env: Env, jobId: string): Promise<Togeth
     throw new Error('TOGETHER_API_KEY is not configured');
   }
 
-  const response = await fetch(`https://api.together.xyz/v1/videos/generations/${encodeURIComponent(jobId)}`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${env.TOGETHER_API_KEY}`,
-    },
-    signal: AbortSignal.timeout(15_000),
-  });
+  const response = await fetch(
+    `https://api.together.xyz/v1/videos/generations/${encodeURIComponent(jobId)}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${env.TOGETHER_API_KEY}`,
+      },
+      signal: AbortSignal.timeout(15_000),
+    }
+  );
 
   if (!response.ok) {
     const text = await response.text();

@@ -1,4 +1,3 @@
-import { swaggerUI } from '@hono/swagger-ui';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { capture, configurePostHog, flushPostHog, trace } from './lib/telemetry';
 import pLimit from 'p-limit';
@@ -15,7 +14,6 @@ import {
   getTtsRegistry,
   getVideoRegistry,
   hasImageProviderKey,
-  hasSttProviderKey,
   hasTtsProviderKey,
   hasVideoProviderKey,
   isWorkersAiEnabled,
@@ -41,10 +39,22 @@ import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-we
 import { buildChatLedgerRecord, queryRoutingLedger, recordRoutingLedger } from './routing/ledger';
 import type { FallbackHop, RoutingOutcome } from './routing/ledger';
 import { deriveRequiredCapabilities, selectCandidates } from './router/select-model';
-import { consumeIpRateLimit, healthLookup, healthRecord, healthSnapshot, nextRoundRobinOffset, providerStats } from './state/client';
+import {
+  consumeIpRateLimit,
+  healthLookup,
+  healthRecord,
+  healthSnapshot,
+  nextRoundRobinOffset,
+  providerStats,
+} from './state/client';
 import { HealthStateDO } from './state/health-do';
 import { IpRateLimitDO } from './state/ip-rate-limit-do';
-import { buildBudgetExhaustedResponse, estimateNeuronCost, getNeuronUsage, tryDebitNeurons } from './state/neuron-budget';
+import {
+  buildBudgetExhaustedResponse,
+  estimateNeuronCost,
+  getNeuronUsage,
+  tryDebitNeurons,
+} from './state/neuron-budget';
 import { NeuronBudgetDO } from './state/neuron-budget-do';
 import type {
   ChatMessage,
@@ -62,7 +72,12 @@ import type {
   Tool,
   VideoProvider,
 } from './types';
-import { buildCompletionEnvelope, createRequestId, getErrorMessage, normalizeMessages } from './utils/request';
+import {
+  buildCompletionEnvelope,
+  createRequestId,
+  getErrorMessage,
+  normalizeMessages,
+} from './utils/request';
 import { createSseStream, toSseData } from './utils/sse';
 
 const app = new OpenAPIHono<{ Bindings: Env }>();
@@ -110,7 +125,11 @@ const messageSchema = z
   })
   .openapi('ChatMessage');
 
-const projectIdSchema = z.string().min(1).max(64).regex(/^[a-zA-Z0-9._:-]+$/);
+const projectIdSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-zA-Z0-9._:-]+$/);
 
 const toolFunctionSchema = z.object({
   name: z.string(),
@@ -202,7 +221,7 @@ const nonStreamResponseSchema = z
           content: z.string().nullable(),
         }),
         finish_reason: z.string().nullable(),
-      }),
+      })
     ),
     usage: z
       .object({
@@ -233,9 +252,9 @@ const responsesApiResponseSchema = z
             type: z.literal('output_text'),
             text: z.string(),
             annotations: z.array(z.unknown()),
-          }),
+          })
         ),
-      }),
+      })
     ),
     output_text: z.string(),
     usage: z
@@ -257,7 +276,7 @@ const embeddingsResponseSchema = z
         object: z.literal('embedding'),
         index: z.number(),
         embedding: z.array(z.number()),
-      }),
+      })
     ),
     model: z.string(),
     usage: z
@@ -337,7 +356,7 @@ const routingStatusSchema = z.object({
       daily_limit: z.number().nullable(),
       quota_status: z.string().optional(),
       reasons: z.array(z.string()),
-    }),
+    })
   ),
   providers: z.record(
     z.string(),
@@ -348,7 +367,7 @@ const routingStatusSchema = z.object({
       exhausted_models: z.number(),
       degraded_models: z.number(),
       best_model: z.string().nullable(),
-    }),
+    })
   ),
 });
 
@@ -406,7 +425,7 @@ const healthSchema = z.object({
       headroom: z.number(),
       daily_used: z.number(),
       daily_limit: z.number().nullable(),
-    }),
+    })
   ),
 });
 
@@ -430,7 +449,7 @@ const analyticsResponseSchema = z.object({
       requests: z.number(),
       successful: z.number(),
       failed: z.number(),
-    }),
+    })
   ),
 });
 
@@ -474,7 +493,7 @@ const routingLedgerResponseSchema = z.object({
       success_rate: z.number(),
       avg_latency_ms: z.number(),
       fallback_rate: z.number(),
-    }),
+    })
   ),
 });
 
@@ -497,7 +516,7 @@ const benchmarkOptimizerSchema = z.object({
       label: z.string(),
       prompt_class: z.string(),
       description: z.string(),
-    }),
+    })
   ),
   candidates: z.array(
     z.object({
@@ -513,7 +532,7 @@ const benchmarkOptimizerSchema = z.object({
       status: z.enum(['available', 'degraded', 'cooldown', 'exhausted']),
       headroom: z.number(),
       score: z.number(),
-    }),
+    })
   ),
   routes_by_workload: z.array(
     z.object({
@@ -525,7 +544,7 @@ const benchmarkOptimizerSchema = z.object({
         reason: z.string(),
       }),
       alternates: z.array(z.object({ id: z.string(), reason: z.string() })),
-    }),
+    })
   ),
   experiments: z.array(
     z.object({
@@ -541,7 +560,7 @@ const benchmarkOptimizerSchema = z.object({
         estimated_cost_usd_per_1k_req: z.number(),
         fallback_rate: z.number(),
       }),
-    }),
+    })
   ),
 });
 
@@ -629,7 +648,7 @@ const EMBEDDING_CANDIDATES: EmbeddingCandidate[] = [
     provider: 'workers_ai',
     model: '@cf/baai/bge-small-en-v1.5',
     dimensions: 384,
-    priority: 0.80,
+    priority: 0.8,
   },
 ];
 
@@ -715,15 +734,21 @@ app.use('/v1/*', async (c, next) => {
         },
       });
       return c.json(
-        { error: { message: 'Gateway API key is not configured', type: 'configuration_error', code: 'auth_not_configured' } },
-        503,
+        {
+          error: {
+            message: 'Gateway API key is not configured',
+            type: 'configuration_error',
+            code: 'auth_not_configured',
+          },
+        },
+        503
       );
     }
 
     const authHeader = c.req.header('authorization') ?? '';
     const providedKey = authHeader.startsWith('Bearer ')
       ? authHeader.slice(7)
-      : c.req.header('x-api-key') ?? '';
+      : (c.req.header('x-api-key') ?? '');
 
     const isValidKey = await isValidGatewayApiKey(providedKey, c.env);
     if (!isValidKey) {
@@ -739,8 +764,10 @@ app.use('/v1/*', async (c, next) => {
         },
       });
       return c.json(
-        { error: { message: 'Unauthorized', type: 'authentication_error', code: 'invalid_api_key' } },
-        401,
+        {
+          error: { message: 'Unauthorized', type: 'authentication_error', code: 'invalid_api_key' },
+        },
+        401
       );
     }
   }
@@ -769,7 +796,7 @@ app.use('/v1/*', async (c, next) => {
           type: 'rate_limit_error',
         },
       },
-      429,
+      429
     );
   }
 
@@ -777,7 +804,9 @@ app.use('/v1/*', async (c, next) => {
   await next();
 });
 
-function getForcedTextProvider(c: { req: { header: (key: string) => string | undefined } }): TextProvider | undefined {
+function getForcedTextProvider(c: {
+  req: { header: (key: string) => string | undefined };
+}): TextProvider | undefined {
   const value = c.req.header('x-gateway-force-provider');
   if (!value) {
     return undefined;
@@ -790,9 +819,9 @@ function getForcedTextProvider(c: { req: { header: (key: string) => string | und
   return undefined;
 }
 
-function getForcedEmbeddingProvider(
-  c: { req: { header: (key: string) => string | undefined } },
-): EmbeddingProvider | undefined {
+function getForcedEmbeddingProvider(c: {
+  req: { header: (key: string) => string | undefined };
+}): EmbeddingProvider | undefined {
   const value = c.req.header('x-gateway-force-provider');
   if (!value) {
     return undefined;
@@ -805,10 +834,14 @@ function getForcedEmbeddingProvider(
   return undefined;
 }
 
-function sortFallbackLast<T extends { provider: Provider; priority: number }>(items: T[], useFallbackOrder: boolean): T[] {
+function sortFallbackLast<T extends { provider: Provider; priority: number }>(
+  items: T[],
+  useFallbackOrder: boolean
+): T[] {
   return [...items].sort((a, b) => {
     if (useFallbackOrder) {
-      const fallbackDiff = Number(a.provider === 'workers_ai') - Number(b.provider === 'workers_ai');
+      const fallbackDiff =
+        Number(a.provider === 'workers_ai') - Number(b.provider === 'workers_ai');
       if (fallbackDiff !== 0) {
         return fallbackDiff;
       }
@@ -818,11 +851,16 @@ function sortFallbackLast<T extends { provider: Provider; priority: number }>(it
   });
 }
 
-async function getRoutingQuotaStatuses(env: Env, registry: ModelCandidate[]): Promise<Map<TextProvider, ProviderQuotaStatus>> {
+async function getRoutingQuotaStatuses(
+  env: Env,
+  registry: ModelCandidate[]
+): Promise<Map<TextProvider, ProviderQuotaStatus>> {
   const providers = new Set(
     registry
       .map((candidate) => candidate.provider)
-      .filter((provider): provider is TextProvider => (QUOTA_POLLING_PROVIDERS as readonly string[]).includes(provider)),
+      .filter((provider): provider is TextProvider =>
+        (QUOTA_POLLING_PROVIDERS as readonly string[]).includes(provider)
+      )
   );
 
   if (providers.size === 0) {
@@ -879,7 +917,7 @@ function resolveEmbeddingCandidates(
     requestedModel: string;
     forcedProvider?: EmbeddingProvider;
     forcedModel?: string;
-  },
+  }
 ): EmbeddingCandidate[] {
   const requestedModel = params.requestedModel.trim();
   const alias = EMBEDDING_MODEL_ALIASES[requestedModel];
@@ -943,13 +981,17 @@ function buildChatRoundRobinKey(params: {
   stream: boolean;
   candidates: ModelCandidate[];
 }): string {
-  const providerSet = params.candidates.map((candidate) => getModelKey(candidate.provider, candidate.model)).join(',');
+  const providerSet = params.candidates
+    .map((candidate) => getModelKey(candidate.provider, candidate.model))
+    .join(',');
   return `chat:${params.endpoint}:${params.min_reasoning_level ?? 'auto'}:${params.stream ? 'stream' : 'nonstream'}:${providerSet}`;
 }
 
 function isSafetyRefusal(completion: Record<string, unknown> | undefined): boolean {
   const choice = Array.isArray(completion?.choices)
-    ? (completion.choices[0] as { finish_reason?: string; message?: { content?: string | null } } | undefined)
+    ? (completion.choices[0] as
+        | { finish_reason?: string; message?: { content?: string | null } }
+        | undefined)
     : undefined;
 
   if (!choice) {
@@ -987,7 +1029,10 @@ function buildGatewayMeta(params: {
   };
 }
 
-function resolveProjectId(headerValue: string | undefined, bodyValue: string | undefined): string | undefined {
+function resolveProjectId(
+  headerValue: string | undefined,
+  bodyValue: string | undefined
+): string | undefined {
   const candidate = (headerValue ?? bodyValue)?.trim();
   if (!candidate) {
     return undefined;
@@ -1010,14 +1055,9 @@ function scheduleChatRoutingLedger(
     outcome: RoutingOutcome;
     requestStartedAt: number;
     errorClass?: string;
-  },
+  }
 ) {
-  ctx.waitUntil(
-    recordRoutingLedger(
-      db,
-      buildChatLedgerRecord(params),
-    ),
-  );
+  ctx.waitUntil(recordRoutingLedger(db, buildChatLedgerRecord(params)));
 }
 
 async function recordAnalytics(params: {
@@ -1033,16 +1073,19 @@ async function recordAnalytics(params: {
     const date = new Date().toISOString().slice(0, 10);
     const isOk = params.outcome === 'ok' ? 1 : 0;
     const isError = params.outcome === 'error' ? 1 : 0;
-    
-    await params.db.prepare(`
+
+    await params.db
+      .prepare(`
       INSERT INTO project_analytics (project_id, date, provider, model, total_requests, successful_requests, failed_requests)
       VALUES (?, ?, ?, ?, 1, ?, ?)
       ON CONFLICT(project_id, date, provider, model) DO UPDATE SET
         total_requests = total_requests + 1,
         successful_requests = successful_requests + excluded.successful_requests,
         failed_requests = failed_requests + excluded.failed_requests
-    `).bind(params.projectId, date, params.provider, params.model, isOk, isError).run();
-  } catch (err) {
+    `)
+      .bind(params.projectId, date, params.provider, params.model, isOk, isError)
+      .run();
+  } catch (_err) {
     // Ignore analytics errors
   }
 }
@@ -1081,15 +1124,20 @@ function responsesInputToPrompt(input: unknown): string {
   return gatherTextFragments(input).join('\n').trim();
 }
 
-function chatCompletionToResponsesObject(completion: Record<string, unknown>): Record<string, unknown> {
-  const chatId = typeof completion.id === 'string' ? completion.id : `chatcmpl-${createRequestId()}`;
-  const responseId = chatId.startsWith('resp_') ? chatId : `resp_${chatId.replace(/^chatcmpl-?/, '')}`;
+function chatCompletionToResponsesObject(
+  completion: Record<string, unknown>
+): Record<string, unknown> {
+  const chatId =
+    typeof completion.id === 'string' ? completion.id : `chatcmpl-${createRequestId()}`;
+  const responseId = chatId.startsWith('resp_')
+    ? chatId
+    : `resp_${chatId.replace(/^chatcmpl-?/, '')}`;
   const createdAt =
     typeof completion.created === 'number' ? completion.created : Math.floor(Date.now() / 1000);
   const model = typeof completion.model === 'string' ? completion.model : 'auto';
 
   const content = String(
-    (completion.choices as Array<{ message?: { content?: unknown } }>)?.[0]?.message?.content ?? '',
+    (completion.choices as Array<{ message?: { content?: unknown } }>)?.[0]?.message?.content ?? ''
   );
 
   const usage = completion.usage as
@@ -1176,10 +1224,11 @@ app.openapi(chatRoute, async (c) => {
   const requestStartedAt = Date.now();
   const body = c.req.valid('json');
   const requestId = createRequestId();
-  const endpoint = c.req.header('x-gateway-source-endpoint') === 'responses' ? 'responses' : 'chat.completions';
+  const endpoint =
+    c.req.header('x-gateway-source-endpoint') === 'responses' ? 'responses' : 'chat.completions';
   const normalizedMessages = normalizeMessages(body.messages, body.prompt);
-  const messageCount = normalizedMessages.length;
-  const promptChars = normalizedMessages.reduce((sum, message) => {
+  const _messageCount = normalizedMessages.length;
+  const _promptChars = normalizedMessages.reduce((sum, message) => {
     if (typeof message.content === 'string') {
       return sum + message.content.length;
     }
@@ -1197,7 +1246,7 @@ app.openapi(chatRoute, async (c) => {
           code: 'invalid_project_id',
         },
       },
-      400,
+      400
     );
   }
 
@@ -1212,7 +1261,7 @@ app.openapi(chatRoute, async (c) => {
           code: 'missing_input',
         },
       },
-      400,
+      400
     );
   }
 
@@ -1223,7 +1272,9 @@ app.openapi(chatRoute, async (c) => {
     temperature: body.temperature,
     max_tokens: body.max_tokens,
     reasoning_effort: body.reasoning_effort,
-    min_reasoning_level: body.min_reasoning_level ?? (body.reasoning_effort === 'auto' ? undefined : body.reasoning_effort),
+    min_reasoning_level:
+      body.min_reasoning_level ??
+      (body.reasoning_effort === 'auto' ? undefined : body.reasoning_effort),
     tools: body.tools as Tool[] | undefined,
     tool_choice: body.tool_choice as NormalizedChatRequest['tool_choice'],
     response_format: body.response_format as ResponseFormat | undefined,
@@ -1245,7 +1296,7 @@ app.openapi(chatRoute, async (c) => {
           type: 'configuration_error',
         },
       },
-      503,
+      503
     );
   }
 
@@ -1272,7 +1323,7 @@ app.openapi(chatRoute, async (c) => {
           code: 'provider_quota_exhausted',
         },
       },
-      503,
+      503
     );
   }
 
@@ -1294,18 +1345,28 @@ app.openapi(chatRoute, async (c) => {
     messages: normalized.messages,
   });
 
-  let selected = await trace('ai:route', () => Promise.resolve(selectCandidates(registry, stateMap, {
-    min_reasoning_level: normalized.min_reasoning_level,
-    stream: normalized.stream,
-    now,
-    modelOverride: forcedModel,
-    requiredCapabilities,
-    evaluationMap,
-  })), { context: { project: projectId, model: normalized.model } });
+  let selected = await trace(
+    'ai:route',
+    () =>
+      Promise.resolve(
+        selectCandidates(registry, stateMap, {
+          min_reasoning_level: normalized.min_reasoning_level,
+          stream: normalized.stream,
+          now,
+          modelOverride: forcedModel,
+          requiredCapabilities,
+          evaluationMap,
+        })
+      ),
+    { context: { project: projectId, model: normalized.model } }
+  );
 
   const requestedModel = normalized.model.trim().toLowerCase();
   const shouldRoundRobin =
-    !forcedProvider && !forcedModel && selected.length > 1 && (requestedModel === '' || requestedModel === 'auto');
+    !forcedProvider &&
+    !forcedModel &&
+    selected.length > 1 &&
+    (requestedModel === '' || requestedModel === 'auto');
 
   if (shouldRoundRobin) {
     const roundRobinKey = buildChatRoundRobinKey({
@@ -1350,7 +1411,7 @@ app.openapi(chatRoute, async (c) => {
           code: 'no_candidate',
         },
       },
-      503,
+      503
     );
   }
 
@@ -1421,7 +1482,10 @@ app.openapi(chatRoute, async (c) => {
           const chunkDecoder = new TextDecoder();
           let workersSseBuffer = '';
 
-          const writeWorkersChunk = async (writer: WritableStreamDefaultWriter<Uint8Array>, token: string) => {
+          const writeWorkersChunk = async (
+            writer: WritableStreamDefaultWriter<Uint8Array>,
+            token: string
+          ) => {
             await writer.write(
               toSseData({
                 id: `chatcmpl-${requestId}`,
@@ -1435,13 +1499,13 @@ app.openapi(chatRoute, async (c) => {
                     finish_reason: null,
                   },
                 ],
-              }),
+              })
             );
           };
 
           const processWorkersSseText = async (
             writer: WritableStreamDefaultWriter<Uint8Array>,
-            text: string,
+            text: string
           ) => {
             workersSseBuffer += text;
 
@@ -1523,7 +1587,7 @@ app.openapi(chatRoute, async (c) => {
                         ? String((chunk as { delta?: { content?: unknown } }).delta?.content ?? '')
                         : chunk && typeof chunk === 'object' && 'text' in chunk
                           ? String((chunk as { text?: unknown }).text ?? '')
-                      : '';
+                          : '';
 
                 if (!token) {
                   continue;
@@ -1557,15 +1621,18 @@ app.openapi(chatRoute, async (c) => {
         }
 
         finalResponse = {
-          ...(completion.id ? completion : buildCompletionEnvelope({
-            model: candidate.model,
-            content:
-              String(
-                (completion.choices as Array<{ message?: { content?: unknown } }>)?.[0]?.message?.content ?? '',
-              ) || '',
-            requestId,
-            gatewayMeta: chosenMeta,
-          })),
+          ...(completion.id
+            ? completion
+            : buildCompletionEnvelope({
+                model: candidate.model,
+                content:
+                  String(
+                    (completion.choices as Array<{ message?: { content?: unknown } }>)?.[0]?.message
+                      ?.content ?? ''
+                  ) || '',
+                requestId,
+                gatewayMeta: chosenMeta,
+              })),
           x_gateway: chosenMeta,
         };
       } catch (error) {
@@ -1599,7 +1666,7 @@ app.openapi(chatRoute, async (c) => {
       retries: 1,
       minTimeout: 10,
       factor: 1,
-    },
+    }
   ).catch(() => undefined);
 
   if (streamResponse) {
@@ -1652,7 +1719,12 @@ app.openapi(chatRoute, async (c) => {
     return c.json(finalResponse as never, 200);
   }
 
-  const status = lastErrorClass === 'input_nonretriable' ? 400 : lastErrorClass === 'usage_retriable' ? 429 : 502;
+  const status =
+    lastErrorClass === 'input_nonretriable'
+      ? 400
+      : lastErrorClass === 'usage_retriable'
+        ? 429
+        : 502;
 
   c.executionCtx.waitUntil(
     recordAnalytics({
@@ -1683,7 +1755,7 @@ app.openapi(chatRoute, async (c) => {
         type: lastErrorClass,
       },
     },
-    status,
+    status
   );
 });
 
@@ -1741,7 +1813,7 @@ app.openapi(replayRoute, async (c) => {
           code: 'missing_provider',
         },
       },
-      400,
+      400
     );
   }
 
@@ -1755,7 +1827,7 @@ app.openapi(replayRoute, async (c) => {
           code: 'missing_input',
         },
       },
-      400,
+      400
     );
   }
 
@@ -1766,13 +1838,17 @@ app.openapi(replayRoute, async (c) => {
     temperature: body.temperature,
     max_tokens: body.max_tokens,
     reasoning_effort: body.reasoning_effort,
-    min_reasoning_level: body.min_reasoning_level ?? (body.reasoning_effort === 'auto' ? undefined : body.reasoning_effort),
+    min_reasoning_level:
+      body.min_reasoning_level ??
+      (body.reasoning_effort === 'auto' ? undefined : body.reasoning_effort),
     tools: body.tools as Tool[] | undefined,
     tool_choice: body.tool_choice as NormalizedChatRequest['tool_choice'],
     response_format: body.response_format as ResponseFormat | undefined,
   };
 
-  const forcedModel = c.req.header('x-gateway-force-model') ?? (normalized.model.trim() === 'auto' ? undefined : normalized.model);
+  const forcedModel =
+    c.req.header('x-gateway-force-model') ??
+    (normalized.model.trim() === 'auto' ? undefined : normalized.model);
   const registry = getModelRegistry(c.env).filter((candidate) => candidate.provider === provider);
   const requiredCapabilities = deriveRequiredCapabilities({
     tools: normalized.tools,
@@ -1799,7 +1875,7 @@ app.openapi(replayRoute, async (c) => {
           code: 'no_replay_candidate',
         },
       },
-      503,
+      503
     );
   }
 
@@ -1839,9 +1915,10 @@ app.openapi(replayRoute, async (c) => {
         model: candidate.model,
         latency_ms: Date.now() - startedAt,
         selected: selectedPayload,
-        completion: body.include_completion === false ? undefined : (providerResult.completion ?? {}),
+        completion:
+          body.include_completion === false ? undefined : (providerResult.completion ?? {}),
       },
-      200,
+      200
     );
   } catch (error) {
     return c.json(
@@ -1857,7 +1934,7 @@ app.openapi(replayRoute, async (c) => {
           type: classifyError(error),
         },
       },
-      502,
+      502
     );
   }
 });
@@ -1917,7 +1994,7 @@ app.openapi(responsesRoute, async (c) => {
           code: 'invalid_project_id',
         },
       },
-      400,
+      400
     );
   }
 
@@ -1925,12 +2002,13 @@ app.openapi(responsesRoute, async (c) => {
     return c.json(
       {
         error: {
-          message: 'Streaming for /v1/responses is not implemented yet. Use /v1/chat/completions for streaming.',
+          message:
+            'Streaming for /v1/responses is not implemented yet. Use /v1/chat/completions for streaming.',
           type: 'invalid_request_error',
           code: 'stream_not_supported',
         },
       },
-      400,
+      400
     );
   }
 
@@ -1944,12 +2022,13 @@ app.openapi(responsesRoute, async (c) => {
           code: 'missing_input',
         },
       },
-      400,
+      400
     );
   }
 
   const reasoningEffort = body.reasoning_effort ?? body.reasoning?.effort ?? 'auto';
-  const min_reasoning_level = body.min_reasoning_level ?? (reasoningEffort === 'auto' ? undefined : reasoningEffort);
+  const min_reasoning_level =
+    body.min_reasoning_level ?? (reasoningEffort === 'auto' ? undefined : reasoningEffort);
 
   const headers = new Headers();
   headers.set('content-type', 'application/json');
@@ -2023,7 +2102,7 @@ app.openapi(responsesRoute, async (c) => {
           type: 'provider_fatal',
         },
       },
-      proxiedResponse.status as 400 | 429 | 503,
+      proxiedResponse.status as 400 | 429 | 503
     );
   }
 
@@ -2038,7 +2117,7 @@ app.openapi(responsesRoute, async (c) => {
           type: 'provider_fatal',
         },
       },
-      503,
+      503
     );
   }
 
@@ -2094,11 +2173,11 @@ const embeddingsRoute = createRoute({
 });
 
 app.openapi(embeddingsRoute, async (c) => {
-  const requestStartedAt = Date.now();
+  const _requestStartedAt = Date.now();
   const body = c.req.valid('json');
   const requestId = createRequestId();
   const normalizedInput = normalizeEmbeddingInput(body.input);
-  const inputChars = normalizedInput.reduce((sum, item) => sum + item.length, 0);
+  const _inputChars = normalizedInput.reduce((sum, item) => sum + item.length, 0);
   const requestedEmbeddingModel = body.model.trim();
   const forcedProvider = getForcedEmbeddingProvider(c);
   const forcedModel = c.req.header('x-gateway-force-model') ?? undefined;
@@ -2114,7 +2193,7 @@ app.openapi(embeddingsRoute, async (c) => {
           code: 'invalid_project_id',
         },
       },
-      400,
+      400
     );
   }
 
@@ -2127,7 +2206,7 @@ app.openapi(embeddingsRoute, async (c) => {
           code: 'invalid_embedding_model',
         },
       },
-      400,
+      400
     );
   }
 
@@ -2140,7 +2219,7 @@ app.openapi(embeddingsRoute, async (c) => {
           code: 'missing_input',
         },
       },
-      400,
+      400
     );
   }
 
@@ -2159,7 +2238,7 @@ app.openapi(embeddingsRoute, async (c) => {
           code: 'no_embedding_provider',
         },
       },
-      503,
+      503
     );
   }
 
@@ -2223,7 +2302,7 @@ app.openapi(embeddingsRoute, async (c) => {
       retries: maxEmbeddingAttempts - 1,
       minTimeout: 10,
       factor: 1,
-    },
+    }
   ).catch(() => undefined);
 
   if (finalResponse && chosenMeta) {
@@ -2239,7 +2318,12 @@ app.openapi(embeddingsRoute, async (c) => {
     return c.json(finalResponse as never, 200);
   }
 
-  const status = lastErrorClass === 'input_nonretriable' ? 400 : lastErrorClass === 'usage_retriable' ? 429 : 502;
+  const status =
+    lastErrorClass === 'input_nonretriable'
+      ? 400
+      : lastErrorClass === 'usage_retriable'
+        ? 429
+        : 502;
 
   c.executionCtx.waitUntil(
     recordAnalytics({
@@ -2258,7 +2342,7 @@ app.openapi(embeddingsRoute, async (c) => {
         type: lastErrorClass,
       },
     },
-    status,
+    status
   );
 });
 
@@ -2278,7 +2362,7 @@ app.post('/v1/audio/transcriptions', async (c) => {
           code: 'missing_file',
         },
       },
-      400,
+      400
     );
   }
 
@@ -2291,7 +2375,7 @@ app.post('/v1/audio/transcriptions', async (c) => {
           code: 'file_too_large',
         },
       },
-      400,
+      400
     );
   }
 
@@ -2307,7 +2391,7 @@ app.post('/v1/audio/transcriptions', async (c) => {
           code: 'invalid_project_id',
         },
       },
-      400,
+      400
     );
   }
 
@@ -2325,12 +2409,13 @@ app.post('/v1/audio/transcriptions', async (c) => {
     return c.json(
       {
         error: {
-          message: 'Speech-to-text unavailable: no configured STT provider (need GROQ_API_KEY, GEMINI_API_KEY, or Workers AI binding)',
+          message:
+            'Speech-to-text unavailable: no configured STT provider (need GROQ_API_KEY, GEMINI_API_KEY, or Workers AI binding)',
           type: 'configuration_error',
           code: 'no_stt_provider',
         },
       },
-      503,
+      503
     );
   }
 
@@ -2366,14 +2451,27 @@ app.post('/v1/audio/transcriptions', async (c) => {
 
         const result = (await groqResponse.json()) as Record<string, unknown>;
         c.executionCtx.waitUntil(
-          recordAnalytics({ db: c.env.GATEWAY_DB, projectId, outcome: 'ok', provider: 'groq', model: cand.model }),
+          recordAnalytics({
+            db: c.env.GATEWAY_DB,
+            projectId,
+            outcome: 'ok',
+            provider: 'groq',
+            model: cand.model,
+          })
         );
         return c.json(
           {
             ...result,
-            x_gateway: { provider: 'groq', model: cand.model, attempts: 1, reasoning_effort: 'auto' as const, request_id: createRequestId(), project_id: projectId },
+            x_gateway: {
+              provider: 'groq',
+              model: cand.model,
+              attempts: 1,
+              reasoning_effort: 'auto' as const,
+              request_id: createRequestId(),
+              project_id: projectId,
+            },
           } as never,
-          200,
+          200
         );
       }
 
@@ -2386,7 +2484,13 @@ app.post('/v1/audio/transcriptions', async (c) => {
       });
 
       c.executionCtx.waitUntil(
-        recordAnalytics({ db: c.env.GATEWAY_DB, projectId, outcome: 'ok', provider: cand.provider, model: cand.model }),
+        recordAnalytics({
+          db: c.env.GATEWAY_DB,
+          projectId,
+          outcome: 'ok',
+          provider: cand.provider,
+          model: cand.model,
+        })
       );
 
       return c.json(
@@ -2394,22 +2498,34 @@ app.post('/v1/audio/transcriptions', async (c) => {
           text: result.text,
           language: result.language,
           duration: result.duration,
-          x_gateway: { provider: cand.provider, model: cand.model, attempts: 1, reasoning_effort: 'auto' as const, request_id: createRequestId(), project_id: projectId },
+          x_gateway: {
+            provider: cand.provider,
+            model: cand.model,
+            attempts: 1,
+            reasoning_effort: 'auto' as const,
+            request_id: createRequestId(),
+            project_id: projectId,
+          },
         } as never,
-        200,
+        200
       );
     } catch (err) {
       lastError = getErrorMessage(err);
-      continue;
     }
   }
 
   c.executionCtx.waitUntil(
-    recordAnalytics({ db: c.env.GATEWAY_DB, projectId, outcome: 'error', provider: chosenProvider as Provider | undefined, model: chosenModel }),
+    recordAnalytics({
+      db: c.env.GATEWAY_DB,
+      projectId,
+      outcome: 'error',
+      provider: chosenProvider as Provider | undefined,
+      model: chosenModel,
+    })
   );
   return c.json(
     { error: { message: `All STT providers failed: ${lastError}`, type: 'provider_error' } },
-    502,
+    502
   );
 });
 
@@ -2418,7 +2534,7 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
   if (!c.env.GROQ_API_KEY) {
     return c.json(
       { error: { message: 'Speech-to-speech requires GROQ_API_KEY', type: 'configuration_error' } },
-      503,
+      503
     );
   }
 
@@ -2434,7 +2550,7 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
           code: 'missing_file',
         },
       },
-      400,
+      400
     );
   }
 
@@ -2447,11 +2563,11 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
           code: 'file_too_large',
         },
       },
-      400,
+      400
     );
   }
 
-  const voice = (formData.get('voice') as string) || 'en-US-AriaNeural';
+  const _voice = (formData.get('voice') as string) || 'en-US-AriaNeural';
   const systemPrompt = formData.get('system_prompt') as string | null;
 
   // Step 1: Speech-to-Text via Groq Whisper
@@ -2468,8 +2584,14 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
   if (!sttResponse.ok) {
     // Do not forward raw upstream error body — it may contain provider internals
     return c.json(
-      { error: { message: `STT failed (provider error ${sttResponse.status})`, type: 'provider_error', code: 'stt_failed' } },
-      502,
+      {
+        error: {
+          message: `STT failed (provider error ${sttResponse.status})`,
+          type: 'provider_error',
+          code: 'stt_failed',
+        },
+      },
+      502
     );
   }
 
@@ -2478,8 +2600,14 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
 
   if (!transcribedText?.trim()) {
     return c.json(
-      { error: { message: 'No speech detected in audio', type: 'invalid_request_error', code: 'no_speech' } },
-      400,
+      {
+        error: {
+          message: 'No speech detected in audio',
+          type: 'invalid_request_error',
+          code: 'no_speech',
+        },
+      },
+      400
     );
   }
 
@@ -2510,24 +2638,41 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
       llmText = llmResult.completion?.choices?.[0]?.message?.content || '';
     } catch (fallbackErr) {
       return c.json(
-        { error: { message: `LLM failed: ${getErrorMessage(fallbackErr)}`, type: 'provider_error', code: 'llm_failed' } },
-        502,
+        {
+          error: {
+            message: `LLM failed: ${getErrorMessage(fallbackErr)}`,
+            type: 'provider_error',
+            code: 'llm_failed',
+          },
+        },
+        502
       );
     }
   }
 
   if (!llmText?.trim()) {
     return c.json(
-      { error: { message: 'LLM returned empty response', type: 'provider_error', code: 'empty_llm_response' } },
-      502,
+      {
+        error: {
+          message: 'LLM returned empty response',
+          type: 'provider_error',
+          code: 'empty_llm_response',
+        },
+      },
+      502
     );
   }
 
   // Step 3: Text-to-Speech via Workers AI
   if (!isWorkersAiEnabled(c.env) || !c.env.AI) {
     return c.json(
-      { error: { message: 'TTS requires Workers AI to be explicitly enabled', type: 'configuration_error' } },
-      503,
+      {
+        error: {
+          message: 'TTS requires Workers AI to be explicitly enabled',
+          type: 'configuration_error',
+        },
+      },
+      503
     );
   }
 
@@ -2559,8 +2704,14 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
     });
   } catch (ttsErr) {
     return c.json(
-      { error: { message: `TTS failed: ${getErrorMessage(ttsErr)}`, type: 'provider_error', code: 'tts_failed' } },
-      502,
+      {
+        error: {
+          message: `TTS failed: ${getErrorMessage(ttsErr)}`,
+          type: 'provider_error',
+          code: 'tts_failed',
+        },
+      },
+      502
     );
   }
 });
@@ -2591,7 +2742,7 @@ const imageGenResponseSchema = z
         url: z.string().optional(),
         b64_json: z.string().optional(),
         revised_prompt: z.string().optional(),
-      }),
+      })
     ),
     x_gateway: gatewayMetaSchema.optional(),
   })
@@ -2638,10 +2789,19 @@ const imagesGenRoute = createRoute({
     body: { content: { 'application/json': { schema: imageGenRequestSchema } } },
   },
   responses: {
-    200: { description: 'Image generated', content: { 'application/json': { schema: imageGenResponseSchema } } },
+    200: {
+      description: 'Image generated',
+      content: { 'application/json': { schema: imageGenResponseSchema } },
+    },
     400: { description: 'Invalid input', content: { 'application/json': { schema: errorSchema } } },
-    502: { description: 'All providers failed', content: { 'application/json': { schema: errorSchema } } },
-    503: { description: 'No image provider configured', content: { 'application/json': { schema: errorSchema } } },
+    502: {
+      description: 'All providers failed',
+      content: { 'application/json': { schema: errorSchema } },
+    },
+    503: {
+      description: 'No image provider configured',
+      content: { 'application/json': { schema: errorSchema } },
+    },
   },
 });
 
@@ -2652,8 +2812,14 @@ app.openapi(imagesGenRoute, async (c) => {
   const projectId = resolveProjectId(headerProjectId, body.project_id);
   if (!projectId) {
     return c.json(
-      { error: { message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]', type: 'invalid_request_error', code: 'invalid_project_id' } },
-      400,
+      {
+        error: {
+          message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
+          type: 'invalid_request_error',
+          code: 'invalid_project_id',
+        },
+      },
+      400
     );
   }
 
@@ -2663,7 +2829,13 @@ app.openapi(imagesGenRoute, async (c) => {
 
   const registry = getImageRegistry(c.env).filter((cand) => {
     if (forcedProvider && cand.provider !== forcedProvider) return false;
-    if (requestedModel && requestedLower !== 'auto' && cand.model !== requestedModel && cand.id !== requestedModel) return false;
+    if (
+      requestedModel &&
+      requestedLower !== 'auto' &&
+      cand.model !== requestedModel &&
+      cand.id !== requestedModel
+    )
+      return false;
     if (!hasImageProviderKey(c.env, cand.provider)) return false;
     return true;
   });
@@ -2672,12 +2844,13 @@ app.openapi(imagesGenRoute, async (c) => {
     return c.json(
       {
         error: {
-          message: 'Image generation unavailable: no Together/Gemini/NVIDIA key and Workers AI binding missing',
+          message:
+            'Image generation unavailable: no Together/Gemini/NVIDIA key and Workers AI binding missing',
           type: 'configuration_error',
           code: 'no_image_provider',
         },
       },
-      503,
+      503
     );
   }
 
@@ -2704,7 +2877,13 @@ app.openapi(imagesGenRoute, async (c) => {
       });
 
       c.executionCtx.waitUntil(
-        recordAnalytics({ db: c.env.GATEWAY_DB, projectId, outcome: 'ok', provider: cand.provider, model: cand.model }),
+        recordAnalytics({
+          db: c.env.GATEWAY_DB,
+          projectId,
+          outcome: 'ok',
+          provider: cand.provider,
+          model: cand.model,
+        })
       );
 
       return c.json(
@@ -2720,21 +2899,26 @@ app.openapi(imagesGenRoute, async (c) => {
             project_id: projectId,
           },
         } as never,
-        200,
+        200
       );
     } catch (err) {
       lastError = getErrorMessage(err);
-      continue;
     }
   }
 
   c.executionCtx.waitUntil(
-    recordAnalytics({ db: c.env.GATEWAY_DB, projectId, outcome: 'error', provider: chosenProvider as Provider | undefined, model: chosenModel }),
+    recordAnalytics({
+      db: c.env.GATEWAY_DB,
+      projectId,
+      outcome: 'error',
+      provider: chosenProvider as Provider | undefined,
+      model: chosenModel,
+    })
   );
 
   return c.json(
     { error: { message: `All image providers failed: ${lastError}`, type: 'provider_error' } },
-    502,
+    502
   );
 });
 
@@ -2746,11 +2930,23 @@ const videosGenRoute = createRoute({
     body: { content: { 'application/json': { schema: videoGenRequestSchema } } },
   },
   responses: {
-    202: { description: 'Video job submitted', content: { 'application/json': { schema: videoGenResponseSchema } } },
-    200: { description: 'Video completed synchronously', content: { 'application/json': { schema: videoGenResponseSchema } } },
+    202: {
+      description: 'Video job submitted',
+      content: { 'application/json': { schema: videoGenResponseSchema } },
+    },
+    200: {
+      description: 'Video completed synchronously',
+      content: { 'application/json': { schema: videoGenResponseSchema } },
+    },
     400: { description: 'Invalid input', content: { 'application/json': { schema: errorSchema } } },
-    502: { description: 'Provider failure', content: { 'application/json': { schema: errorSchema } } },
-    503: { description: 'No video provider', content: { 'application/json': { schema: errorSchema } } },
+    502: {
+      description: 'Provider failure',
+      content: { 'application/json': { schema: errorSchema } },
+    },
+    503: {
+      description: 'No video provider',
+      content: { 'application/json': { schema: errorSchema } },
+    },
   },
 });
 
@@ -2761,8 +2957,14 @@ app.openapi(videosGenRoute, async (c) => {
   const projectId = resolveProjectId(headerProjectId, body.project_id);
   if (!projectId) {
     return c.json(
-      { error: { message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]', type: 'invalid_request_error', code: 'invalid_project_id' } },
-      400,
+      {
+        error: {
+          message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
+          type: 'invalid_request_error',
+          code: 'invalid_project_id',
+        },
+      },
+      400
     );
   }
 
@@ -2770,7 +2972,13 @@ app.openapi(videosGenRoute, async (c) => {
   const requestedLower = requestedModel.toLowerCase();
 
   const registry = getVideoRegistry(c.env).filter((cand) => {
-    if (requestedModel && requestedLower !== 'auto' && cand.model !== requestedModel && cand.id !== requestedModel) return false;
+    if (
+      requestedModel &&
+      requestedLower !== 'auto' &&
+      cand.model !== requestedModel &&
+      cand.id !== requestedModel
+    )
+      return false;
     if (!hasVideoProviderKey(c.env, cand.provider)) return false;
     return true;
   });
@@ -2779,12 +2987,13 @@ app.openapi(videosGenRoute, async (c) => {
     return c.json(
       {
         error: {
-          message: 'Video generation unavailable: TOGETHER_API_KEY not configured or model not found',
+          message:
+            'Video generation unavailable: TOGETHER_API_KEY not configured or model not found',
           type: 'configuration_error',
           code: 'no_video_provider',
         },
       },
-      503,
+      503
     );
   }
 
@@ -2810,7 +3019,7 @@ app.openapi(videosGenRoute, async (c) => {
         outcome: job.status === 'failed' ? 'error' : 'ok',
         provider: chosen.provider,
         model: chosen.model,
-      }),
+      })
     );
 
     // Persist job mapping to KV so polling can recover project_id context (best-effort).
@@ -2818,7 +3027,7 @@ app.openapi(videosGenRoute, async (c) => {
       await c.env.HEALTH_KV.put(
         `video_job:${job.id}`,
         JSON.stringify({ provider: chosen.provider, model: chosen.model, project_id: projectId }),
-        { expirationTtl: 60 * 60 * 24 },
+        { expirationTtl: 60 * 60 * 24 }
       );
     } catch {
       // Ignore KV failures
@@ -2840,15 +3049,23 @@ app.openapi(videosGenRoute, async (c) => {
           project_id: projectId,
         },
       } as never,
-      statusCode as 200 | 202,
+      statusCode as 200 | 202
     );
   } catch (err) {
     c.executionCtx.waitUntil(
-      recordAnalytics({ db: c.env.GATEWAY_DB, projectId, outcome: 'error', provider: chosen.provider, model: chosen.model }),
+      recordAnalytics({
+        db: c.env.GATEWAY_DB,
+        projectId,
+        outcome: 'error',
+        provider: chosen.provider,
+        model: chosen.model,
+      })
     );
     return c.json(
-      { error: { message: `Video submit failed: ${getErrorMessage(err)}`, type: 'provider_error' } },
-      502,
+      {
+        error: { message: `Video submit failed: ${getErrorMessage(err)}`, type: 'provider_error' },
+      },
+      502
     );
   }
 });
@@ -2859,11 +3076,23 @@ const videosPollRoute = createRoute({
   path: '/v1/videos/generations/{id}',
   request: { params: z.object({ id: z.string().min(1).max(256) }) },
   responses: {
-    200: { description: 'Video job status', content: { 'application/json': { schema: videoGenResponseSchema } } },
+    200: {
+      description: 'Video job status',
+      content: { 'application/json': { schema: videoGenResponseSchema } },
+    },
     404: { description: 'Job not found', content: { 'application/json': { schema: errorSchema } } },
-    501: { description: 'Not implemented — upstream poll endpoint undocumented', content: { 'application/json': { schema: errorSchema } } },
-    502: { description: 'Provider failure', content: { 'application/json': { schema: errorSchema } } },
-    503: { description: 'Provider not configured', content: { 'application/json': { schema: errorSchema } } },
+    501: {
+      description: 'Not implemented — upstream poll endpoint undocumented',
+      content: { 'application/json': { schema: errorSchema } },
+    },
+    502: {
+      description: 'Provider failure',
+      content: { 'application/json': { schema: errorSchema } },
+    },
+    503: {
+      description: 'Provider not configured',
+      content: { 'application/json': { schema: errorSchema } },
+    },
   },
 });
 
@@ -2875,9 +3104,11 @@ app.openapi(videosPollRoute, async (c) => {
   let projectId: string | undefined;
 
   try {
-    const meta = await c.env.HEALTH_KV.get(`video_job:${id}`, 'json') as
-      | { provider?: VideoProvider; model?: string; project_id?: string }
-      | null;
+    const meta = (await c.env.HEALTH_KV.get(`video_job:${id}`, 'json')) as {
+      provider?: VideoProvider;
+      model?: string;
+      project_id?: string;
+    } | null;
     if (meta?.provider) provider = meta.provider;
     if (meta?.model) model = meta.model;
     if (meta?.project_id) projectId = meta.project_id;
@@ -2887,8 +3118,14 @@ app.openapi(videosPollRoute, async (c) => {
 
   if (!hasVideoProviderKey(c.env, provider)) {
     return c.json(
-      { error: { message: 'Video provider not configured', type: 'configuration_error', code: 'no_video_provider' } },
-      503,
+      {
+        error: {
+          message: 'Video provider not configured',
+          type: 'configuration_error',
+          code: 'no_video_provider',
+        },
+      },
+      503
     );
   }
 
@@ -2910,7 +3147,7 @@ app.openapi(videosPollRoute, async (c) => {
           project_id: projectId,
         },
       } as never,
-      200,
+      200
     );
   } catch (err) {
     // Together's video poll endpoint is undocumented upstream — returns 404 on all known paths.
@@ -2923,7 +3160,7 @@ app.openapi(videosPollRoute, async (c) => {
           code: 'video_poll_pending_upstream',
         },
       },
-      501,
+      501
     );
   }
 });
@@ -2945,8 +3182,14 @@ const audioSpeechRoute = createRoute({
       },
     },
     400: { description: 'Invalid input', content: { 'application/json': { schema: errorSchema } } },
-    502: { description: 'Provider failure', content: { 'application/json': { schema: errorSchema } } },
-    503: { description: 'No TTS provider', content: { 'application/json': { schema: errorSchema } } },
+    502: {
+      description: 'Provider failure',
+      content: { 'application/json': { schema: errorSchema } },
+    },
+    503: {
+      description: 'No TTS provider',
+      content: { 'application/json': { schema: errorSchema } },
+    },
   },
 });
 
@@ -2956,8 +3199,14 @@ app.openapi(audioSpeechRoute, async (c) => {
   const projectId = resolveProjectId(headerProjectId, body.project_id);
   if (!projectId) {
     return c.json(
-      { error: { message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]', type: 'invalid_request_error', code: 'invalid_project_id' } },
-      400,
+      {
+        error: {
+          message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
+          type: 'invalid_request_error',
+          code: 'invalid_project_id',
+        },
+      },
+      400
     );
   }
 
@@ -2967,7 +3216,13 @@ app.openapi(audioSpeechRoute, async (c) => {
 
   const registry = getTtsRegistry(c.env).filter((cand) => {
     if (forcedProvider && cand.provider !== forcedProvider) return false;
-    if (requestedModel && requestedLower !== 'auto' && cand.model !== requestedModel && cand.id !== requestedModel) return false;
+    if (
+      requestedModel &&
+      requestedLower !== 'auto' &&
+      cand.model !== requestedModel &&
+      cand.id !== requestedModel
+    )
+      return false;
     if (!hasTtsProviderKey(c.env, cand.provider)) return false;
     return true;
   });
@@ -2981,7 +3236,7 @@ app.openapi(audioSpeechRoute, async (c) => {
           code: 'no_tts_provider',
         },
       },
-      503,
+      503
     );
   }
 
@@ -3006,7 +3261,13 @@ app.openapi(audioSpeechRoute, async (c) => {
       });
 
       c.executionCtx.waitUntil(
-        recordAnalytics({ db: c.env.GATEWAY_DB, projectId, outcome: 'ok', provider: cand.provider, model: cand.model }),
+        recordAnalytics({
+          db: c.env.GATEWAY_DB,
+          projectId,
+          outcome: 'ok',
+          provider: cand.provider,
+          model: cand.model,
+        })
       );
 
       return new Response(result.audio, {
@@ -3019,16 +3280,21 @@ app.openapi(audioSpeechRoute, async (c) => {
       });
     } catch (err) {
       lastError = getErrorMessage(err);
-      continue;
     }
   }
 
   c.executionCtx.waitUntil(
-    recordAnalytics({ db: c.env.GATEWAY_DB, projectId, outcome: 'error', provider: chosenProvider as Provider | undefined, model: chosenModel }),
+    recordAnalytics({
+      db: c.env.GATEWAY_DB,
+      projectId,
+      outcome: 'error',
+      provider: chosenProvider as Provider | undefined,
+      model: chosenModel,
+    })
   );
   return c.json(
     { error: { message: `All TTS providers failed: ${lastError}`, type: 'provider_error' } },
-    502,
+    502
   );
 });
 
@@ -3108,8 +3374,8 @@ async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
           evaluated_at: evaluation?.evaluatedAt ?? null,
           enabled: candidate.enabled,
         };
-      }),
-    ),
+      })
+    )
   );
 
   const embeddings = EMBEDDING_CANDIDATES.map((candidate) => ({
@@ -3164,10 +3430,19 @@ app.get('/models', async (c) => {
 });
 app.get('/models/', (c) => c.redirect('/models'));
 
-app.get('/dashboard', (c) => { setDashboardHeaders(c); return c.html(DASHBOARD_HTML); });
+app.get('/dashboard', (c) => {
+  setDashboardHeaders(c);
+  return c.html(DASHBOARD_HTML);
+});
 app.get('/dashboard/', (c) => c.redirect('/dashboard'));
-app.get('/live', (c) => { setDashboardHeaders(c); return c.html(DASHBOARD_HTML); });
-app.get('/v1/dashboard', (c) => { setDashboardHeaders(c); return c.html(DASHBOARD_HTML); });
+app.get('/live', (c) => {
+  setDashboardHeaders(c);
+  return c.html(DASHBOARD_HTML);
+});
+app.get('/v1/dashboard', (c) => {
+  setDashboardHeaders(c);
+  return c.html(DASHBOARD_HTML);
+});
 
 app.get('/benchmark', (c) => {
   setDashboardHeaders(c);
@@ -3224,20 +3499,31 @@ app.openapi(benchmarkExperimentRoute, async (c) => {
   return c.json(createBenchmarkExperimentEntry(body));
 });
 
-function routingModelStatus(snapshot: ModelStateSnapshot | undefined, now: number): 'available' | 'degraded' | 'cooldown' | 'exhausted' {
+function routingModelStatus(
+  snapshot: ModelStateSnapshot | undefined,
+  now: number
+): 'available' | 'degraded' | 'cooldown' | 'exhausted' {
   if (snapshot && snapshot.cooldownUntil > now) {
     return 'cooldown';
   }
   if (snapshot && snapshot.headroom <= 0) {
     return 'exhausted';
   }
-  if (snapshot && (snapshot.successRate < 0.75 || snapshot.shortRetriableFailures > 0 || snapshot.avgLatencyMs > 5_000)) {
+  if (
+    snapshot &&
+    (snapshot.successRate < 0.75 ||
+      snapshot.shortRetriableFailures > 0 ||
+      snapshot.avgLatencyMs > 5_000)
+  ) {
     return 'degraded';
   }
   return 'available';
 }
 
-function routingReasons(snapshot: ModelStateSnapshot | undefined, status: ReturnType<typeof routingModelStatus>): string[] {
+function routingReasons(
+  snapshot: ModelStateSnapshot | undefined,
+  status: ReturnType<typeof routingModelStatus>
+): string[] {
   const reasons: string[] = [];
   if (!snapshot) {
     return ['no_health_data_yet'];
@@ -3293,28 +3579,37 @@ app.openapi(routingStatusRoute, async (c) => {
   const stateMap = await healthLookup(c.env, keys, lookupLimits, now);
   const evaluationMap = parseEvaluationWeights(c.env.MODEL_EVALUATIONS_JSON);
   const quotaStatuses = await getRoutingQuotaStatuses(c.env, registry);
-  const routableRegistry = registry.filter((candidate) => providerQuotaAllowsCandidate(candidate, quotaStatuses));
+  const routableRegistry = registry.filter((candidate) =>
+    providerQuotaAllowsCandidate(candidate, quotaStatuses)
+  );
   const selected = selectCandidates(routableRegistry, stateMap, {
     stream: false,
     now,
     evaluationMap,
   });
   const selectedIds = new Set(selected.map((candidate) => candidate.id));
-  const fallbackCandidates = [...selected, ...registry.filter((candidate) => !selectedIds.has(candidate.id))];
-  const providers: Record<string, {
-    configured_models: number;
-    available_models: number;
-    cooldown_models: number;
-    exhausted_models: number;
-    degraded_models: number;
-    best_model: string | null;
-  }> = {};
+  const fallbackCandidates = [
+    ...selected,
+    ...registry.filter((candidate) => !selectedIds.has(candidate.id)),
+  ];
+  const providers: Record<
+    string,
+    {
+      configured_models: number;
+      available_models: number;
+      cooldown_models: number;
+      exhausted_models: number;
+      degraded_models: number;
+      best_model: string | null;
+    }
+  > = {};
 
   const fallbackOrder = fallbackCandidates.map((candidate, index) => {
     const key = getModelKey(candidate.provider, candidate.model);
     const snapshot = stateMap.get(key);
     const quotaStatus = quotaStatuses.get(candidate.provider);
-    const status = quotaStatus?.status === 'exhausted' ? 'exhausted' : routingModelStatus(snapshot, now);
+    const status =
+      quotaStatus?.status === 'exhausted' ? 'exhausted' : routingModelStatus(snapshot, now);
     const provider = providers[candidate.provider] ?? {
       configured_models: 0,
       available_models: 0,
@@ -3387,7 +3682,8 @@ const routingConfigRoute = createRoute({
   path: '/v1/routing/config',
   responses: {
     200: {
-      description: 'Routing policy: scoring weights, cooldown constants, retry limits, and degradation thresholds',
+      description:
+        'Routing policy: scoring weights, cooldown constants, retry limits, and degradation thresholds',
       content: {
         'application/json': {
           schema: routingConfigSchema,
@@ -3594,23 +3890,33 @@ app.openapi(analyticsRoute, async (c) => {
 
   const stats = await c.env.GATEWAY_DB.prepare(
     `SELECT SUM(total_requests) as total, SUM(successful_requests) as successful, SUM(failed_requests) as failed FROM project_analytics ${where}`
-  ).bind(...params).first<{ total: number | null; successful: number | null; failed: number | null }>();
+  )
+    .bind(...params)
+    .first<{ total: number | null; successful: number | null; failed: number | null }>();
 
   const providerStats = await c.env.GATEWAY_DB.prepare(
     `SELECT provider, SUM(total_requests) as requests, SUM(successful_requests) as successful, SUM(failed_requests) as failed FROM project_analytics ${where} GROUP BY provider`
-  ).bind(...params).all<{ provider: string; requests: number; successful: number; failed: number }>();
+  )
+    .bind(...params)
+    .all<{ provider: string; requests: number; successful: number; failed: number }>();
 
   const modelStats = await c.env.GATEWAY_DB.prepare(
     `SELECT model, SUM(total_requests) as requests, SUM(successful_requests) as successful, SUM(failed_requests) as failed FROM project_analytics ${where} GROUP BY model`
-  ).bind(...params).all<{ model: string; requests: number; successful: number; failed: number }>();
+  )
+    .bind(...params)
+    .all<{ model: string; requests: number; successful: number; failed: number }>();
 
   const projectStats = await c.env.GATEWAY_DB.prepare(
     `SELECT project_id, SUM(total_requests) as requests, SUM(successful_requests) as successful, SUM(failed_requests) as failed FROM project_analytics ${where} GROUP BY project_id`
-  ).bind(...params).all<{ project_id: string; requests: number; successful: number; failed: number }>();
+  )
+    .bind(...params)
+    .all<{ project_id: string; requests: number; successful: number; failed: number }>();
 
   const dailyStats = await c.env.GATEWAY_DB.prepare(
     `SELECT date, SUM(total_requests) as requests, SUM(successful_requests) as successful, SUM(failed_requests) as failed FROM project_analytics ${where} GROUP BY date ORDER BY date ASC`
-  ).bind(...params).all<{ date: string; requests: number; successful: number; failed: number }>();
+  )
+    .bind(...params)
+    .all<{ date: string; requests: number; successful: number; failed: number }>();
 
   const providers: Record<string, unknown> = {};
   providerStats.results.forEach((p) => {
@@ -3649,9 +3955,12 @@ app.get('/v1/stats/providers', async (c) => {
 app.get('/v1/budget', async (c) => {
   const usage = await getNeuronUsage(c.env);
   if (!usage) {
-    return c.json({
-      error: { message: 'NEURON_BUDGET binding unavailable', type: 'configuration_error' },
-    }, 503);
+    return c.json(
+      {
+        error: { message: 'NEURON_BUDGET binding unavailable', type: 'configuration_error' },
+      },
+      503
+    );
   }
   return c.json(usage);
 });
@@ -3665,8 +3974,6 @@ app.doc('/openapi.json', {
       'OpenAI-compatible AI gateway with health-aware free-tier routing across Workers AI, Groq, Gemini, Voyage AI embeddings, voice (Whisper STT + Workers AI TTS), and optional OpenRouter/Cerebras.',
   },
 });
-
-
 
 // Catch-all for uncaught exceptions in any route handler. Keeps the gateway's
 // `{ error: { message, type } }` contract consistent (and classified) instead
@@ -3686,10 +3993,7 @@ app.onError((err, c) => {
       message: getErrorMessage(err),
     },
   });
-  return c.json(
-    { error: { message: getErrorMessage(err), type } },
-    status,
-  );
+  return c.json({ error: { message: getErrorMessage(err), type } }, status);
 });
 
 // Fallback to static assets (docs site) for any path worker doesn't handle

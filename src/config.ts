@@ -29,7 +29,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.93,
-    capabilities: { toolCalling: false, jsonMode: false, vision: false, contextWindow: 131072, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: false,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'workers-ai-deepseek-r1-32b',
@@ -38,8 +44,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'high',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.90,
-    capabilities: { toolCalling: false, jsonMode: false, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.9,
+    capabilities: {
+      toolCalling: false,
+      jsonMode: false,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'workers-ai-llama-8b',
@@ -49,7 +61,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.92,
-    capabilities: { toolCalling: false, jsonMode: false, vision: false, contextWindow: 131072, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: false,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'workers-ai-mistral-7b',
@@ -59,7 +77,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.88,
-    capabilities: { toolCalling: false, jsonMode: false, vision: false, contextWindow: 8192, maxOutputTokens: 2048 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: false,
+      vision: false,
+      contextWindow: 8192,
+      maxOutputTokens: 2048,
+    },
   },
   {
     id: 'workers-ai-llama-3b',
@@ -69,7 +93,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.83,
-    capabilities: { toolCalling: false, jsonMode: false, vision: false, contextWindow: 131072, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: false,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'workers-ai-llama-1b',
@@ -79,7 +109,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.78,
-    capabilities: { toolCalling: false, jsonMode: false, vision: false, contextWindow: 131072, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: false,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'workers-ai-phi-2',
@@ -89,7 +125,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.75,
-    capabilities: { toolCalling: false, jsonMode: false, vision: false, contextWindow: 2048, maxOutputTokens: 1024 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: false,
+      vision: false,
+      contextWindow: 2048,
+      maxOutputTokens: 1024,
+    },
   },
 
   // ── Groq (free tier, rate-limited) ──────────────────────────────────
@@ -101,7 +143,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.91,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 32768 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 32768,
+    },
   },
   {
     id: 'groq-gpt-oss-120b',
@@ -111,7 +159,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.89,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'groq-gpt-oss-20b',
@@ -121,7 +175,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.87,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'groq-qwen3-32b',
@@ -131,7 +191,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.86,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'groq-llama4-scout',
@@ -141,7 +207,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.84,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'groq-llama-8b',
@@ -151,7 +223,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.91,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
 
   // ── Gemini (free tier, generous limits) ─────────────────────────────
@@ -163,7 +241,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.92,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 1048576, maxOutputTokens: 65536 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 1048576,
+      maxOutputTokens: 65536,
+    },
   },
   {
     id: 'gemini-2.5-flash-lite',
@@ -173,7 +257,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.87,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 1048576, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 1048576,
+      maxOutputTokens: 8192,
+    },
   },
 
   // ── OpenRouter (needs OPENROUTER_API_KEY) ────────────────────────────
@@ -185,7 +275,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.79,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-llama-70b-free',
@@ -195,7 +291,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.78,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-gpt-oss-120b-free',
@@ -205,7 +307,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.77,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'openrouter-qwen3-next-80b-free',
@@ -215,7 +323,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.76,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'openrouter-qwen3-coder-free',
@@ -225,7 +339,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.73,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'openrouter-nvidia-nemotron-12b-free',
@@ -234,8 +354,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.70,
-    capabilities: { toolCalling: false, jsonMode: true, vision: true, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.7,
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-llama-3.2-3b-free',
@@ -245,7 +371,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.68,
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 4096,
+    },
   },
 
   // ── Cerebras (needs CEREBRAS_API_KEY) ───────────────────────────────
@@ -257,7 +389,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.77,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
 
   // ── SambaNova (free tier, needs SAMBANOVA_API_KEY) ─────────────────
@@ -269,7 +407,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.76,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'sambanova-deepseek-v3',
@@ -279,7 +423,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.75,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'sambanova-qwen3-32b',
@@ -289,7 +439,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.74,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
 
   // ── NVIDIA NIM (free tier, needs NVIDIA_API_KEY) ───────────────────
@@ -301,7 +457,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.73,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'nvidia-deepseek-r1',
@@ -311,7 +473,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.72,
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'nvidia-qwen-32b',
@@ -321,7 +489,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.71,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'nvidia-nemotron-super-49b',
@@ -331,7 +505,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.74,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'nvidia-nemotron-70b',
@@ -341,7 +521,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.73,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'nvidia-llama4-maverick',
@@ -351,7 +537,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.72,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'nvidia-deepseek-v3',
@@ -361,7 +553,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.71,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'nvidia-deepseek-r1-distill-70b',
@@ -371,7 +569,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.69,
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'nvidia-qwen-coder-32b',
@@ -381,7 +585,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.68,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
 
   // ── GitHub Models (needs GITHUB_TOKEN, free tier) ───────────────────
@@ -393,7 +603,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.95,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 272000, maxOutputTokens: 16384 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 272000,
+      maxOutputTokens: 16384,
+    },
   },
   {
     id: 'gh-gpt-5-mini',
@@ -403,7 +619,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.93,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 272000, maxOutputTokens: 16384 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 272000,
+      maxOutputTokens: 16384,
+    },
   },
   {
     id: 'gh-gpt-5-nano',
@@ -413,7 +635,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.88,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 272000, maxOutputTokens: 16384 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 272000,
+      maxOutputTokens: 16384,
+    },
   },
   {
     id: 'gh-gpt-4.1',
@@ -423,7 +651,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.91,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 1047576, maxOutputTokens: 32768 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 1047576,
+      maxOutputTokens: 32768,
+    },
   },
   {
     id: 'gh-gpt-4.1-mini',
@@ -433,7 +667,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.89,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 1047576, maxOutputTokens: 32768 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 1047576,
+      maxOutputTokens: 32768,
+    },
   },
   {
     id: 'gh-gpt-4o-mini',
@@ -443,7 +683,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.86,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 128000, maxOutputTokens: 16384 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 128000,
+      maxOutputTokens: 16384,
+    },
   },
   {
     id: 'gh-o3',
@@ -453,7 +699,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.94,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 100000 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 100000,
+    },
   },
   {
     id: 'gh-o4-mini',
@@ -462,8 +714,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'high',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.90,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 100000 },
+    priority: 0.9,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 100000,
+    },
   },
   {
     id: 'gh-deepseek-r1',
@@ -473,7 +731,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.87,
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 163840, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 163840,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-deepseek-r1-0528',
@@ -483,7 +747,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.86,
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 163840, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 163840,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-deepseek-v3',
@@ -493,7 +763,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.85,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-llama-4-maverick',
@@ -503,7 +779,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.82,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-llama-4-scout',
@@ -513,7 +795,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.81,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-llama-3.3-70b',
@@ -523,7 +811,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.83,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-grok-3',
@@ -533,7 +827,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.84,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-grok-3-mini',
@@ -542,8 +842,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.80,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    priority: 0.8,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-codestral',
@@ -553,7 +859,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.82,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 262144, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 262144,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-mistral-medium',
@@ -563,7 +875,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.79,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-command-a',
@@ -573,7 +891,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.78,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-command-r-plus',
@@ -583,7 +907,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.77,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'gh-phi-4',
@@ -593,7 +923,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.72,
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 16384, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 16384,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'gh-phi-4-reasoning',
@@ -603,7 +939,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.73,
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'gh-mai-ds-r1',
@@ -613,7 +955,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.74,
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 163840, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 163840,
+      maxOutputTokens: 8192,
+    },
   },
 
   // ── Pollinations (no key required) ──────────────────────────────────
@@ -625,7 +973,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.68,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 128000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 128000,
+      maxOutputTokens: 8192,
+    },
   },
 
   // ── Cohere (trial key, 1000 req/mo) ─────────────────────────────────
@@ -637,7 +991,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.82,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 256000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 256000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'cohere-command-r-plus',
@@ -647,7 +1007,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.78,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 128000, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 128000,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'cohere-command-r',
@@ -657,7 +1023,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.75,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 128000, maxOutputTokens: 4096 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 128000,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'cohere-command-r7b',
@@ -666,8 +1038,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'low',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.70,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 128000, maxOutputTokens: 4096 },
+    priority: 0.7,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 128000,
+      maxOutputTokens: 4096,
+    },
   },
 
   // ── Mistral La Plateforme (Experiment tier, 1 RPS, 500k tok/min) ────
@@ -679,7 +1057,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.85,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'mistral-medium',
@@ -689,7 +1073,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.82,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'mistral-small',
@@ -699,7 +1089,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.78,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'mistral-codestral',
@@ -708,8 +1104,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'high',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.80,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 262144, maxOutputTokens: 8192 },
+    priority: 0.8,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 262144,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'mistral-ministral-8b',
@@ -719,7 +1121,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.72,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'mistral-ministral-3b',
@@ -728,8 +1136,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'low',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.70,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 131072, maxOutputTokens: 8192 },
+    priority: 0.7,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'mistral-pixtral',
@@ -739,7 +1153,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.76,
-    capabilities: { toolCalling: true, jsonMode: true, vision: true, contextWindow: 131072, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
   },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
@@ -750,8 +1170,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-google-gemma-4-31b-it-free',
@@ -760,8 +1186,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-nvidia-nemotron-3-super-120b-a12b-free',
@@ -770,8 +1202,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-openrouter-free',
@@ -780,8 +1218,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-liquid-lfm-2-5-1-2b-thinking-free',
@@ -790,8 +1234,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-liquid-lfm-2-5-1-2b-instruct-free',
@@ -800,8 +1250,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-nvidia-nemotron-3-nano-30b-a3b-free',
@@ -810,8 +1266,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-nvidia-nemotron-nano-9b-v2-free',
@@ -820,8 +1282,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-openai-gpt-oss-20b-free',
@@ -830,8 +1298,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-cognitivecomputations-dolphin-mistral-24b-venice-',
@@ -840,8 +1314,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
@@ -852,8 +1332,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-nvidia-nemotron-3-nano-omni-30b-a3b-reasoning-fre',
@@ -862,8 +1348,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-poolside-laguna-xs-2-free',
@@ -872,8 +1364,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-poolside-laguna-m-1-free',
@@ -882,8 +1380,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
@@ -894,8 +1398,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-nvidia-nemotron-3-ultra-550b-a55b-free',
@@ -904,8 +1414,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'cerebras-zai-glm-4-7',
@@ -914,8 +1430,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
 
   // ── Command Code (needs COMMAND_CODE_API_KEY) ───────────────────────
@@ -927,7 +1449,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-claude-fable-5',
@@ -937,7 +1465,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-claude-opus-4-8',
@@ -947,7 +1481,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-claude-opus-4-7',
@@ -957,7 +1497,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-claude-haiku-4-5-20251001',
@@ -967,7 +1513,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-gpt-5-5',
@@ -977,7 +1529,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-gpt-5-4',
@@ -987,7 +1545,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 400000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 400000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-gpt-5-3-codex',
@@ -997,7 +1561,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.74,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 400000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 400000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-gpt-5-4-mini',
@@ -1007,7 +1577,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 400000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 400000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-moonshotai-kimi-k2-6',
@@ -1017,7 +1593,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.73,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 256000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 256000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-moonshotai-kimi-k2-5',
@@ -1027,7 +1609,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 256000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 256000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-zai-org-glm-5-1',
@@ -1037,7 +1625,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-zai-org-glm-5',
@@ -1047,7 +1641,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-minimaxai-minimax-m3',
@@ -1057,7 +1657,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.71,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-minimaxai-minimax-m2-7',
@@ -1067,7 +1673,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-minimaxai-minimax-m2-5',
@@ -1077,7 +1689,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-deepseek-deepseek-v4-pro',
@@ -1087,7 +1705,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-deepseek-deepseek-v4-flash',
@@ -1097,7 +1721,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.75,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-qwen-qwen3-6-max-preview',
@@ -1107,7 +1737,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-qwen-qwen3-6-plus',
@@ -1117,7 +1753,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 200000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 200000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-qwen-qwen3-7-max',
@@ -1127,7 +1769,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.72,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-qwen-qwen3-7-plus',
@@ -1137,7 +1785,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.72,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-stepfun-step-3-7-flash',
@@ -1147,7 +1801,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 256000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 256000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-stepfun-step-3-5-flash',
@@ -1157,7 +1817,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-mimo-v2-5-pro',
@@ -1167,7 +1833,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.84,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-mimo-v2-5',
@@ -1177,7 +1849,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.86,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-google-gemini-3-5-flash',
@@ -1186,8 +1864,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'high',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.70,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    priority: 0.7,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-google-gemini-3-1-flash-lite',
@@ -1197,7 +1881,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
   {
     id: 'command-code-nvidia-nemotron-3-ultra-550b-a55b',
@@ -1207,7 +1897,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.66,
-    capabilities: { toolCalling: true, jsonMode: true, vision: false, contextWindow: 1000000, maxOutputTokens: 8192 },
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 1000000,
+      maxOutputTokens: 8192,
+    },
   },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
@@ -1218,8 +1914,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
   {
     id: 'openrouter-cohere-north-mini-code-free',
@@ -1228,8 +1930,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
   },
 ];
 
@@ -1325,8 +2033,10 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:nvidia/nemotron-3-nano-30b-a3b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-nano-9b-v2:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:openai/gpt-oss-20b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
- // AUTO-ADDED — tune
+  'openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free': {
+    requestsPerDay: 100,
+  }, // AUTO-ADDED — tune
+  // AUTO-ADDED — tune
   // AUTO-ADDED limits
   'openrouter:openrouter/owl-alpha': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
@@ -1416,7 +2126,10 @@ function safeParse<T>(value: string | undefined): T | null {
 function hasProviderKey(env: Env, provider: TextProvider): boolean {
   switch (provider) {
     case 'workers_ai':
-      return isWorkersAiEnabled(env) && (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY));
+      return (
+        isWorkersAiEnabled(env) &&
+        (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY))
+      );
     case 'groq':
       return Boolean(env.GROQ_API_KEY);
     case 'gemini':
@@ -1482,7 +2195,8 @@ export function getModelRegistry(env: Env): ModelCandidate[] {
       ...candidate,
       capabilities: {
         ...candidate.capabilities,
-        nativeReasoning: candidate.capabilities.nativeReasoning ?? modelHasNativeReasoning(candidate),
+        nativeReasoning:
+          candidate.capabilities.nativeReasoning ?? modelHasNativeReasoning(candidate),
       },
     }));
 }
@@ -1503,7 +2217,6 @@ export function getTierOrder(reasoning: ReasoningEffort): ReasoningTier[] {
       return ['high', 'medium', 'low'];
     case 'medium':
       return ['medium', 'high', 'low'];
-    case 'auto':
     default:
       return ['medium', 'low', 'high'];
   }
@@ -1515,43 +2228,207 @@ export function getModelKey(provider: Provider, model: string): string {
 
 const DEFAULT_IMAGE_MODELS: ImageModelCandidate[] = [
   // Together (free via key)
-  { id: 'flux-schnell', provider: 'together', model: 'black-forest-labs/FLUX.1-schnell', enabled: true, priority: 0.90 },
-  { id: 'flux-1.1-pro', provider: 'together', model: 'black-forest-labs/FLUX.1.1-pro', enabled: true, priority: 0.85 },
-  { id: 'flux-kontext-pro', provider: 'together', model: 'black-forest-labs/FLUX.1-kontext-pro', enabled: true, priority: 0.83 },
-  { id: 'flux-2-dev', provider: 'together', model: 'black-forest-labs/FLUX.2-dev', enabled: true, priority: 0.82 },
-  { id: 'flux-2-flex', provider: 'together', model: 'black-forest-labs/FLUX.2-flex', enabled: true, priority: 0.80 },
-  { id: 'flux-2-pro', provider: 'together', model: 'black-forest-labs/FLUX.2-pro', enabled: true, priority: 0.88 },
-  { id: 'flux-2-max', provider: 'together', model: 'black-forest-labs/FLUX.2-max', enabled: true, priority: 0.91 },
+  {
+    id: 'flux-schnell',
+    provider: 'together',
+    model: 'black-forest-labs/FLUX.1-schnell',
+    enabled: true,
+    priority: 0.9,
+  },
+  {
+    id: 'flux-1.1-pro',
+    provider: 'together',
+    model: 'black-forest-labs/FLUX.1.1-pro',
+    enabled: true,
+    priority: 0.85,
+  },
+  {
+    id: 'flux-kontext-pro',
+    provider: 'together',
+    model: 'black-forest-labs/FLUX.1-kontext-pro',
+    enabled: true,
+    priority: 0.83,
+  },
+  {
+    id: 'flux-2-dev',
+    provider: 'together',
+    model: 'black-forest-labs/FLUX.2-dev',
+    enabled: true,
+    priority: 0.82,
+  },
+  {
+    id: 'flux-2-flex',
+    provider: 'together',
+    model: 'black-forest-labs/FLUX.2-flex',
+    enabled: true,
+    priority: 0.8,
+  },
+  {
+    id: 'flux-2-pro',
+    provider: 'together',
+    model: 'black-forest-labs/FLUX.2-pro',
+    enabled: true,
+    priority: 0.88,
+  },
+  {
+    id: 'flux-2-max',
+    provider: 'together',
+    model: 'black-forest-labs/FLUX.2-max',
+    enabled: true,
+    priority: 0.91,
+  },
   // Gemini Imagen
-  { id: 'imagen-4', provider: 'gemini', model: 'imagen-4.0-generate-001', enabled: true, priority: 0.86 },
-  { id: 'gemini-flash-image', provider: 'gemini', model: 'gemini-2.5-flash-image', enabled: true, priority: 0.82 },
+  {
+    id: 'imagen-4',
+    provider: 'gemini',
+    model: 'imagen-4.0-generate-001',
+    enabled: true,
+    priority: 0.86,
+  },
+  {
+    id: 'gemini-flash-image',
+    provider: 'gemini',
+    model: 'gemini-2.5-flash-image',
+    enabled: true,
+    priority: 0.82,
+  },
   // Workers AI
-  { id: 'cf-flux-schnell', provider: 'workers_ai', model: '@cf/black-forest-labs/flux-1-schnell', enabled: true, priority: 0.78 },
-  { id: 'cf-sdxl', provider: 'workers_ai', model: '@cf/stabilityai/stable-diffusion-xl-base-1.0', enabled: true, priority: 0.72 },
-  { id: 'cf-dreamshaper', provider: 'workers_ai', model: '@cf/lykon/dreamshaper-8-lcm', enabled: true, priority: 0.70 },
+  {
+    id: 'cf-flux-schnell',
+    provider: 'workers_ai',
+    model: '@cf/black-forest-labs/flux-1-schnell',
+    enabled: true,
+    priority: 0.78,
+  },
+  {
+    id: 'cf-sdxl',
+    provider: 'workers_ai',
+    model: '@cf/stabilityai/stable-diffusion-xl-base-1.0',
+    enabled: true,
+    priority: 0.72,
+  },
+  {
+    id: 'cf-dreamshaper',
+    provider: 'workers_ai',
+    model: '@cf/lykon/dreamshaper-8-lcm',
+    enabled: true,
+    priority: 0.7,
+  },
   // NVIDIA NIM
-  { id: 'nvidia-flux-schnell', provider: 'nvidia', model: 'black-forest-labs/flux.1-schnell', enabled: true, priority: 0.76 },
-  { id: 'nvidia-sdxl', provider: 'nvidia', model: 'stabilityai/stable-diffusion-xl', enabled: false, priority: 0.70 }, // NVIDIA NIM function id not found (404)
+  {
+    id: 'nvidia-flux-schnell',
+    provider: 'nvidia',
+    model: 'black-forest-labs/flux.1-schnell',
+    enabled: true,
+    priority: 0.76,
+  },
+  {
+    id: 'nvidia-sdxl',
+    provider: 'nvidia',
+    model: 'stabilityai/stable-diffusion-xl',
+    enabled: false,
+    priority: 0.7,
+  }, // NVIDIA NIM function id not found (404)
   // Pollinations (no key)
-  { id: 'pollinations-flux', provider: 'pollinations', model: 'flux', enabled: true, priority: 0.60 },
-  { id: 'pollinations-flux-realism', provider: 'pollinations', model: 'flux-realism', enabled: true, priority: 0.58 },
-  { id: 'pollinations-turbo', provider: 'pollinations', model: 'turbo', enabled: true, priority: 0.55 },
+  {
+    id: 'pollinations-flux',
+    provider: 'pollinations',
+    model: 'flux',
+    enabled: true,
+    priority: 0.6,
+  },
+  {
+    id: 'pollinations-flux-realism',
+    provider: 'pollinations',
+    model: 'flux-realism',
+    enabled: true,
+    priority: 0.58,
+  },
+  {
+    id: 'pollinations-turbo',
+    provider: 'pollinations',
+    model: 'turbo',
+    enabled: true,
+    priority: 0.55,
+  },
 ];
 
 const DEFAULT_VIDEO_MODELS: VideoModelCandidate[] = [
-  { id: 'veo-3-audio', provider: 'together', model: 'google/veo-3.0-audio', enabled: true, priority: 0.95 },
-  { id: 'veo-3-fast-audio', provider: 'together', model: 'google/veo-3.0-fast-audio', enabled: true, priority: 0.93 },
+  {
+    id: 'veo-3-audio',
+    provider: 'together',
+    model: 'google/veo-3.0-audio',
+    enabled: true,
+    priority: 0.95,
+  },
+  {
+    id: 'veo-3-fast-audio',
+    provider: 'together',
+    model: 'google/veo-3.0-fast-audio',
+    enabled: true,
+    priority: 0.93,
+  },
   { id: 'veo-2', provider: 'together', model: 'google/veo-2.0', enabled: true, priority: 0.88 },
   { id: 'sora-2', provider: 'together', model: 'openai/sora-2', enabled: true, priority: 0.94 },
-  { id: 'kling-2.1-master', provider: 'together', model: 'kwaivgI/kling-2.1-master', enabled: true, priority: 0.90 },
-  { id: 'kling-2.1-pro', provider: 'together', model: 'kwaivgI/kling-2.1-pro', enabled: true, priority: 0.87 },
-  { id: 'kling-2.0-master', provider: 'together', model: 'kwaivgI/kling-2.0-master', enabled: true, priority: 0.84 },
-  { id: 'kling-1.6-pro', provider: 'together', model: 'kwaivgI/kling-1.6-pro', enabled: true, priority: 0.80 },
-  { id: 'wan-2.6-image', provider: 'together', model: 'Wan-AI/Wan2.6-image', enabled: true, priority: 0.78, supportsImageToVideo: true },
-  { id: 'wan-2.2-i2v', provider: 'together', model: 'Wan-AI/Wan2.2-I2V-A14B', enabled: true, priority: 0.76, supportsImageToVideo: true },
+  {
+    id: 'kling-2.1-master',
+    provider: 'together',
+    model: 'kwaivgI/kling-2.1-master',
+    enabled: true,
+    priority: 0.9,
+  },
+  {
+    id: 'kling-2.1-pro',
+    provider: 'together',
+    model: 'kwaivgI/kling-2.1-pro',
+    enabled: true,
+    priority: 0.87,
+  },
+  {
+    id: 'kling-2.0-master',
+    provider: 'together',
+    model: 'kwaivgI/kling-2.0-master',
+    enabled: true,
+    priority: 0.84,
+  },
+  {
+    id: 'kling-1.6-pro',
+    provider: 'together',
+    model: 'kwaivgI/kling-1.6-pro',
+    enabled: true,
+    priority: 0.8,
+  },
+  {
+    id: 'wan-2.6-image',
+    provider: 'together',
+    model: 'Wan-AI/Wan2.6-image',
+    enabled: true,
+    priority: 0.78,
+    supportsImageToVideo: true,
+  },
+  {
+    id: 'wan-2.2-i2v',
+    provider: 'together',
+    model: 'Wan-AI/Wan2.2-I2V-A14B',
+    enabled: true,
+    priority: 0.76,
+    supportsImageToVideo: true,
+  },
   { id: 'vidu-q1', provider: 'together', model: 'vidu/vidu-q1', enabled: true, priority: 0.74 },
-  { id: 'seedream-3', provider: 'together', model: 'ByteDance-Seed/Seedream-3.0', enabled: true, priority: 0.82 },
-  { id: 'seedream-4', provider: 'together', model: 'ByteDance-Seed/Seedream-4.0', enabled: true, priority: 0.85 },
+  {
+    id: 'seedream-3',
+    provider: 'together',
+    model: 'ByteDance-Seed/Seedream-3.0',
+    enabled: true,
+    priority: 0.82,
+  },
+  {
+    id: 'seedream-4',
+    provider: 'together',
+    model: 'ByteDance-Seed/Seedream-4.0',
+    enabled: true,
+    priority: 0.85,
+  },
 ];
 
 const DEFAULT_TTS_MODELS: AudioTtsModelCandidate[] = [
@@ -1560,16 +2437,40 @@ const DEFAULT_TTS_MODELS: AudioTtsModelCandidate[] = [
     provider: 'workers_ai',
     model: '@cf/myshell-ai/melotts',
     enabled: true,
-    priority: 0.70,
+    priority: 0.7,
     voices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
   },
 ];
 
 const DEFAULT_STT_MODELS: AudioSttModelCandidate[] = [
-  { id: 'groq-whisper-turbo', provider: 'groq', model: 'whisper-large-v3-turbo', enabled: true, priority: 0.95 },
-  { id: 'groq-whisper-v3', provider: 'groq', model: 'whisper-large-v3', enabled: true, priority: 0.90 },
-  { id: 'cf-whisper', provider: 'workers_ai', model: '@cf/openai/whisper', enabled: true, priority: 0.75 },
-  { id: 'gemini-audio', provider: 'gemini', model: 'gemini-2.5-flash', enabled: true, priority: 0.78 },
+  {
+    id: 'groq-whisper-turbo',
+    provider: 'groq',
+    model: 'whisper-large-v3-turbo',
+    enabled: true,
+    priority: 0.95,
+  },
+  {
+    id: 'groq-whisper-v3',
+    provider: 'groq',
+    model: 'whisper-large-v3',
+    enabled: true,
+    priority: 0.9,
+  },
+  {
+    id: 'cf-whisper',
+    provider: 'workers_ai',
+    model: '@cf/openai/whisper',
+    enabled: true,
+    priority: 0.75,
+  },
+  {
+    id: 'gemini-audio',
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    enabled: true,
+    priority: 0.78,
+  },
 ];
 
 const DEFAULT_MODALITY_LIMITS: Record<string, ProviderLimitConfig> = {
@@ -1629,16 +2530,16 @@ const IMAGE_PROVIDER_KEY_REQUIRED: Record<ImageProvider, boolean> = {
   nvidia: true,
 };
 
-const VIDEO_PROVIDER_KEY_REQUIRED: Record<VideoProvider, boolean> = {
+const _VIDEO_PROVIDER_KEY_REQUIRED: Record<VideoProvider, boolean> = {
   together: true,
 };
 
-const TTS_PROVIDER_KEY_REQUIRED: Record<AudioTtsProvider, boolean> = {
+const _TTS_PROVIDER_KEY_REQUIRED: Record<AudioTtsProvider, boolean> = {
   workers_ai: false,
   groq: true,
 };
 
-const STT_PROVIDER_KEY_REQUIRED: Record<AudioSttProvider, boolean> = {
+const _STT_PROVIDER_KEY_REQUIRED: Record<AudioSttProvider, boolean> = {
   groq: true,
   workers_ai: false,
   gemini: true,
@@ -1649,7 +2550,10 @@ export function hasImageProviderKey(env: Env, provider: ImageProvider): boolean 
     case 'together':
       return Boolean(env.TOGETHER_API_KEY);
     case 'workers_ai':
-      return isWorkersAiEnabled(env) && (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY));
+      return (
+        isWorkersAiEnabled(env) &&
+        (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY))
+      );
     case 'pollinations':
       return true;
     case 'gemini':
@@ -1675,7 +2579,10 @@ export function hasTtsProviderKey(env: Env, provider: AudioTtsProvider): boolean
     case 'groq':
       return Boolean(env.GROQ_API_KEY);
     case 'workers_ai':
-      return isWorkersAiEnabled(env) && (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY));
+      return (
+        isWorkersAiEnabled(env) &&
+        (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY))
+      );
     default:
       return false;
   }
@@ -1686,7 +2593,10 @@ export function hasSttProviderKey(env: Env, provider: AudioSttProvider): boolean
     case 'groq':
       return Boolean(env.GROQ_API_KEY);
     case 'workers_ai':
-      return isWorkersAiEnabled(env) && (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY));
+      return (
+        isWorkersAiEnabled(env) &&
+        (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY))
+      );
     case 'gemini':
       return Boolean(env.GEMINI_API_KEY);
     default:
@@ -1697,10 +2607,16 @@ export function hasSttProviderKey(env: Env, provider: AudioSttProvider): boolean
 export function getImageRegistry(env: Env): ImageModelCandidate[] {
   return DEFAULT_IMAGE_MODELS.filter((candidate) => {
     if (!candidate.enabled) return false;
-    if (IMAGE_PROVIDER_KEY_REQUIRED[candidate.provider] && !hasImageProviderKey(env, candidate.provider)) {
+    if (
+      IMAGE_PROVIDER_KEY_REQUIRED[candidate.provider] &&
+      !hasImageProviderKey(env, candidate.provider)
+    ) {
       return false;
     }
-    if (!IMAGE_PROVIDER_KEY_REQUIRED[candidate.provider] && !hasImageProviderKey(env, candidate.provider)) {
+    if (
+      !IMAGE_PROVIDER_KEY_REQUIRED[candidate.provider] &&
+      !hasImageProviderKey(env, candidate.provider)
+    ) {
       return false;
     }
     return true;

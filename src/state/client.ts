@@ -9,7 +9,7 @@ export async function healthLookup(
   env: Env,
   keys: string[],
   limits: Record<string, ProviderLimitConfig>,
-  now: number,
+  now: number
 ): Promise<Map<string, ModelStateSnapshot>> {
   const id = env.HEALTH_DO.idFromName('global-health');
   const stub = env.HEALTH_DO.get(id);
@@ -35,7 +35,7 @@ export async function healthRecord(
     latencyMs: number;
     failureClass?: FailureClass;
     now: number;
-  },
+  }
 ): Promise<void> {
   const id = env.HEALTH_DO.idFromName('global-health');
   const stub = env.HEALTH_DO.get(id);
@@ -78,7 +78,7 @@ export async function nextRoundRobinOffset(
   params: {
     key: string;
     size: number;
-  },
+  }
 ): Promise<number> {
   if (!params.key || params.size <= 1) {
     return 0;
@@ -116,7 +116,7 @@ export async function consumeIpRateLimit(
     capacity: number;
     refillPerSecond: number;
     cost?: number;
-  },
+  }
 ): Promise<{ allowed: boolean; remaining: number; retryAfter: number }> {
   const id = env.RATE_LIMIT_DO.idFromName(params.ipKey);
   const stub = env.RATE_LIMIT_DO.get(id);

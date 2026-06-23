@@ -32,7 +32,9 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export async function callPollinationsImages(input: PollinationsImageInput): Promise<PollinationsImageOutput> {
+export async function callPollinationsImages(
+  input: PollinationsImageInput
+): Promise<PollinationsImageOutput> {
   const { width, height } = parseSize(input.size);
   const params = new URLSearchParams({
     model: input.model,

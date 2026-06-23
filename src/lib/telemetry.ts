@@ -7,12 +7,12 @@ interface CaptureEvent {
 }
 
 let _apiKey: string | null = null;
-let _host = "https://us.i.posthog.com";
+let _host = 'https://us.i.posthog.com';
 const queue: Promise<unknown>[] = [];
 
-export function configurePostHog(apiKey: string, host = "https://us.i.posthog.com"): void {
+export function configurePostHog(apiKey: string, host = 'https://us.i.posthog.com'): void {
   _apiKey = apiKey;
-  _host = host.replace(/\/+$/, "");
+  _host = host.replace(/\/+$/, '');
 }
 
 export function capture(event: CaptureEvent): void {
@@ -25,11 +25,11 @@ export function capture(event: CaptureEvent): void {
     timestamp: new Date().toISOString(),
   };
   const promise = fetch(`${_host}/i/v0/e/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).catch((err) => {
-    console.error("[telemetry] PostHog capture failed:", err instanceof Error ? err.message : err);
+    console.error('[telemetry] PostHog capture failed:', err instanceof Error ? err.message : err);
   });
   queue.push(promise);
 }
@@ -47,7 +47,7 @@ export interface TraceOptions {
 export async function trace<T>(
   name: string,
   fn: () => Promise<T>,
-  options: TraceOptions = {},
+  options: TraceOptions = {}
 ): Promise<T> {
   const start = performance.now();
   try {

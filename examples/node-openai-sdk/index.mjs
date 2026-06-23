@@ -45,7 +45,9 @@ function previewToken(token) {
 async function main() {
   loadDotEnv(resolve(process.cwd(), '.env'));
 
-  const gatewayBaseUrl = (process.env.GATEWAY_BASE_URL || 'https://free-ai-gateway.sarthakagrawal927.workers.dev').replace(/\/$/, '');
+  const gatewayBaseUrl = (
+    process.env.GATEWAY_BASE_URL || 'https://free-ai-gateway.sarthakagrawal927.workers.dev'
+  ).replace(/\/$/, '');
   const model = process.env.MODEL || 'auto';
   const responsesInput = process.env.RESPONSES_INPUT || 'Reply with exactly: NODE_RESPONSES_OK';
   const chatPrompt = process.env.CHAT_PROMPT || 'Reply with exactly: NODE_CHAT_OK';
@@ -106,8 +108,8 @@ async function main() {
         stream_text: streamText,
       },
       null,
-      2,
-    ),
+      2
+    )
   );
 }
 
@@ -119,8 +121,8 @@ main().catch((error) => {
         error: error instanceof Error ? error.message : String(error),
       },
       null,
-      2,
-    ),
+      2
+    )
   );
   process.exit(1);
 });

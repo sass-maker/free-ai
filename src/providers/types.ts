@@ -1,4 +1,11 @@
-import type { ChatMessage, EmbeddingProvider, Env, ResponseFormat, TextProvider, Tool } from '../types';
+import type {
+  ChatMessage,
+  EmbeddingProvider,
+  Env,
+  ResponseFormat,
+  TextProvider,
+  Tool,
+} from '../types';
 
 export interface ProviderCallInput {
   env: Env;
@@ -82,4 +89,6 @@ export interface ProviderEmbeddingResult {
   };
 }
 
-export type ProviderEmbeddingCaller = (input: ProviderEmbeddingInput) => Promise<ProviderEmbeddingResult>;
+export type ProviderEmbeddingCaller = (
+  input: ProviderEmbeddingInput
+) => Promise<ProviderEmbeddingResult>;

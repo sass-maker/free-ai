@@ -90,7 +90,13 @@ export async function callNvidiaImages(input: NvidiaImageInput): Promise<NvidiaI
   if (Array.isArray(json.data)) {
     for (const item of json.data) {
       if (item.b64_json) {
-        data.push({ b64_json: item.b64_json, url: input.response_format === 'b64_json' ? undefined : `data:image/png;base64,${item.b64_json}` });
+        data.push({
+          b64_json: item.b64_json,
+          url:
+            input.response_format === 'b64_json'
+              ? undefined
+              : `data:image/png;base64,${item.b64_json}`,
+        });
       } else if (item.url) {
         data.push({ url: item.url });
       }

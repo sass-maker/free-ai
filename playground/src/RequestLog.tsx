@@ -45,13 +45,13 @@ export function RequestLog({ history, onSelectRequest, selectedRequestId }: Requ
             }`}
           >
             <div className="flex justify-between items-start">
-              <p className="font-mono text-sm truncate w-full pr-4">
-                {entry.prompt}
-              </p>
+              <p className="font-mono text-sm truncate w-full pr-4">{entry.prompt}</p>
               <div className="flex items-center gap-4">
                 <span
                   className={`text-xs px-2 py-1 rounded-full ${
-                    entry.status === 200 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                    entry.status === 200
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-red-500/20 text-red-400'
                   }`}
                 >
                   {entry.status}

@@ -34,7 +34,9 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export async function callWorkersAiImages(input: WorkersAiImageInput): Promise<WorkersAiImageOutput> {
+export async function callWorkersAiImages(
+  input: WorkersAiImageInput
+): Promise<WorkersAiImageOutput> {
   if (!isWorkersAiEnabled(input.env)) {
     throw new Error('Workers AI is disabled');
   }

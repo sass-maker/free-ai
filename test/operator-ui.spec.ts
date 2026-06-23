@@ -8,7 +8,11 @@ async function fetchRoute(path: string, headers: HeadersInit = {}) {
   return app.fetch(new Request(`https://gateway.test${path}`, { headers }), env, makeCtx());
 }
 
-async function fetchRouteWithEnv(path: string, overrides: Parameters<typeof makeTestEnv>[0], headers: HeadersInit = {}) {
+async function fetchRouteWithEnv(
+  path: string,
+  overrides: Parameters<typeof makeTestEnv>[0],
+  headers: HeadersInit = {}
+) {
   const { env } = makeTestEnv(overrides);
   return app.fetch(new Request(`https://gateway.test${path}`, { headers }), env, makeCtx());
 }
@@ -47,7 +51,9 @@ describe('Operator browser UI routes', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type') ?? '').toContain('application/json');
-    const body = (await res.json()) as { data: Array<{ id: string; provider: string; type: string }> };
+    const body = (await res.json()) as {
+      data: Array<{ id: string; provider: string; type: string }>;
+    };
     expect(body.data.length).toBeGreaterThan(0);
     expect(body.data[0]).toHaveProperty('id');
     expect(body.data[0]).toHaveProperty('provider');
@@ -99,27 +105,27 @@ describe('Operator browser UI routes', () => {
           dimensions: 1024,
           enabled: true,
         }),
-      ]),
+      ])
     );
   });
 
-  it.each([['/v1/models'], ['/models']])(
-    '%s serves the searchable catalog for browser document requests',
-    async (path) => {
-      const res = await fetchRoute(path, {
-        accept: 'text/html,application/xhtml+xml',
-        'sec-fetch-dest': 'document',
-      });
+  it.each([
+    ['/v1/models'],
+    ['/models'],
+  ])('%s serves the searchable catalog for browser document requests', async (path) => {
+    const res = await fetchRoute(path, {
+      accept: 'text/html,application/xhtml+xml',
+      'sec-fetch-dest': 'document',
+    });
 
-      expect(res.status).toBe(200);
-      expect(res.headers.get('content-type') ?? '').toContain('text/html');
-      const html = await res.text();
-      expect(html).toContain('<title>Free AI Gateway - Model Catalog</title>');
-      expect(html).toContain('Model Catalog');
-      expect(html).toContain('Search model, provider, capability');
-      expect(html).toContain("fetch('/v1/models'");
-    },
-  );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type') ?? '').toContain('text/html');
+    const html = await res.text();
+    expect(html).toContain('<title>Free AI Gateway - Model Catalog</title>');
+    expect(html).toContain('Model Catalog');
+    expect(html).toContain('Search model, provider, capability');
+    expect(html).toContain("fetch('/v1/models'");
+  });
 
   it('serves /models as JSON for non-browser clients', async () => {
     const res = await fetchRoute('/models', { accept: 'application/json' });

@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { getModelRegistry, getTtsRegistry, isWorkersAiEnabled } from '../src/config';
 import { callWorkersAi } from '../src/providers/workers-ai';
 import { classifyError, isRetriableFailure } from '../src/router/classify-error';
-import { estimateChatInputChars, estimateNeuronCost, tryDebitNeurons } from '../src/state/neuron-budget';
+import {
+  estimateChatInputChars,
+  estimateNeuronCost,
+  tryDebitNeurons,
+} from '../src/state/neuron-budget';
 import type { Env } from '../src/types';
 
 function makeEnv(overrides: Partial<Env> = {}): Env {
@@ -23,7 +27,7 @@ describe('Workers AI free-tier guard', () => {
 
     const commandCodeModels = withKey.filter((candidate) => candidate.provider === 'command_code');
     const topCommandCodeModel = commandCodeModels.reduce((top, candidate) =>
-      candidate.priority > top.priority ? candidate : top,
+      candidate.priority > top.priority ? candidate : top
     );
 
     expect(withoutKey.some((candidate) => candidate.provider === 'command_code')).toBe(false);
@@ -40,7 +44,7 @@ describe('Workers AI free-tier guard', () => {
           provider: 'command_code',
           model: 'xiaomi/mimo-v2.5',
         }),
-      ]),
+      ])
     );
   });
 
@@ -50,12 +54,20 @@ describe('Workers AI free-tier guard', () => {
     const enabledEnv = makeEnv({ AI: ai, WORKERS_AI_ENABLED: 'true' });
 
     expect(isWorkersAiEnabled(disabledEnv)).toBe(false);
-    expect(getModelRegistry(disabledEnv).some((candidate) => candidate.provider === 'workers_ai')).toBe(false);
-    expect(getTtsRegistry(disabledEnv).some((candidate) => candidate.provider === 'workers_ai')).toBe(false);
+    expect(
+      getModelRegistry(disabledEnv).some((candidate) => candidate.provider === 'workers_ai')
+    ).toBe(false);
+    expect(
+      getTtsRegistry(disabledEnv).some((candidate) => candidate.provider === 'workers_ai')
+    ).toBe(false);
 
     expect(isWorkersAiEnabled(enabledEnv)).toBe(true);
-    expect(getModelRegistry(enabledEnv).some((candidate) => candidate.provider === 'workers_ai')).toBe(true);
-    expect(getTtsRegistry(enabledEnv).some((candidate) => candidate.provider === 'workers_ai')).toBe(true);
+    expect(
+      getModelRegistry(enabledEnv).some((candidate) => candidate.provider === 'workers_ai')
+    ).toBe(true);
+    expect(
+      getTtsRegistry(enabledEnv).some((candidate) => candidate.provider === 'workers_ai')
+    ).toBe(true);
   });
 
   it('fails closed when the neuron budget binding is unavailable', async () => {
@@ -104,7 +116,7 @@ describe('Workers AI free-tier guard', () => {
         model: '@cf/meta/llama-3.2-1b-instruct',
         messages: [{ role: 'user', content: 'hello' }],
         stream: false,
-      }),
+      })
     ).rejects.toThrow('Workers AI is disabled');
 
     expect(run).not.toHaveBeenCalled();
@@ -121,7 +133,7 @@ describe('Workers AI free-tier guard', () => {
         model: '@cf/meta/llama-3.2-1b-instruct',
         messages: [{ role: 'user', content: 'hello' }],
         stream: false,
-      }),
+      })
     ).rejects.toThrow('Daily Workers AI Neuron budget exhausted');
 
     expect(run).not.toHaveBeenCalled();
@@ -139,7 +151,7 @@ describe('Workers AI free-tier guard', () => {
       stream: false,
     }).then(
       () => null,
-      (err: unknown) => err,
+      (err: unknown) => err
     );
 
     expect(error).toBeInstanceOf(Error);
