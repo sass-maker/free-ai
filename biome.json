@@ -11,6 +11,7 @@
       "!**/out",
       "!**/coverage",
       "!**/node_modules",
+      "!**/*.astro",
       "!**/.astro",
       "!**/site/dist",
       "!**/site/.astro",
