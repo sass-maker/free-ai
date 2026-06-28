@@ -1,5 +1,5 @@
 # free-ai — PROJECT STATUS
-Last updated: 2026-06-22
+Last updated: 2026-06-28
 
 ## Why / What
 
@@ -183,8 +183,5 @@ Last updated: 2026-06-22
 
 ### Blocked
 
-- `src/index.ts` remains monolithic (~3600+ lines) — intentional until split has test coverage.
-- Live smoke (2026-06-03): OpenRouter reported exhausted — routing should keep exhausted providers visible but rank routable first.
-- Per-IP limits (~10 burst, ~20/min) and per-model daily caps are best-effort, not SLA.
+- `src/index.ts` remains monolithic (~4000 lines) — intentional until split has test coverage.
 - `/v1/responses` streaming not implemented — returns error directing to chat completions.
-- Playground behind `PLAYGROUND_ENABLED=false` by default.
