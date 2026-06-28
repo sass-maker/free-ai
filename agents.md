@@ -19,7 +19,7 @@ OpenAI-compatible API gateway on Cloudflare Workers — routes requests across 3
 ## Repo structure
 ```
 src/
-  index.ts              # Hono app + all route handlers (monolithic, ~55KB — known TODO to split)
+  index.ts              # Hono app + all route handlers (monolithic, ~111KB / 4000+ lines — known TODO to split)
   config.ts             # Model registry (30+ chat + 6 embedding models), tier ordering
   types.ts              # Shared types (Env, ModelCandidate, Provider)
   dashboard-html.ts     # Bundled HTML for /dashboard
@@ -70,7 +70,7 @@ node scripts/sync-dev-vars.mjs  # sync .env to wrangler dev vars
 - **State**: single global `HealthStateDO`; per-IP `IpRateLimitDO`. KV (`HEALTH_KV`) for fast health snapshots.
 - **Providers requiring API keys**: OpenRouter, Cerebras, SambaNova, NVIDIA, Groq, Gemini, Voyage. Workers AI uses CF AI binding (no extra key).
 - **30+ chat models + 6 embedding models** in config registry.
-- **Monolithic `index.ts`** (~55KB) — splitting is a known TODO.
+- **Monolithic `index.ts`** (~111KB / 4000+ lines) — splitting is a known TODO.
 - `site/` is an Astro site with its own `package.json`; managed separately.
 - Playground Vite SPA served via `ASSETS` binding in `wrangler.toml`.
 
