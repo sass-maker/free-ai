@@ -3,7 +3,7 @@ export const BENCHMARK_COST_OPTIMIZER_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Free AI Gateway - Benchmark &amp; Cost Optimizer</title>
+<title>AI Gateway - Benchmark &amp; Cost Optimizer</title>
 <style>
   :root {
     color-scheme: light;

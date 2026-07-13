@@ -20,7 +20,7 @@ describe('Dashboard HTML routes', () => {
     const contentType = res.headers.get('content-type') ?? '';
     expect(contentType).toContain('text/html');
     const html = await res.text();
-    expect(html).toContain('<title>Free AI Gateway — Live</title>');
+    expect(html).toContain('<title>AI Gateway — Live</title>');
   });
 
   it.each([

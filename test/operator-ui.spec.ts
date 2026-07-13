@@ -38,7 +38,7 @@ describe('Operator browser UI routes', () => {
     expect(res.headers.get('content-type') ?? '').toContain('text/html');
     expect(res.headers.get('cache-control') ?? '').toContain('no-store');
     const html = await res.text();
-    expect(html).toContain('<title>Free AI Gateway - Health</title>');
+    expect(html).toContain('<title>AI Gateway - Health</title>');
     expect(html).toContain('Gateway Health');
     expect(html).toContain("readJson('/health')");
     expect(html).toContain('/v1/routing/status');
@@ -121,7 +121,7 @@ describe('Operator browser UI routes', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type') ?? '').toContain('text/html');
     const html = await res.text();
-    expect(html).toContain('<title>Free AI Gateway - Model Catalog</title>');
+    expect(html).toContain('<title>AI Gateway - Model Catalog</title>');
     expect(html).toContain('Model Catalog');
     expect(html).toContain('Search model, provider, capability');
     expect(html).toContain("fetch('/v1/models'");

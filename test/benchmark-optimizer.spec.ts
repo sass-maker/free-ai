@@ -56,7 +56,7 @@ describe('Benchmark cost optimizer prototype', () => {
     expect(res.headers.get('cache-control') ?? '').toContain('no-store');
 
     const html = await res.text();
-    expect(html).toContain('<title>Free AI Gateway - Benchmark &amp; Cost Optimizer</title>');
+    expect(html).toContain('<title>AI Gateway - Benchmark &amp; Cost Optimizer</title>');
     expect(html).toContain('Model benchmark matrix');
     expect(html).toContain('Recommended route by workload');
     expect(html).toContain('Experiment ledger');

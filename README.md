@@ -1,4 +1,4 @@
-# Free AI Gateway
+# AI Gateway
 
 OpenAI-compatible API gateway that routes requests across free LLM providers with health-aware model selection, capability-based filtering, and aggregated analytics. Powered by [SaaS Maker](https://sassmaker.com).
 

@@ -6,7 +6,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Free AI Gateway — Live</title>
+<title>AI Gateway — Live</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   :root {
@@ -178,7 +178,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 <body>
 <div class="app">
   <div class="topbar">
-    <h1><span class="dot"></span>Free AI Gateway — Live</h1>
+    <h1><span class="dot"></span>AI Gateway — Live</h1>
     <div class="spacer"></div>
     <select id="groupBySel" title="Breakdown grouping">
       <option value="providers" selected>Group: Provider</option>
