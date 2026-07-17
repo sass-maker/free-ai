@@ -17,10 +17,12 @@ const rb = '}';
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={gw} />
+    <meta property="og:image" content={`${gw}/favicon.svg`} />
     <link rel="canonical" href={gw} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
+    <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: 'AI Gateway', applicationCategory: 'DeveloperApplication', operatingSystem: 'Web', url: gw, description })}></script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
