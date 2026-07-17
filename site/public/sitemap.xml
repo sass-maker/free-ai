@@ -1,9 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://ai-gateway.sassmaker.com/</loc></url>
-  <url><loc>https://ai-gateway.sassmaker.com/index.md</loc></url>
-  <url><loc>https://ai-gateway.sassmaker.com/llms.txt</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/about</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/analytics</loc></url>
   <url><loc>https://ai-gateway.sassmaker.com/api/ai</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/authentication</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/benchmark</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/chat-completions</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/dashboard</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/analytics</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/authentication</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/chat-completions</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/dashboard</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/embeddings</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/error-handling</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/getting-started</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/health</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/images</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/models</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/provider-stats</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/rate-limiting</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/responses-api</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/speech-to-speech</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/speech-to-text</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/text-to-speech</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/docs/videos</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/embeddings</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/error-handling</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/getting-started</loc></url>
   <url><loc>https://ai-gateway.sassmaker.com/health</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/images</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/index.md</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/live</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/llms.txt</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/models</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/provider-stats</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/rate-limiting</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/responses-api</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/speech-to-speech</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/speech-to-text</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/text-to-speech</loc></url>
   <url><loc>https://ai-gateway.sassmaker.com/v1/models</loc></url>
+  <url><loc>https://ai-gateway.sassmaker.com/videos</loc></url>
 </urlset>
