@@ -1,0 +1,39 @@
+{
+  "name": "AI Gateway",
+  "version": "1",
+  "url": "https://ai-gateway.sassmaker.com",
+  "llms": "https://ai-gateway.sassmaker.com/llms.txt",
+  "llmsFull": null,
+  "sitemap": "https://ai-gateway.sassmaker.com/sitemap.xml",
+  "markdown": {
+    "suffix": ".md",
+    "negotiation": true
+  },
+  "surfaces": [
+    {
+      "id": "home",
+      "url": "https://ai-gateway.sassmaker.com/",
+      "md": "https://ai-gateway.sassmaker.com/index.md",
+      "kind": "spa",
+      "description": "Product home"
+    },
+    {
+      "id": "health",
+      "url": "https://ai-gateway.sassmaker.com/health",
+      "md": null,
+      "kind": "static",
+      "description": "Health probe"
+    },
+    {
+      "id": "models",
+      "url": "https://ai-gateway.sassmaker.com/v1/models",
+      "md": null,
+      "kind": "static",
+      "description": "OpenAI-compatible models list"
+    }
+  ],
+  "auth": {
+    "public": true,
+    "notes": "Auth-walled app routes are not agent-indexed unless listed here."
+  }
+}

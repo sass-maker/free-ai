@@ -3,6 +3,7 @@ import { capture, configurePostHog, flushPostHog, trace } from './lib/telemetry'
 import pLimit from 'p-limit';
 import pRetry, { AbortError } from 'p-retry';
 
+import { handleAgentEdge } from './agent-edge.mjs';
 import { isGatewayAuthConfigured, isValidGatewayApiKey } from './auth/gateway';
 import {
   getImageRegistry,
@@ -81,6 +82,13 @@ import {
 import { createSseStream, toSseData } from './utils/sse';
 
 const app = new OpenAPIHono<{ Bindings: Env }>();
+
+// Fleet agent indexing (GEO) — discoverable product brief for AI crawlers
+app.use('*', async (c, next) => {
+  const agent = handleAgentEdge(c.req.raw);
+  if (agent) return agent;
+  return next();
+});
 
 const TEXT_PROVIDER_VALUES = [
   'workers_ai',

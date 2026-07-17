@@ -1,0 +1,18 @@
+# AI Gateway
+
+> OpenAI-compatible LLM gateway fronting free-tier models across multiple providers.
+
+## Product
+
+- [Health](https://ai-gateway.sassmaker.com/health): Health probe
+- [Models](https://ai-gateway.sassmaker.com/v1/models): OpenAI-compatible models list
+
+## Machine surfaces
+
+- [Agent catalog](https://ai-gateway.sassmaker.com/api/ai): JSON inventory of public surfaces
+- [Homepage markdown](https://ai-gateway.sassmaker.com/index.md): Product brief without JS
+- [This index](https://ai-gateway.sassmaker.com/llms.txt)
+
+## Optional
+
+- [Foundry](https://sassmaker.com): Parent fleet showcase
