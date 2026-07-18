@@ -25,7 +25,8 @@ const rb = '}';
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" /></noscript>
     <style is:inline>
       :root{--bg:#050a0e;--bg-raised:#0a1118;--bg-card:#0d1820;--surface:#121f2b;--border:#1a2d3a;--border-bright:#245068;--text:#e4edf3;--text-secondary:#7d9bae;--text-muted:#4a6575;--brand:#0ea5e9;--brand-glow:rgba(14,165,233,0.15);--emerald:#10b981;--amber:#f59e0b;--font-display:'Instrument Serif',Georgia,serif;--font-body:'DM Sans',system-ui,sans-serif;--font-mono:'JetBrains Mono',ui-monospace,monospace}
       *{box-sizing:border-box;margin:0;padding:0}
@@ -167,6 +168,7 @@ const rb = '}';
         <ul class="nav-links">
           <li><a href="/" class="active">Home</a></li>
           <li><a href="/getting-started">Docs</a></li>
+          <li><a href="/faq">FAQ</a></li>
           <li><a href="/dashboard">Dashboard</a></li>
         </ul>
       </div>
@@ -426,6 +428,7 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
         <div class="footer-col">
           <h4>Product</h4>
           <a href="/getting-started">Documentation</a>
+          <a href="/faq">FAQ</a>
           <a href="/dashboard">Dashboard</a>
           <a href={`${gw}/health`} target="_blank">Health Status</a>
         </div>

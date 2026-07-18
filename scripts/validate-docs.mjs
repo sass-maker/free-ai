@@ -105,7 +105,7 @@ async function checkLinks(files) {
           const headings = await collectHeadings(resolved.target);
           if (!headings.has(resolved.anchor)) {
             errors.push(
-              `broken anchor: ${rel} → ${href} (heading "#${resolved.anchor}" not found in ${relative(ROOT, resolved.target)})`,
+              `broken anchor: ${rel} → ${href} (heading "#${resolved.anchor}" not found in ${relative(ROOT, resolved.target)})`
             );
           }
         }

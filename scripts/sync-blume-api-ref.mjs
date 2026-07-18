@@ -15,7 +15,7 @@
 //   - Writes the result to docs-blume/docs/<same-name>.mdx
 //   - Preserves frontmatter (title, description)
 
-import { readFile, writeFile, mkdir, readdir, stat } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,10 +28,7 @@ const DEST = join(ROOT, 'docs-blume/docs');
 function stripStarlight(content) {
   let out = content;
   // Remove the starlight components import line
-  out = out.replace(
-    /^import\s*\{[^}]*\}\s*from\s*'@astrojs\/starlight\/components';\s*\n/m,
-    '',
-  );
+  out = out.replace(/^import\s*\{[^}]*\}\s*from\s*'@astrojs\/starlight\/components';\s*\n/m, '');
   // Convert <Tabs> ... </Tabs> blocks into #### headers
   // <TabItem label="curl"> ... </TabItem>  →  #### curl\n ...
   out = out.replace(/<Tabs>\s*\n/g, '');
