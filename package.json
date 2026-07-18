@@ -37,7 +37,10 @@
     "lint": "biome check .",
     "lint:fix": "biome check . --write --unsafe",
     "format": "biome format . --write",
-    "format:check": "biome format ."
+    "format:check": "biome format .",
+    "docs:check": "node scripts/validate-docs.mjs",
+    "docs:build": "cd docs-blume && npm install --silent && npm run build",
+    "docs:sync-api-ref": "node scripts/sync-blume-api-ref.mjs"
   },
   "dependencies": {
     "@hono/swagger-ui": "0.6.1",

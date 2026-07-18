@@ -3,3 +3,9 @@ dist/
 .blume/
 .astro/
 .DS_Store
+# Generated API-ref copy (run scripts/sync-blume-api-ref.mjs to regenerate).
+# The source of truth is site/src/content/docs/, not this directory.
+docs/
+# npm lockfile — this package uses npm but the root repo uses pnpm; don't commit
+# a competing lockfile.
+package-lock.json

@@ -6,6 +6,7 @@
 
 - [Health](https://ai-gateway.sassmaker.com/health): Health probe
 - [Models](https://ai-gateway.sassmaker.com/v1/models): OpenAI-compatible models list
+- [FAQ](https://ai-gateway.sassmaker.com/faq): Frequently asked questions about the gateway
 
 ## Machine surfaces
 

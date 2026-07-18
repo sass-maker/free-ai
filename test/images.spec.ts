@@ -139,7 +139,7 @@ describe('POST /v1/images/generations', () => {
     const res = await app.fetch(req, env, makeCtx());
     expect(res.status).toBe(502);
     const body = (await res.json()) as { error: { message: string; type: string } };
-    expect(body.error.type).toBe('provider_error');
+    expect(body.error.type).toBe('provider_fatal');
     expect(body.error.message).toContain('upstream 500');
   });
 

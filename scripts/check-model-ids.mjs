@@ -29,6 +29,7 @@ async function fetchGroqModels() {
   if (!key) return null;
   const res = await fetch('https://api.groq.com/openai/v1/models', {
     headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) return null;
   const data = await res.json();
@@ -44,6 +45,7 @@ async function fetchOpenRouterModels() {
   if (!key) return null;
   const res = await fetch('https://openrouter.ai/api/v1/models', {
     headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) return null;
   const data = await res.json();
@@ -74,6 +76,7 @@ async function fetchCerebrasModels() {
   if (!key) return null;
   const res = await fetch('https://api.cerebras.ai/v1/models', {
     headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) return null;
   const data = await res.json();
@@ -84,7 +87,9 @@ async function fetchCerebrasModels() {
 async function fetchGeminiModels() {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!res.ok) return null;
   const data = await res.json();
   const all = new Set(data.models.map((m) => m.name.replace('models/', '')));

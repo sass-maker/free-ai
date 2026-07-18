@@ -1,0 +1,312 @@
+---
+const title = 'FAQ — AI Gateway';
+const description =
+  'Answers to common questions about the free OpenAI-compatible AI gateway: multi-provider routing, health-aware selection, automatic fallback, analytics, and Cloudflare Workers deployment.';
+const gw = 'https://ai-gateway.sassmaker.com';
+
+const faqs = [
+  {
+    q: "What's a free OpenAI-compatible API gateway?",
+    a: "It's a proxy that exposes the same request/response shape as the OpenAI API (/v1/chat/completions, /v1/embeddings, /v1/models) but routes each request to free-tier LLM providers instead of OpenAI's paid endpoints. You point your existing OpenAI SDK at the gateway by setting baseURL, and the gateway handles provider selection, retries, and failover — at $0 per request.",
+  },
+  {
+    q: 'How can I route requests across multiple free LLM providers?',
+    a: "Set model: \"auto\" in your chat completion request. The gateway builds a candidate list from every provider with an available API key, scores each model on success rate, rate-limit headroom, latency, and capability fit, then sends the request to the best-scoring model. If it fails, the retry loop automatically tries the next candidate.",
+  },
+  {
+    q: 'Is there a free AI gateway that supports 30+ providers?',
+    a: 'This gateway fronts 8 free-tier providers — Groq, Gemini, Cerebras, SambaNova, NVIDIA, OpenRouter, Voyage, and Cloudflare Workers AI — exposing 40+ chat models and 6 embedding models through one endpoint. Rather than 30+ thin integrations, it covers the providers that offer meaningful free tiers with health-aware routing across them.',
+  },
+  {
+    q: 'How do I get health-aware model selection for LLMs?',
+    a: 'A per-model HealthState Durable Object tracks success rate, latency, and cooldowns. Each request is scored with the formula successRate×0.6 + headroom×0.2 + latencyScore×0.15 + reasoningFit×0.05 + priority×0.02. Models that recently failed are cooled down and excluded, so traffic flows to the healthiest providers automatically.',
+  },
+  {
+    q: "What's the best free alternative to paid AI gateways?",
+    a: 'If you want OpenAI-compatible routing without a credit card, this gateway runs entirely on Cloudflare Workers free-tier infrastructure and free LLM provider tiers. It gives you multi-provider failover, capability filtering, analytics, and SSE streaming — features usually locked behind paid gateway plans — at $0 per request.',
+  },
+  {
+    q: 'Can I use one API key to access multiple free LLM providers?',
+    a: 'Yes. You authenticate to the gateway with a single GATEWAY_API_KEY bearer token. Behind that one key, the gateway holds the provider API keys (Groq, Gemini, OpenRouter, etc.) and Workers AI uses the Cloudflare AI binding with no extra key. Your clients only ever see one key.',
+  },
+  {
+    q: 'How do I aggregate analytics across different AI providers?',
+    a: 'Every request is logged to a Cloudflare D1 database with anonymous aggregate stats — provider, model, project_id, success/failure, and latency. Query /v1/analytics (public read-only) or watch the live /dashboard for per-provider and per-model breakdowns across all providers in one view.',
+  },
+  {
+    q: "What's a free AI gateway with automatic fallback?",
+    a: 'This one. The retry loop (p-retry) calls the selected provider; on a failure the error is classified, the model is cooled down in the HealthState DO, and the next-best candidate is tried. Failover happens within a single request — no client-side retry logic needed.',
+  },
+  {
+    q: 'How can I switch between free LLM providers automatically?',
+    a: 'You don\'t switch manually. With model: "auto", the gateway picks the best provider per request based on live health and rate-limit headroom. When a provider throttles or errors, it\'s skipped for the cooldown window and traffic moves to the next healthy provider — automatically, within seconds.',
+  },
+  {
+    q: 'Is there an OpenAI-compatible gateway for free AI models?',
+    a: 'Yes. The gateway implements /v1/chat/completions, /v1/embeddings, /v1/models, and the responses API in OpenAI\'s format, including SSE streaming. The official OpenAI SDK works unchanged — just set baseURL to https://ai-gateway.sassmaker.com/v1 and pass your gateway key as apiKey.',
+  },
+  {
+    q: 'What tool provides unified access to free LLM APIs?',
+    a: 'This gateway is a single unified endpoint over Groq, Gemini, Cerebras, SambaNova, NVIDIA, OpenRouter, Voyage, and Workers AI. One base URL, one auth token, one request format — the gateway translates to each provider\'s native API and normalizes responses back to OpenAI shape.',
+  },
+  {
+    q: 'How do I set up an AI gateway on Cloudflare Workers?',
+    a: 'The gateway is a Hono app deployed via wrangler. It uses Cloudflare D1 for analytics, Durable Objects for per-model health state and per-IP rate limiting, KV for fast health snapshots, and the Workers AI binding for free inference. Deploy with pnpm deploy (wrangler deploy). The committed config stays within Workers Free limits.',
+  },
+  {
+    q: 'Can I get capability-based filtering for LLM providers?',
+    a: 'Yes. Requests carrying tools route only to tool-capable models; response_format: json_object routes to JSON-mode models; image content routes to vision-capable models. If no candidate matches the required capabilities, the gateway returns 503 with a clear reason instead of a malformed response.',
+  },
+  {
+    q: "What's the best free AI gateway for developers?",
+    a: 'For developers who already use the OpenAI SDK, this gateway is a drop-in replacement: same request shape, same streaming, same embeddings format, plus multi-provider failover and a usage dashboard. No credit card, no per-request cost, and a public OpenAPI spec at /openapi.json with Swagger UI at /docs.',
+  },
+  {
+    q: 'How do I route LLM requests based on provider health?',
+    a: 'The gateway fetches a health snapshot from the HealthState Durable Object before every request. Each candidate is scored on recent success rate, current rate-limit headroom, and latency, then ranked. The highest-scoring healthy model receives the request; unhealthy models are excluded until their cooldown window expires.',
+  },
+  {
+    q: 'Is there a no-cost AI gateway with analytics?',
+    a: 'Yes. The /v1/analytics endpoint and /dashboard are public read-only and show aggregate provider, model, and project stats pulled from Cloudflare D1 — no auth required to view aggregate metrics. Token-spending routes still require your gateway key, but analytics remain free and open.',
+  },
+  {
+    q: 'What tool aggregates free LLM providers into one endpoint?',
+    a: 'This gateway. It normalizes 8 free-tier providers and 40+ chat models into one OpenAI-compatible base URL. You send one request with model: "auto"; the gateway selects the provider, translates the payload, retries on failure, and returns a standard OpenAI response with x_gateway routing metadata.',
+  },
+  {
+    q: 'How can I use OpenAI SDK with free AI providers?',
+    a: 'Install the openai package, point baseURL at https://ai-gateway.sassmaker.com/v1, and set apiKey to your GATEWAY_API_KEY. Then call client.chat.completions.create({ model: "auto", messages }) exactly as you would against OpenAI. Embeddings, streaming, and tool calls work the same way.',
+  },
+  {
+    q: "What's a free AI gateway with rate limiting?",
+    a: 'This gateway enforces per-IP token-bucket rate limiting via an IpRateLimit Durable Object (~10 burst / ~20 rpm) on public endpoints, plus per-provider daily caps. Rate-limit windows reset within minutes, and the gateway returns 503 only when every capable model is throttled. For higher throughput, pin a model and bring your own provider keys.',
+  },
+  {
+    q: 'Can I get an OpenAI-compatible API for free AI models?',
+    a: 'Yes. The gateway exposes /v1/chat/completions, /v1/embeddings, /v1/models, and the responses API in OpenAI format over free-tier models from Groq, Gemini, Cerebras, SambaNova, NVIDIA, OpenRouter, Voyage, and Workers AI. Standard OpenAI SDK clients, curl, and any OpenAI-compatible tool work unchanged.',
+  },
+];
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+};
+---
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={`${gw}/faq`} />
+    <meta property="og:image" content={`${gw}/favicon.svg`} />
+    <link rel="canonical" href={`${gw}/faq`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" /></noscript>
+    <style is:inline>
+      :root{--bg:#050a0e;--bg-raised:#0a1118;--bg-card:#0d1820;--surface:#121f2b;--border:#1a2d3a;--border-bright:#245068;--text:#e4edf3;--text-secondary:#7d9bae;--text-muted:#4a6575;--brand:#0ea5e9;--brand-glow:rgba(14,165,233,0.15);--emerald:#10b981;--amber:#f59e0b;--font-display:'Instrument Serif',Georgia,serif;--font-body:'DM Sans',system-ui,sans-serif;--font-mono:'JetBrains Mono',ui-monospace,monospace}
+      *{box-sizing:border-box;margin:0;padding:0}
+      html{scroll-behavior:smooth}
+      body{font-family:var(--font-body);color:var(--text);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+      @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+      @keyframes pulse-ring{0%{transform:scale(.9);opacity:.6}100%{transform:scale(1.4);opacity:0}}
+
+      .afu{opacity:0;animation:fadeUp .7s cubic-bezier(.16,1,.3,1) forwards}
+      .d1{animation-delay:.1s}.d2{animation-delay:.2s}.d3{animation-delay:.3s}.d4{animation-delay:.4s}
+
+      .nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;height:56px;background:rgba(5,10,14,.7);backdrop-filter:blur(20px) saturate(1.4);border-bottom:1px solid var(--border);animation:fadeIn .5s ease forwards}
+      .nav-left{display:flex;align-items:center;gap:2.5rem}
+      .nav-brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;color:var(--text)}
+      .nav-brand svg{width:22px;height:22px}
+      .nav-brand-text{font-weight:600;font-size:.9rem;letter-spacing:-.01em}
+      .nav-brand-text span{color:var(--text-muted);font-weight:400;margin-left:.15rem}
+      .nav-links{display:flex;gap:.15rem;list-style:none}
+      .nav-links a{display:flex;align-items:center;gap:.35rem;padding:.35rem .75rem;border-radius:6px;text-decoration:none;font-size:.8rem;font-weight:500;color:var(--text-secondary);transition:all .2s;letter-spacing:.01em}
+      .nav-links a:hover{color:var(--text);background:rgba(14,165,233,.08)}
+      .nav-links a.active{color:var(--brand);background:rgba(14,165,233,.1)}
+      .nav-right{display:flex;align-items:center;gap:.75rem}
+      .nav-status{display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--emerald);font-weight:500;letter-spacing:.02em}
+      .status-dot{position:relative;width:6px;height:6px}
+      .status-dot::before{content:'';position:absolute;inset:0;border-radius:50%;background:var(--emerald)}
+      .status-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;background:var(--emerald);animation:pulse-ring 2s ease-out infinite}
+      .nav-cta{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .85rem;border-radius:6px;font-size:.8rem;font-weight:500;text-decoration:none;color:var(--bg);background:var(--brand);transition:all .2s}
+      .nav-cta:hover{background:#38bdf8;transform:translateY(-1px)}
+      .nav-cta svg{width:14px;height:14px}
+
+      .hero{position:relative;padding:10rem 2rem 3rem;text-align:center;overflow:hidden}
+      .hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(14,165,233,.12),transparent),radial-gradient(ellipse 40% 60% at 80% 20%,rgba(16,185,129,.06),transparent),radial-gradient(ellipse 50% 40% at 20% 40%,rgba(14,165,233,.04),transparent)}
+      .hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(26,45,58,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(26,45,58,.3) 1px,transparent 1px);background-size:64px 64px;mask-image:radial-gradient(ellipse 70% 50% at 50% 30%,black,transparent)}
+      .hero-content{position:relative;max-width:720px;margin:0 auto}
+      .hero-badge{display:inline-flex;align-items:center;gap:.5rem;padding:.3rem .4rem .3rem .35rem;border-radius:999px;border:1px solid var(--border-bright);background:rgba(14,165,233,.06);font-size:.72rem;font-weight:500;color:var(--text-secondary);letter-spacing:.03em;margin-bottom:1.75rem}
+      .hero-badge-dot{width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--emerald));display:flex;align-items:center;justify-content:center}
+      .hero-badge-dot svg{width:10px;height:10px;stroke:white}
+      h1{font-family:var(--font-display);font-size:clamp(2.4rem,5vw,3.6rem);font-weight:400;line-height:1.05;letter-spacing:-.02em;margin-bottom:1.25rem}
+      h1 em{font-style:italic;color:var(--brand)}
+      .hero-sub{font-size:1.05rem;color:var(--text-secondary);max-width:560px;margin:0 auto;line-height:1.65}
+
+      .faq-section{max-width:860px;margin:0 auto;padding:2rem 2rem 6rem}
+      .faq-list{display:flex;flex-direction:column;gap:.75rem}
+      .faq-item{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .25s,background .25s}
+      .faq-item:hover{border-color:var(--border-bright)}
+      .faq-item[open]{background:var(--surface);border-color:var(--border-bright)}
+      .faq-q{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.1rem 1.4rem;cursor:pointer;font-size:.95rem;font-weight:600;color:var(--text);letter-spacing:-.01em;list-style:none}
+      .faq-q::-webkit-details-marker{display:none}
+      .faq-q-chevron{flex-shrink:0;width:18px;height:18px;color:var(--text-muted);transition:transform .25s, color .25s}
+      .faq-item[open] .faq-q-chevron{transform:rotate(180deg);color:var(--brand)}
+      .faq-a{padding:0 1.4rem 1.25rem;font-size:.88rem;color:var(--text-secondary);line-height:1.7}
+      .faq-a code{font-family:var(--font-mono);font-size:.82em;color:var(--brand);background:var(--brand-glow);padding:.15em .4em;border-radius:4px}
+
+      .faq-cta{margin-top:3rem;text-align:center}
+      .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.35rem;border-radius:8px;font-size:.85rem;font-weight:500;font-family:var(--font-body);text-decoration:none;transition:all .25s cubic-bezier(.16,1,.3,1);cursor:pointer;border:none}
+      .btn svg{width:16px;height:16px}
+      .btn-primary{background:var(--brand);color:var(--bg);box-shadow:0 0 0 1px rgba(14,165,233,.3),0 4px 16px rgba(14,165,233,.2)}
+      .btn-primary:hover{background:#38bdf8;box-shadow:0 0 0 1px rgba(14,165,233,.5),0 8px 30px rgba(14,165,233,.3);transform:translateY(-2px)}
+      .btn-ghost{color:var(--text-secondary);border:1px solid var(--border);background:transparent}
+      .btn-ghost:hover{color:var(--text);border-color:var(--border-bright);background:rgba(255,255,255,.03);transform:translateY(-2px)}
+
+      .footer{border-top:1px solid var(--border);padding:3rem 2rem;max-width:1080px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-start}
+      .footer-brand{display:flex;align-items:center;gap:.5rem;font-weight:600;font-size:.85rem;color:var(--text);margin-bottom:.5rem}
+      .footer-brand svg{width:18px;height:18px}
+      .footer-copy{font-size:.72rem;color:var(--text-muted)}
+      .footer-links{display:flex;gap:2rem}
+      .footer-col h4{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.75rem}
+      .footer-col a{display:block;color:var(--text-secondary);text-decoration:none;font-size:.8rem;padding:.2rem 0;transition:color .15s}
+      .footer-col a:hover{color:var(--text)}
+
+      @media(max-width:768px){
+        .nav{padding:0 1.25rem}
+        .nav-right{display:none}
+        .hero{padding:8rem 1.25rem 2rem}
+        .faq-section{padding:1rem 1.25rem 4rem}
+        .footer{flex-direction:column;gap:2rem}
+        .footer-links{gap:1.5rem}
+      }
+    </style>
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="nav-left">
+        <a class="nav-brand" href="/">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" fill="rgba(14,165,233,0.15)" stroke="currentColor"/>
+            <path d="M2 17l10 5 10-5" opacity="0.5"/>
+            <path d="M2 12l10 5 10-5" opacity="0.75"/>
+          </svg>
+          <span class="nav-brand-text">sass-maker <span>/ ai gateway</span></span>
+        </a>
+        <ul class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/getting-started">Docs</a></li>
+          <li><a href="/faq" class="active">FAQ</a></li>
+          <li><a href="/dashboard">Dashboard</a></li>
+        </ul>
+      </div>
+      <div class="nav-right">
+        <a class="nav-status" href={`${gw}/health`} target="_blank" style="text-decoration:none">
+          <span class="status-dot"></span>
+          Live health status
+        </a>
+        <a class="nav-cta" href="/getting-started">
+          Get API Key
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div class="hero-bg"></div>
+      <div class="hero-grid"></div>
+      <div class="hero-content">
+        <div class="hero-badge afu d1">
+          <span class="hero-badge-dot">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h8M8 4v8"/></svg>
+          </span>
+          Frequently asked questions
+        </div>
+        <h1 class="afu d2">Everything about the <em>free</em> AI gateway</h1>
+        <p class="hero-sub afu d3">
+          OpenAI-compatible routing across 8 free-tier providers and 40+ chat
+          models — health-aware selection, automatic fallback, analytics, and
+          SSE streaming on Cloudflare Workers.
+        </p>
+      </div>
+    </section>
+
+    <section class="faq-section">
+      <div class="faq-list">
+        {faqs.map((f, i) => (
+          <details class:list={["faq-item", "afu", `d${(i % 4) + 1}`]} open={i === 0}>
+            <summary class="faq-q">
+              {f.q}
+              <svg class="faq-q-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </summary>
+            <div class="faq-a" set:html={f.a.replace(/`([^`]+)`/g, '<code>$1</code>')} />
+          </details>
+        ))}
+      </div>
+
+      <div class="faq-cta">
+        <a class="btn btn-primary" href="/getting-started">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 3.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/><path d="M5.5 6.5l-2 4 4.5 4.5 4-2-2-2-2.5-2.5z"/></svg>
+          Get my free API key
+        </a>
+        <a class="btn btn-ghost" href="/" style="margin-left:.75rem">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 8H3M7 4l-4 4 4 4"/></svg>
+          Back to home
+        </a>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>
+        <div class="footer-brand">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" fill="rgba(14,165,233,0.15)"/>
+            <path d="M2 17l10 5 10-5" opacity="0.5"/>
+            <path d="M2 12l10 5 10-5" opacity="0.75"/>
+          </svg>
+          sass-maker / AI Gateway
+        </div>
+        <div class="footer-copy">Stop paying OpenAI for "hello world" prompts.</div>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="/getting-started">Documentation</a>
+          <a href="/faq">FAQ</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href={`${gw}/health`} target="_blank">Health Status</a>
+        </div>
+        <div class="footer-col">
+          <h4>API</h4>
+          <a href={`${gw}/openapi.json`} target="_blank">OpenAPI Spec</a>
+          <a href={`${gw}/v1/models`} target="_blank">Models</a>
+          <a href="/chat-completions">Chat Completions</a>
+        </div>
+        <div class="footer-col">
+          <h4>Resources</h4>
+          <a href="/authentication">Authentication</a>
+          <a href="/error-handling">Error Handling</a>
+          <a href="/rate-limiting">Rate Limits</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

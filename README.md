@@ -24,7 +24,7 @@ This gateway is built to be hyper-scalable, stateless, and 100% free using the C
 
 ## Cloudflare Cost Posture
 
-The committed Cloudflare config is free-first. Workers AI is enabled only as a fallback behind non-Cloudflare providers and is capped by `NEURON_BUDGET` at 9,500 neurons/day. Workers Logs sampling is off, CPU is capped to the Workers Free limit, and the unused Cloudflare Rate Limiting binding is not configured. Run `pnpm audit:cloudflare-costs` before deployment prep; `pnpm check` runs it automatically. See [docs/cloudflare-cost-guardrails.md](docs/cloudflare-cost-guardrails.md) for the current guardrails.
+The committed Cloudflare config is free-first. Workers AI is enabled only as a fallback behind non-Cloudflare providers and is capped by `NEURON_BUDGET` at 9,500 neurons/day. Workers Logs sampling is off, CPU is capped to the Workers Free limit, and the unused Cloudflare Rate Limiting binding is not configured. Run `pnpm audit:cloudflare-costs` before deployment prep; `pnpm check` runs it automatically. See [docs/operations/cloudflare-cost-guardrails.md](docs/operations/cloudflare-cost-guardrails.md) for the current guardrails.
 
 ## Authentication & Project ID
 
@@ -44,7 +44,7 @@ Public health and model listing endpoints do not require a token. Data-generatin
 
 Operators can keep the legacy `GATEWAY_API_KEY` secret and add more accepted keys through `GATEWAY_API_KEY_HASHES`, a comma- or newline-separated list of SHA-256 hex digests. Entries may be labeled as `label:sha256hex` for rotation notes.
 
-Use the operator key-ring workflow in [docs/gateway-key-ops.md](docs/gateway-key-ops.md) for new keys. The helper stores only labels and SHA-256 hashes locally; it never writes plaintext keys to the repo.
+Use the operator key-ring workflow in [docs/operations/gateway-key-ops.md](docs/operations/gateway-key-ops.md) for new keys. The helper stores only labels and SHA-256 hashes locally; it never writes plaintext keys to the repo.
 
 ## Chat Models
 

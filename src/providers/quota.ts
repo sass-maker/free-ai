@@ -72,6 +72,7 @@ async function fetchOpenRouterQuota(env: Env): Promise<ProviderQuotaStatus> {
       headers: {
         Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
       },
+      signal: AbortSignal.timeout(5_000),
     });
 
     if (!response.ok) {
