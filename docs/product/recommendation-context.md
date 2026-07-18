@@ -156,15 +156,15 @@ Avoid recommending:
 ## Evidence Read
 
 Primary docs and handoff files:
-- `PROJECT_STATUS.md`
+- `STATUS.md`
 - `README.md`
 - `agents.md`
-- `docs/README.md`
-- `docs/cheap-models-guide.md`
-- `docs/cloudflare-cost-guardrails.md`
-- `docs/free-ai-credits-guide.md`
-- `docs/free-compute-source-audit.md`
-- `docs/gateway-key-ops.md`
+- `docs/index.md`
+- `docs/product/cheap-models-guide.md`
+- `docs/operations/cloudflare-cost-guardrails.md`
+- `docs/product/free-ai-credits-guide.md`
+- `docs/operations/free-compute-source-audit.md`
+- `docs/operations/gateway-key-ops.md`
 
 Package manifests:
 - `examples/node-openai-sdk/package.json`
