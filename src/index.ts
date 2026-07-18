@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { capture, configurePostHog, flushPostHog, trace } from './lib/telemetry';
+import { CostBudget } from './lib/cost-budget';
 import pLimit from 'p-limit';
 import pRetry, { AbortError } from 'p-retry';
 
@@ -1621,6 +1622,7 @@ app.openapi(chatRoute, async (c) => {
               'x-gateway-model': chosenMeta.model,
               'x-gateway-attempts': String(chosenMeta.attempts),
               'x-gateway-request-id': chosenMeta.request_id,
+              ...(attemptCounter > 1 ? { 'x-degraded-mode': 'true' } : {}),
             },
           });
 
@@ -1646,6 +1648,7 @@ app.openapi(chatRoute, async (c) => {
                 requestId,
                 gatewayMeta: chosenMeta,
               })),
+          degraded: attemptCounter > 1,
           x_gateway: chosenMeta,
         };
       } catch (error) {
@@ -1677,8 +1680,10 @@ app.openapi(chatRoute, async (c) => {
     },
     {
       retries: 1,
-      minTimeout: 10,
-      factor: 1,
+      minTimeout: 500,
+      maxTimeout: 5000,
+      factor: 2,
+      randomize: true,
     }
   ).catch(() => undefined);
 
@@ -2317,8 +2322,10 @@ app.openapi(embeddingsRoute, async (c) => {
     },
     {
       retries: maxEmbeddingAttempts - 1,
-      minTimeout: 10,
-      factor: 1,
+      minTimeout: 500,
+      maxTimeout: 5000,
+      factor: 2,
+      randomize: true,
     }
   ).catch(() => undefined);
 
@@ -2441,10 +2448,12 @@ app.post('/v1/audio/transcriptions', async (c) => {
   let lastError = 'Unknown error';
   let chosenProvider: string | undefined;
   let chosenModel: string | undefined;
+  let sttAttempts = 0;
 
   for (const cand of sorted) {
     chosenProvider = cand.provider;
     chosenModel = cand.model;
+    sttAttempts += 1;
 
     try {
       if (cand.provider === 'groq') {
@@ -2457,6 +2466,7 @@ app.post('/v1/audio/transcriptions', async (c) => {
           method: 'POST',
           headers: { Authorization: `Bearer ${c.env.GROQ_API_KEY}` },
           body: groqForm,
+          signal: AbortSignal.timeout(60_000),
         });
 
         if (!groqResponse.ok) {
@@ -2479,16 +2489,18 @@ app.post('/v1/audio/transcriptions', async (c) => {
         return c.json(
           {
             ...result,
+            degraded: sttAttempts > 1,
             x_gateway: {
               provider: 'groq',
               model: cand.model,
-              attempts: 1,
+              attempts: sttAttempts,
               reasoning_effort: 'auto' as const,
               request_id: createRequestId(),
               project_id: projectId,
             },
           } as never,
-          200
+          200,
+          sttAttempts > 1 ? { 'x-degraded-mode': 'true' } : undefined
         );
       }
 
@@ -2515,16 +2527,18 @@ app.post('/v1/audio/transcriptions', async (c) => {
           text: result.text,
           language: result.language,
           duration: result.duration,
+          degraded: sttAttempts > 1,
           x_gateway: {
             provider: cand.provider,
             model: cand.model,
-            attempts: 1,
+            attempts: sttAttempts,
             reasoning_effort: 'auto' as const,
             request_id: createRequestId(),
             project_id: projectId,
           },
         } as never,
-        200
+        200,
+        sttAttempts > 1 ? { 'x-degraded-mode': 'true' } : undefined
       );
     } catch (err) {
       lastError = getErrorMessage(err);
@@ -2596,6 +2610,7 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
     method: 'POST',
     headers: { Authorization: `Bearer ${c.env.GROQ_API_KEY}` },
     body: sttForm,
+    signal: AbortSignal.timeout(60_000),
   });
 
   if (!sttResponse.ok) {
@@ -2741,7 +2756,7 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
 const imageGenRequestSchema = z
   .object({
     model: z.string().default('auto'),
-    prompt: z.string().min(1).max(8000),
+    prompt: z.string().min(1).max(2000),
     n: z.number().int().min(1).max(4).optional(),
     size: z.enum(['256x256', '512x512', '1024x1024', '1024x1792', '1792x1024']).optional(),
     response_format: z.enum(['url', 'b64_json']).optional(),
@@ -2768,7 +2783,7 @@ const imageGenResponseSchema = z
 const videoGenRequestSchema = z
   .object({
     model: z.string().default('auto'),
-    prompt: z.string().min(1).max(8000),
+    prompt: z.string().min(1).max(2000),
     duration_seconds: z.number().int().min(1).max(60).optional(),
     aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional(),
     image_url: z.string().url().optional(),
@@ -2790,7 +2805,7 @@ const videoGenResponseSchema = z
 const ttsRequestSchema = z
   .object({
     model: z.string().default('auto'),
-    input: z.string().min(1).max(10_000),
+    input: z.string().min(1).max(3000),
     voice: z.string().optional(),
     response_format: z.enum(['mp3', 'wav', 'opus', 'flac']).optional(),
     speed: z.number().min(0.25).max(4.0).optional(),
@@ -2811,6 +2826,10 @@ const imagesGenRoute = createRoute({
       content: { 'application/json': { schema: imageGenResponseSchema } },
     },
     400: { description: 'Invalid input', content: { 'application/json': { schema: errorSchema } } },
+    429: {
+      description: 'Rate limited or retriable provider failure',
+      content: { 'application/json': { schema: errorSchema } },
+    },
     502: {
       description: 'All providers failed',
       content: { 'application/json': { schema: errorSchema } },
@@ -2876,11 +2895,20 @@ app.openapi(imagesGenRoute, async (c) => {
   let attempts = 0;
   let chosenProvider: string | undefined;
   let chosenModel: string | undefined;
+  let lastErrorClass = 'provider_fatal';
+
+  // Per-request cost budget: cap provider attempts and cumulative timeout so a
+  // single image request cannot fan out into unbounded provider work.
+  // 3 attempts × 60s timeout = 180s max — matches the existing sequential cap.
+  const costBudget = new CostBudget({ maxAttempts: 3, maxTotalTimeoutMs: 180_000 });
 
   for (const cand of sorted.slice(0, 3)) {
+    if (!costBudget.canAttempt()) break;
+
     attempts += 1;
     chosenProvider = cand.provider;
     chosenModel = cand.model;
+    costBudget.recordAttempt(60_000);
 
     try {
       const caller = imageProviderCallers[cand.provider];
@@ -2903,10 +2931,14 @@ app.openapi(imagesGenRoute, async (c) => {
         })
       );
 
+      // Degraded-mode label: if we fell back from a primary provider, surface it.
+      const degraded = attempts > 1;
+
       return c.json(
         {
           created: result.created,
           data: result.data,
+          degraded,
           x_gateway: {
             provider: cand.provider,
             model: cand.model,
@@ -2916,10 +2948,20 @@ app.openapi(imagesGenRoute, async (c) => {
             project_id: projectId,
           },
         } as never,
-        200
+        200,
+        degraded ? { 'x-degraded-mode': 'true' } : undefined
       );
     } catch (err) {
       lastError = getErrorMessage(err);
+      const failureClass = classifyError(err);
+      lastErrorClass = failureClass;
+
+      // Non-retriable errors (input_fatal / safety) fail immediately — do not
+      // amplify into another provider attempt.
+      if (!isRetriableFailure(failureClass)) {
+        break;
+      }
+      // Retriable: continue to next provider (jittered by the sequential loop).
     }
   }
 
@@ -2933,9 +2975,22 @@ app.openapi(imagesGenRoute, async (c) => {
     })
   );
 
+  const errorStatus =
+    lastErrorClass === 'input_nonretriable'
+      ? 400
+      : lastErrorClass === 'usage_retriable'
+        ? 429
+        : 502;
+
   return c.json(
-    { error: { message: `All image providers failed: ${lastError}`, type: 'provider_error' } },
-    502
+    {
+      error: {
+        message: `All image providers failed: ${lastError}`,
+        type: lastErrorClass,
+        cost_budget: costBudget.state(),
+      },
+    } as never,
+    errorStatus as 400 | 429 | 502
   );
 });
 
@@ -2956,6 +3011,10 @@ const videosGenRoute = createRoute({
       content: { 'application/json': { schema: videoGenResponseSchema } },
     },
     400: { description: 'Invalid input', content: { 'application/json': { schema: errorSchema } } },
+    429: {
+      description: 'Rate limited or retriable provider failure',
+      content: { 'application/json': { schema: errorSchema } },
+    },
     502: {
       description: 'Provider failure',
       content: { 'application/json': { schema: errorSchema } },
@@ -3016,6 +3075,11 @@ app.openapi(videosGenRoute, async (c) => {
 
   const chosen = registry.sort((a, b) => b.priority - a.priority)[0];
 
+  // Per-request cost budget: video submit is the most expensive compute op.
+  // 1 attempt × 30s timeout — no retry on submit (async job, not a sync result).
+  const costBudget = new CostBudget({ maxAttempts: 1, maxTotalTimeoutMs: 30_000 });
+  costBudget.recordAttempt(30_000);
+
   try {
     const submitter = videoProviderCallers[chosen.provider].submit;
     const job = await submitter({
@@ -3069,6 +3133,7 @@ app.openapi(videosGenRoute, async (c) => {
       statusCode as 200 | 202
     );
   } catch (err) {
+    const failureClass = classifyError(err);
     c.executionCtx.waitUntil(
       recordAnalytics({
         db: c.env.GATEWAY_DB,
@@ -3078,11 +3143,17 @@ app.openapi(videosGenRoute, async (c) => {
         model: chosen.model,
       })
     );
+    const errorStatus =
+      failureClass === 'input_nonretriable' ? 400 : failureClass === 'usage_retriable' ? 429 : 502;
     return c.json(
       {
-        error: { message: `Video submit failed: ${getErrorMessage(err)}`, type: 'provider_error' },
-      },
-      502
+        error: {
+          message: `Video submit failed: ${getErrorMessage(err)}`,
+          type: failureClass,
+          cost_budget: costBudget.state(),
+        },
+      } as never,
+      errorStatus as 400 | 429 | 502
     );
   }
 });
@@ -3261,10 +3332,12 @@ app.openapi(audioSpeechRoute, async (c) => {
   let lastError = 'Unknown error';
   let chosenProvider: string | undefined;
   let chosenModel: string | undefined;
+  let ttsAttempts = 0;
 
   for (const cand of sorted) {
     chosenProvider = cand.provider;
     chosenModel = cand.model;
+    ttsAttempts += 1;
 
     try {
       const caller = ttsProviderCallers[cand.provider];
@@ -3287,12 +3360,14 @@ app.openapi(audioSpeechRoute, async (c) => {
         })
       );
 
+      const degraded = ttsAttempts > 1;
       return new Response(result.audio, {
         headers: {
           'content-type': result.contentType,
           'x-gateway-provider': cand.provider,
           'x-gateway-model': cand.model,
           'x-gateway-project-id': projectId,
+          ...(degraded ? { 'x-degraded-mode': 'true' } : {}),
         },
       });
     } catch (err) {
