@@ -54,7 +54,9 @@ Starlight). For the public product overview see [`../../README.md`](../../README
 
 ## Provider catalog
 
-30+ chat models + 6 embedding models across:
+80+ chat models across 11 providers, plus 6 embedding models across 3 providers.
+
+Chat providers:
 
 - **Workers AI** (CF AI binding, no extra key) — fallback rank, neuron-budgeted.
 - **Groq** — `GROQ_API_KEY`.
@@ -63,7 +65,12 @@ Starlight). For the public product overview see [`../../README.md`](../../README
 - **Cerebras** — `CEREBRAS_API_KEY`.
 - **SambaNova** — `SAMBANOVA_API_KEY`.
 - **NVIDIA NIM** — `NVIDIA_API_KEY`.
-- **Voyage** — `VOYAGE_API_KEY` (embeddings).
+- **GitHub Models** — `GITHUB_TOKEN`.
+- **Pollinations** — no key required.
+- **Cohere** — `COHERE_API_KEY`.
+- **Mistral** — `MISTRAL_API_KEY`.
+
+Embedding providers: Gemini, Voyage AI (`VOYAGE_API_KEY`), Workers AI.
 
 The authoritative model registry is `src/config.ts`. The model tables in
 [`README.md`](../../README.md) are a snapshot for users; `src/config.ts` is the

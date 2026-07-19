@@ -17,7 +17,7 @@ inbound request
   → deriveRequiredCapabilities()   # tools / json / vision / minContextWindow
   → selectCandidates()             # score + rank + hard-filter
   → p-retry loop over providers    # x_gateway.attempts counts tries
-  → recordAnalytics() + healthRecord()  # skipped on /v1/replay
+  → recordAnalytics() + healthRecord()  # skipped on /v1/debug/replay
   → OpenAI-format response + x_gateway metadata
 ```
 

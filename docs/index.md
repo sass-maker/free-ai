@@ -11,6 +11,7 @@ configuration remain authoritative for implementation details and schedules.
 | Current state | [`STATUS.md`](../STATUS.md) + [`current/`](current/) | Live objective, blockers, timeline |
 | Product | [`product/`](product/) | What the gateway is, model/provider landscape, credit guides |
 | Architecture | [`architecture/`](architecture/) | System design, request flow, ADRs |
+| How it works (learning) | [`architecture/how-it-works.md`](architecture/how-it-works.md) | End-to-end request walkthrough for first-time readers |
 | Development | [`development/`](development/) | Local dev, testing, contribution workflow |
 | Operations | [`operations/`](operations/) | Deploy, cost guardrails, key ops, CI jobs, runbooks |
 | Knowledge | [`knowledge/`](knowledge/) | Durable learnings, concept stubs, failed approaches |

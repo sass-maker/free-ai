@@ -10,8 +10,8 @@ OpenAI-compatible API gateway that routes requests across free LLM providers wit
 | Database | Cloudflare D1 (`free-ai-gateway-db`) — anonymous aggregate analytics |
 | State / Caching | Cloudflare Durable Objects (`HealthStateDO`, `IpRateLimitDO`, `NeuronBudgetDO`); Cloudflare KV (`HEALTH_KV`) |
 | Marketing / docs site | Astro + Starlight (`site/`), built into `site/dist` and served by the Worker via the `ASSETS` binding — no separate deploy |
-| AI | Cloudflare Workers AI (`AI` binding) plus upstream provider free tiers (Groq, Gemini, OpenRouter, Cerebras, SambaNova, NVIDIA, Voyage) |
-| CI/CD | GitHub Actions (`.github/workflows/cloudflare-deploy.yml`) — auto-deploy on push to `main` |
+| AI | Cloudflare Workers AI (`AI` binding) plus upstream provider free tiers (Groq, Gemini, OpenRouter, Cerebras, SambaNova, NVIDIA, GitHub Models, Pollinations, Cohere, Mistral; Voyage for embeddings) |
+| CI/CD | GitHub Actions (`.github/workflows/cloudflare-deploy.yml`) — manual deploy via `workflow_dispatch` (not auto-on-push) |
 
 ## Architecture & Toolkit
 

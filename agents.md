@@ -4,10 +4,10 @@ Concise agent bootloader. For depth, follow the documentation navigation below.
 
 ## Purpose
 
-OpenAI-compatible API gateway on Cloudflare Workers — routes requests across 30+
-free LLM providers with health-aware model selection, capability filtering, per-IP
-rate limiting, and aggregate analytics. Serves fleet projects (e.g. ai-game via
-service binding) and exposes operator health/dashboard surfaces.
+OpenAI-compatible API gateway on Cloudflare Workers — routes requests across 11
+free LLM providers (80+ chat models) with health-aware model selection, capability
+filtering, per-IP rate limiting, and aggregate analytics. Serves fleet projects
+(e.g. ai-game via service binding) and exposes operator health/dashboard surfaces.
 
 ## Essential commands
 
@@ -97,7 +97,7 @@ pnpm keys:generate|list|print-secret|upload   # operator key ring
 ```
 src/                  gateway implementation (authoritative for code behavior)
   index.ts            Hono app + all route handlers (monolithic — known TODO)
-  config.ts           model registry (30+ chat + 6 embedding models)
+  config.ts           chat/image/video/audio model registry (80+ chat models; embedding registry lives in index.ts)
   providers/          one file per provider
   router/             select-model.ts (scoring), classify-error.ts
   state/              HealthStateDO, IpRateLimitDO, NeuronBudgetDO, client

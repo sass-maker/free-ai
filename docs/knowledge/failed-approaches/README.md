@@ -69,7 +69,7 @@ debug a failing provider.
 every attempt, so a debugging session distorts the production routing state for
 that model/provider pair.
 
-**Current status:** `/v1/replay` calls the provider directly but skips
+**Current status:** `/v1/debug/replay` calls the provider directly but skips
 `healthRecord()` and `recordAnalytics()`. See
 [`learnings/lessons.md`](../learnings/lessons.md).
 

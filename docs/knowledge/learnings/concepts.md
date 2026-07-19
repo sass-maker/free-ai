@@ -7,7 +7,7 @@ Stubs for concepts encountered building a health-aware multi-LLM gateway on Clou
 ## Durable Objects (DO)
 - What: Cloudflare Workers primitive giving a single-instance actor with strongly consistent SQLite storage and in-memory state that persists across requests to that instance.
 - Why here: TBD
-- Gotcha (from code): DO in-memory state requires explicit cold-start hydration — first call does a full `ctx.storage.list()` bulk load (`health-do.ts:238`); per-key reads on every request are 5-10x more storage ops.
+- Gotcha (from code): DO in-memory state requires explicit cold-start hydration — first call does a full `ctx.storage.list()` bulk load (`health-do.ts:246`); per-key reads on every request are 5-10x more storage ops.
 - Source: https://developers.cloudflare.com/durable-objects/
 
 ---
@@ -39,7 +39,7 @@ Stubs for concepts encountered building a health-aware multi-LLM gateway on Clou
 ## Neuron budget / daily cap pattern
 - What: Technique for staying under a free-tier GPU quota — track cumulative spend in a DO, hard-stop at 9,500/day (500 below the 10,000 limit), return `503 + Retry-After` when hit.
 - Why here: TBD
-- Gotcha (from code): The DO `/try-debit` endpoint returns HTTP 200 with `allowed: false` (not 429) — the `503` surfaces only after the caller invokes `buildBudgetExhaustedResponse()` (`neuron-budget.ts:176`). Token-to-Neuron estimates carry a 20% buffer (`neuron-budget.ts:26`, `NEURON_BUFFER = 1.2`); the 500-unit headroom absorbs estimation error, not traffic spikes.
+- Gotcha (from code): The DO `/try-debit` endpoint returns HTTP 200 with `allowed: false` (not 429) — the `503` surfaces only after the caller invokes `buildBudgetExhaustedResponse()` (`neuron-budget.ts:202`). Token-to-Neuron estimates carry a 20% buffer (`neuron-budget.ts:26`, `NEURON_BUFFER = 1.2`); the 500-unit headroom absorbs estimation error, not traffic spikes.
 - Source: https://developers.cloudflare.com/workers-ai/platform/pricing/
 
 ---

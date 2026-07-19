@@ -40,7 +40,7 @@ Lesson: Historical Workers AI cost can be bounded from request volume and the `N
 
 The original approach for debugging provider failures was to re-send via `/v1/chat/completions` with `x-gateway-force-provider`. The problem: the normal chat path writes health records and analytics on every attempt, so a debugging session distorts the production routing state for that model/provider pair.
 
-Lesson: Provider-level debugging needs a separate path that calls the provider directly but skips `healthRecord()` and `recordAnalytics()`. The replay lab (`/v1/replay`) intentionally omits both.
+Lesson: Provider-level debugging needs a separate path that calls the provider directly but skips `healthRecord()` and `recordAnalytics()`. The replay lab (`/v1/debug/replay`) intentionally omits both.
 
 ---
 

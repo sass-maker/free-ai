@@ -39,7 +39,7 @@ Operational procedures for common gateway issues. For deploy steps see
      -H "Authorization: Bearer $KEY" \
      -d '{"provider":"groq","model":"llama-3.3-70b-versatile","messages":[...]}'
    ```
-   `/v1/replay` intentionally skips `healthRecord()` and `recordAnalytics()`.
+   `/v1/debug/replay` intentionally skips `healthRecord()` and `recordAnalytics()`.
 2. If the provider returns 400 for a capability (e.g. vision), check
    `GITHUB_MODELS_IMAGE_INCOMPATIBLE` and the capability flags in `src/config.ts` —
    the model may be miscataloged.
@@ -57,7 +57,7 @@ Operational procedures for common gateway issues. For deploy steps see
 
 ## Debug replay distorts routing state
 
-The normal chat path writes health + analytics on every attempt. Use `/v1/replay`
+The normal chat path writes health + analytics on every attempt. Use `/v1/debug/replay`
 for provider debugging — it skips both. See
 [`knowledge/learnings/lessons.md`](../../knowledge/learnings/lessons.md).
 
