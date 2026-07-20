@@ -56,6 +56,7 @@ jobs:
 
           Auto-detected by weekly model check.
           See report.json in workflow run for details."
+          git format-patch -1 --stdout > model-sync.patch
           git push origin "$BRANCH"
 
           STALE_LIST=$(node -e "
@@ -67,7 +68,7 @@ jobs:
             (r.new||[]).forEach(m => console.log('- \`'+m.provider+'/'+m.model+'\`'));
           ")
 
-          gh pr create \
+          if ! PR_URL=$(gh pr create \
             --title "chore: sync model registry with upstream" \
             --body "## Stale models removed
 
@@ -80,4 +81,20 @@ jobs:
           New models use conservative defaults: \`priority: 0.50\`, \`reasoning: 'medium'\`, \`toolCalling: false\`, \`vision: false\`, \`contextWindow: 32768\`. Review & tune before merge.
 
           Detected by the weekly \`check-models\` workflow." \
-            --base main
+            --base main 2>&1); then
+            echo "::warning title=Model sync PR not created::$PR_URL"
+            echo "The model drift report and patch were preserved as workflow artifacts." >> "$GITHUB_STEP_SUMMARY"
+            git push origin --delete "$BRANCH" || true
+          else
+            echo "Created model sync PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload model drift evidence
+        if: steps.check.outputs.drift != '0'
+        uses: actions/upload-artifact@v7
+        with:
+          name: model-drift-${{ github.run_id }}
+          path: |
+            report.json
+            model-sync.patch
+          if-no-files-found: error
