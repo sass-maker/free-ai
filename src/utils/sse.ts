@@ -4,12 +4,8 @@ export function toSseData(value: unknown): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(value)}\n\n`);
 }
 
-export function toSseDone(): Uint8Array {
+function toSseDone(): Uint8Array {
   return encoder.encode('data: [DONE]\n\n');
-}
-
-export function toSseComment(value: string): Uint8Array {
-  return encoder.encode(`: ${value}\n\n`);
 }
 
 export function createSseStream(

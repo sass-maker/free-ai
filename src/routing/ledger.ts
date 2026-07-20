@@ -33,7 +33,7 @@ export interface RoutingLedgerRecord {
   error_class?: string;
 }
 
-export interface RoutingLedgerBreakdownRow {
+interface RoutingLedgerBreakdownRow {
   key: string;
   requests: number;
   successful: number;
@@ -159,7 +159,7 @@ export function buildChatLedgerRecord(params: {
   };
 }
 
-export function compactQuotaState(
+function compactQuotaState(
   quotas: Map<TextProvider, ProviderQuotaStatus>
 ): Record<string, { status: string; limit_remaining?: number | null }> {
   return Object.fromEntries(

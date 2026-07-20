@@ -2148,7 +2148,7 @@ export function hasTtsProviderKey(env: Env, provider: AudioTtsProvider): boolean
   }
 }
 
-export function hasSttProviderKey(env: Env, provider: AudioSttProvider): boolean {
+function hasSttProviderKey(env: Env, provider: AudioSttProvider): boolean {
   switch (provider) {
     case 'groq':
       return Boolean(env.GROQ_API_KEY);

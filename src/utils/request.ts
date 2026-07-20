@@ -1,4 +1,4 @@
-import type { ChatMessage, NormalizedChatRequest } from '../types';
+import type { ChatMessage } from '../types';
 
 export function createRequestId(): string {
   return crypto.randomUUID();
@@ -60,21 +60,5 @@ export function buildCompletionEnvelope(params: {
     ],
     usage: params.usage,
     x_gateway: params.gatewayMeta,
-  };
-}
-
-export function sanitizeOpenAIRequest(payload: NormalizedChatRequest): {
-  model: string;
-  messages: ChatMessage[];
-  stream: boolean;
-  temperature?: number;
-  max_tokens?: number;
-} {
-  return {
-    model: payload.model,
-    messages: payload.messages,
-    stream: payload.stream,
-    temperature: payload.temperature,
-    max_tokens: payload.max_tokens,
   };
 }

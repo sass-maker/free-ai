@@ -29,7 +29,7 @@ export async function isValidGatewayApiKey(providedKey: string, env: Env): Promi
   return expectedHashes.some((expectedHash) => isConstantTimeEqual(providedHash, expectedHash));
 }
 
-export function parseGatewayApiKeyHashes(raw: string | undefined): string[] {
+function parseGatewayApiKeyHashes(raw: string | undefined): string[] {
   if (!raw) {
     return [];
   }

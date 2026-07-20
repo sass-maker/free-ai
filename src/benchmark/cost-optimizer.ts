@@ -1,9 +1,9 @@
 import fixture from '../../fixtures/benchmark-cost-optimizer.json';
 
-export type BenchmarkQualityTier = 'low' | 'medium' | 'high';
-export type BenchmarkModelStatus = 'available' | 'degraded' | 'cooldown' | 'exhausted';
+type BenchmarkQualityTier = 'low' | 'medium' | 'high';
+type BenchmarkModelStatus = 'available' | 'degraded' | 'cooldown' | 'exhausted';
 
-export interface BenchmarkCandidate {
+interface BenchmarkCandidate {
   id: string;
   provider: string;
   model: string;
@@ -18,14 +18,14 @@ export interface BenchmarkCandidate {
   score: number;
 }
 
-export interface BenchmarkWorkload {
+interface BenchmarkWorkload {
   id: string;
   label: string;
   prompt_class: string;
   description: string;
 }
 
-export interface BenchmarkRouteRecommendation {
+interface BenchmarkRouteRecommendation {
   workload_id: string;
   recommended: {
     provider: string;
@@ -36,7 +36,7 @@ export interface BenchmarkRouteRecommendation {
   alternates: Array<{ id: string; reason: string }>;
 }
 
-export interface BenchmarkExperimentEntry {
+interface BenchmarkExperimentEntry {
   id: string;
   label: string;
   recorded_at: string;

@@ -42,12 +42,12 @@ export type ReasoningTier = Exclude<ReasoningEffort, 'auto'>;
 
 export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
 
-export interface ContentPartText {
+interface ContentPartText {
   type: 'text';
   text: string;
 }
 
-export interface ContentPartImageUrl {
+interface ContentPartImageUrl {
   type: 'image_url';
   image_url: { url: string; detail?: 'auto' | 'low' | 'high' };
 }
@@ -60,7 +60,7 @@ export interface ChatMessage {
   name?: string;
 }
 
-export interface ModelCapabilities {
+interface ModelCapabilities {
   toolCalling: boolean;
   jsonMode: boolean;
   vision: boolean;
@@ -80,7 +80,7 @@ export interface ModelCandidate {
   capabilities: ModelCapabilities;
 }
 
-export type ImageSize = '256x256' | '512x512' | '1024x1024' | '1024x1792' | '1792x1024';
+type ImageSize = '256x256' | '512x512' | '1024x1024' | '1024x1792' | '1792x1024';
 
 export interface ImageModelCandidate {
   id: string;
@@ -162,7 +162,7 @@ export interface GatewayMeta {
   project_id?: string;
 }
 
-export interface ToolFunction {
+interface ToolFunction {
   name: string;
   description?: string;
   parameters?: Record<string, unknown>;

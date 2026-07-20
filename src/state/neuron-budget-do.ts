@@ -18,7 +18,7 @@ interface BudgetState {
 
 const STORAGE_KEY = 'budget';
 /** Daily Neuron cap. 500 buffer below the 10k/day free-tier quota. */
-export const DAILY_NEURON_CAP = 9500;
+const DAILY_NEURON_CAP = 9500;
 
 const json = (value: unknown, status = 200): Response =>
   Response.json(value, {
