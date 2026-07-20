@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="favicon">
-  <rect width="32" height="32" rx="7" fill="#0e7490"/>
+  <rect width="32" height="32" fill="#0e7490"/>
   <path fill="#ffffff" d="M16 6 8.5 10l7.5 4 7.5-4z" opacity=".95"/>
       <path fill="none" stroke="#ffffff" stroke-width="1.6" d="M8.5 15.5 16 19.5l7.5-4" opacity=".85"/>
       <path fill="none" stroke="#ffffff" stroke-width="1.6" d="M8.5 20.5 16 24.5l7.5-4" opacity=".7"/>
