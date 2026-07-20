@@ -1535,8 +1535,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:google/gemma-4-31b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-3-super-120b-a12b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:openrouter/free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
- // AUTO-ADDED — tune
- // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-3-nano-30b-a3b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-nano-9b-v2:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:openai/gpt-oss-20b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune

@@ -234,7 +234,7 @@ async function main() {
 
       // Remove corresponding limit entry (not nested — simple regex OK)
       const limitKey = `${m.provider}:${m.model}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const limitRe = new RegExp(`\\s*'${limitKey}':\\s*\\{[^}]*\\},?\\n?`, 'g');
+      const limitRe = new RegExp(`^[ \\t]*'${limitKey}':\\s*\\{[^}]*\\},?[^\\n]*(?:\\n|$)`, 'gm');
       src = src.replace(limitRe, '\n');
     }
 

@@ -27,6 +27,7 @@ function chatRequest(body: Record<string, unknown> = {}) {
     headers: {
       'content-type': 'application/json',
       authorization: 'Bearer test-gateway-key',
+      'x-gateway-force-provider': 'groq',
     },
     body: JSON.stringify({
       model: 'auto',
