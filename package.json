@@ -45,6 +45,7 @@
     "knip:strict": "knip --reporter symbols"
   },
   "dependencies": {
+    "@saas-maker/app-health": "https://github.com/sarthakagrawal927/app-health/releases/download/node-v0.2.0/saas-maker-app-health-0.2.0.tgz",
     "@hono/zod-openapi": "1.3.0",
     "@hookform/resolvers": "5.2.2",
     "@tanstack/react-query": "5.100.9",

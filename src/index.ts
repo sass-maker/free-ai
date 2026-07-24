@@ -1,5 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { honoMiddleware } from '@saas-maker/app-health/hono';
 import { capture, configurePostHog, flushPostHog, trace } from './lib/telemetry';
+import { getAppHealthClient } from './lib/app-health';
 import { CostBudget } from './lib/cost-budget';
 import pLimit from 'p-limit';
 import pRetry, { AbortError } from 'p-retry';
@@ -83,6 +85,13 @@ import {
 import { createSseStream, toSseData } from './utils/sse';
 
 const app = new OpenAPIHono<{ Bindings: Env }>();
+
+app.use(
+  '*',
+  honoMiddleware<{ Bindings: Env }>({
+    client: (context) => getAppHealthClient(context.env),
+  })
+);
 
 // Fleet agent indexing (GEO) — discoverable product brief for AI crawlers
 app.use('*', async (c, next) => {

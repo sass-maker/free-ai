@@ -232,6 +232,7 @@ export interface Env {
   RATE_LIMIT_CONFIG_JSON?: string;
   DOCS_SITE_URL?: string;
   POSTHOG_API_KEY?: string;
+  APP_HEALTH_INGEST_KEY?: string;
 }
 
 export interface ProviderQuotaStatus {

@@ -1,6 +1,6 @@
 # free-ai — STATUS
 
-Last updated: 2026-07-18
+Last updated: 2026-07-25
 
 ## Objective
 
@@ -13,6 +13,10 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
 ## Active work
 
 - Repository knowledge system consolidation (this branch).
+- App Health Hono middleware is integrated from the immutable public
+  `node-v0.2.0` SDK release. It remains a no-op until the optional
+  `APP_HEALTH_INGEST_KEY` Worker secret is provisioned; no credential is stored
+  in source.
 - Operator hash-ring seeding: mirror current `GATEWAY_API_KEY_HASHES` entries into
   `ops/gateway-key-hashes.local.json` for `pnpm keys:upload` workflow.
 
