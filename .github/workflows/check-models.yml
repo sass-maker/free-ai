@@ -6,8 +6,7 @@ on:
   workflow_dispatch: # Manual trigger
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   check:
@@ -36,28 +35,16 @@ jobs:
           echo "drift=$((STALE + NEW))" >> "$GITHUB_OUTPUT"
           cat report.json
 
-      - name: Patch config and create PR
+      - name: Patch config and preserve evidence
         if: steps.check.outputs.drift != '0'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           node scripts/check-model-ids.mjs --patch
-
-          BRANCH="chore/model-sync-$(date +%Y%m%d-%H%M%S)"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-          git add src/config.ts
-          git commit -m "chore: sync model registry with upstream providers
-
-          Auto-detected by weekly model check.
-          See report.json in workflow run for details."
-          git format-patch -1 --stdout > model-sync.patch
-          git push origin "$BRANCH"
+          git diff --binary -- src/config.ts > model-sync.patch
 
           STALE_LIST=$(node -e "
             const r=JSON.parse(require('fs').readFileSync('report.json','utf-8'));
@@ -68,26 +55,20 @@ jobs:
             (r.new||[]).forEach(m => console.log('- \`'+m.provider+'/'+m.model+'\`'));
           ")
 
-          if ! PR_URL=$(gh pr create \
-            --title "chore: sync model registry with upstream" \
-            --body "## Stale models removed
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Model registry drift detected
+
+          ### Stale models
 
           ${STALE_LIST:-_none_}
 
-          ## New models added (auto-stubbed, review defaults)
+          ### New models
 
           ${NEW_LIST:-_none_}
 
-          New models use conservative defaults: \`priority: 0.50\`, \`reasoning: 'medium'\`, \`toolCalling: false\`, \`vision: false\`, \`contextWindow: 32768\`. Review & tune before merge.
-
-          Detected by the weekly \`check-models\` workflow." \
-            --base main 2>&1); then
-            echo "::warning title=Model sync PR not created::$PR_URL"
-            echo "The model drift report and patch were preserved as workflow artifacts." >> "$GITHUB_STEP_SUMMARY"
-            git push origin --delete "$BRANCH" || true
-          else
-            echo "Created model sync PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          Download \`model-sync.patch\` from the workflow artifacts, review the
+          conservative defaults, and apply it manually.
+          EOF
 
       - name: Upload model drift evidence
         if: steps.check.outputs.drift != '0'

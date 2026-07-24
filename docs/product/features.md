@@ -75,7 +75,7 @@ Embedding providers: Gemini, Voyage AI (`VOYAGE_API_KEY`), Workers AI.
 The authoritative model registry is `src/config.ts`. The model tables in
 [`README.md`](../../README.md) are a snapshot for users; `src/config.ts` is the
 source of truth. The weekly `check-models.yml` workflow auto-detects drift and
-opens a PR.
+uploads a reviewable patch artifact; it does not push branches or open PRs.
 
 ## Durable Objects & storage
 

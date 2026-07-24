@@ -32,17 +32,17 @@ files (cron) — those are authoritative, not this page.
 
 - **Schedule:** `0 9 * * 0` (every Sunday 09:00 UTC).
 - **Trigger:** schedule + `workflow_dispatch`.
-- **Permissions:** `contents: write`, `pull-requests: write`.
+- **Permissions:** `contents: read`.
 - **Steps:**
   1. `node scripts/check-model-ids.mjs --json` against live provider APIs
      (Groq, OpenRouter, Cerebras, Gemini).
-  2. If `stale + new > 0`: run `--patch` to update `src/config.ts`, create a
-     branch `chore/model-sync-<timestamp>`, commit, push, open a PR.
+  2. If `stale + new > 0`: run `--patch` against the checkout and upload
+     `report.json` plus `model-sync.patch` for manual review.
   3. New models get conservative defaults (`priority: 0.50`, `reasoning: medium`,
      `toolCalling: false`, `vision: false`, `contextWindow: 32768`) — review and
      tune before merge.
 - **Secrets required:** `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`,
-  `GEMINI_API_KEY`, `GITHUB_TOKEN`.
+  `GEMINI_API_KEY`.
 
 ## `docs-check.yml` — Documentation validation
 
