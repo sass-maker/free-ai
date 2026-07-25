@@ -8,6 +8,8 @@ coverage/
 .dev.vars
 .dev.vars.*
 .DS_Store
+__pycache__/
+*.py[cod]
 playground/node_modules/
 playwright-report/
 test-results/
@@ -37,4 +39,3 @@ docs-blume/package-lock.json
 .agent-logs/
 .agent-scratch/
 *.agent-log
-
