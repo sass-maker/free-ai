@@ -339,6 +339,16 @@ function extractWorkersDevUrl(output) {
   return match ? match[0] : null;
 }
 
+function resolveDeploySha() {
+  const sha = process.env.GITHUB_SHA || run('git', ['rev-parse', 'HEAD'], { capture: true }).trim();
+
+  if (!/^[0-9a-f]{40}$/i.test(sha)) {
+    throw new Error(`Cannot deploy without a full Git SHA tag; received: ${sha || '<empty>'}`);
+  }
+
+  return sha;
+}
+
 function main() {
   const args = new Set(process.argv.slice(2));
   const skipSecrets = args.has('--skip-secrets');
@@ -379,9 +389,14 @@ function main() {
   }
 
   console.log('Deploying worker...');
-  const deployOutput = run('npx', ['wrangler', 'deploy', '--config', WRANGLER_GENERATED], {
-    capture: true,
-  });
+  const deploySha = resolveDeploySha();
+  const deployOutput = run(
+    'npx',
+    ['wrangler', 'deploy', '--config', WRANGLER_GENERATED, '--tag', deploySha],
+    {
+      capture: true,
+    }
+  );
   process.stdout.write(deployOutput);
 
   const url = extractWorkersDevUrl(deployOutput);
