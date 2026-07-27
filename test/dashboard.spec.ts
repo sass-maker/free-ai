@@ -10,29 +10,27 @@ async function fetchRoute(path: string) {
 }
 
 describe('Dashboard HTML routes', () => {
-  it.each([
-    ['/dashboard'],
-    ['/live'],
-    ['/v1/dashboard'],
-  ])('%s returns 200 with the dashboard HTML', async (path) => {
-    const res = await fetchRoute(path);
-    expect(res.status).toBe(200);
-    const contentType = res.headers.get('content-type') ?? '';
-    expect(contentType).toContain('text/html');
-    const html = await res.text();
-    expect(html).toContain('<title>AI Gateway — Live</title>');
-  });
+  it.each([['/dashboard'], ['/live'], ['/v1/dashboard']])(
+    '%s returns 200 with the dashboard HTML',
+    async (path) => {
+      const res = await fetchRoute(path);
+      expect(res.status).toBe(200);
+      const contentType = res.headers.get('content-type') ?? '';
+      expect(contentType).toContain('text/html');
+      const html = await res.text();
+      expect(html).toContain('<title>AI Gateway — Live</title>');
+    }
+  );
 
-  it.each([
-    ['/dashboard'],
-    ['/live'],
-    ['/v1/dashboard'],
-  ])('%s sets no-store cache headers so dashboards do not get CDN-cached', async (path) => {
-    const res = await fetchRoute(path);
-    expect(res.headers.get('cache-control') ?? '').toContain('no-store');
-    expect(res.headers.get('cdn-cache-control')).toBe('no-store');
-    expect(res.headers.get('cloudflare-cdn-cache-control')).toBe('no-store');
-  });
+  it.each([['/dashboard'], ['/live'], ['/v1/dashboard']])(
+    '%s sets no-store cache headers so dashboards do not get CDN-cached',
+    async (path) => {
+      const res = await fetchRoute(path);
+      expect(res.headers.get('cache-control') ?? '').toContain('no-store');
+      expect(res.headers.get('cdn-cache-control')).toBe('no-store');
+      expect(res.headers.get('cloudflare-cdn-cache-control')).toBe('no-store');
+    }
+  );
 
   it('redirects /dashboard/ to /dashboard', async () => {
     const res = await fetchRoute('/dashboard/');

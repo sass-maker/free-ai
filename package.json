@@ -45,34 +45,34 @@
     "knip:strict": "knip --reporter symbols"
   },
   "dependencies": {
+    "@hono/zod-openapi": "1.5.1",
+    "@hookform/resolvers": "5.5.7",
     "@saas-maker/app-health": "https://github.com/sarthakagrawal927/app-health/releases/download/node-v0.2.1/saas-maker-app-health-0.2.1.tgz",
-    "@hono/zod-openapi": "1.3.0",
-    "@hookform/resolvers": "5.2.2",
-    "@tanstack/react-query": "5.100.9",
-    "hono": "4.12.18",
-    "openai": "6.37.0",
-    "p-limit": "7.3.0",
+    "@tanstack/react-query": "5.101.4",
+    "hono": "4.12.32",
+    "openai": "6.49.0",
+    "p-limit": "7.3.1",
     "p-retry": "8.0.0",
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "react-hook-form": "7.75.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-hook-form": "7.83.0",
     "zod": "4.4.3",
-    "zustand": "5.0.13"
+    "zustand": "5.0.14"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.1",
+    "@biomejs/biome": "^2.5.5",
     "@cloudflare/vitest-pool-workers": "0.16.3",
     "@cloudflare/workers-types": "4.20260509.1",
-    "@playwright/test": "1.59.1",
-    "@types/react": "19",
+    "@playwright/test": "1.62.0",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "19",
-    "@vitest/coverage-v8": "^4.1.5",
+    "@vitest/coverage-v8": "^4.1.10",
     "husky": "9.1.7",
-    "knip": "^6.6.3",
+    "knip": "^6.29.0",
     "typescript": "6.0.3",
-    "vite": "8.0.11",
-    "vitest": "4.1.5",
-    "wrangler": "4.90.0"
+    "vite": "8.1.5",
+    "vitest": "4.1.10",
+    "wrangler": "4.114.0"
   },
   "packageManager": "pnpm@10.33.2"
 }
