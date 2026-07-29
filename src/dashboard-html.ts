@@ -72,11 +72,11 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kpi.bad .value { color: var(--danger); }
 
   .grid { display: grid; gap: 16px; }
+  .grid > * { min-width: 0; }
   .grid-2 { grid-template-columns: 2fr 1fr; }
   @media (max-width: 960px) {
     .grid-2 { grid-template-columns: 1fr; }
     .kpis { grid-template-columns: repeat(2, 1fr); }
-    .topbar select, .topbar button { width: 100%; }
   }
 
   .card { background: var(--surface); border: 1px solid var(--border);
@@ -94,6 +94,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: rgba(255,255,255,0.02); }
   .mono { font-family: var(--mono); font-size: 12px; }
+  .table-scroll { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-scroll table { min-width: 620px; }
 
   .badge { display: inline-block; padding: 2px 8px; border-radius: 10px;
     font-size: 11px; font-family: var(--mono); font-weight: 500; }
@@ -104,7 +106,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   .progress { position: relative; height: 6px; background: var(--surface-2);
     border-radius: 3px; overflow: hidden; min-width: 80px; }
-  .progress > div { height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; }
+  .progress > div { height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; } /* impeccable-disable-line layout-transition: width is the quota value */
   .progress.warn > div { background: var(--warn); }
   .progress.danger > div { background: var(--danger); }
   .progress-label { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
@@ -173,6 +175,24 @@ export const DASHBOARD_HTML = `<!doctype html>
   .quota-name { font-weight:600; font-size:13px; }
   .quota-meta { font-size:11px; color:var(--muted); font-family:var(--mono); }
   @media (max-width: 960px) { .pcards { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) {
+    .app { padding: 12px 12px 40px; }
+    .topbar { align-items: stretch; padding: 12px; }
+    .topbar .spacer { display: none; }
+    .topbar h1, .last-updated { width: 100%; }
+    .topbar input, .topbar select, .topbar button, .topbar label { min-height: 44px; }
+    .topbar select, .topbar button { width: 100%; }
+    .kpis { gap: 8px; margin-bottom: 12px; }
+    .kpi, .card { padding: 12px; }
+    .kpi .value { font-size: 22px; }
+    .card { margin-bottom: 12px; }
+    .chart-wrap { height: 220px; }
+    .chart-wrap.tall { height: 260px; }
+    .lab-grid input, .lab-grid select, .lab-grid button { min-height: 44px; }
+    .lab-grid textarea { min-height: 160px; }
+    .pcards, .quota-grid, .throttle-grid { grid-template-columns: 1fr; }
+    .table-scroll th, .table-scroll td { white-space: nowrap; }
+  }
 </style>
 </head>
 <body>
@@ -233,12 +253,14 @@ export const DASHBOARD_HTML = `<!doctype html>
 
     <div class="card" id="routingCard">
       <h2>Routing fallback order</h2>
+      <div class="table-scroll" role="region" aria-label="Routing fallback order" tabindex="0">
       <table>
         <thead><tr>
           <th>Rank</th><th>Model</th><th>Provider</th><th>Status</th><th>Upstream success</th><th>Reasons</th>
         </tr></thead>
         <tbody id="routingBody"></tbody>
       </table>
+      </div>
     </div>
 
     <div class="card" id="throttleCard" style="display:none">
@@ -287,6 +309,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 
     <div class="card">
       <h2>Live model health</h2>
+      <div class="table-scroll" role="region" aria-label="Live model health" tabindex="0">
       <table>
         <thead><tr>
           <th>Key</th><th>Samples</th><th>Upstream success</th><th>Avg</th><th>P90</th><th>P99</th>
@@ -294,26 +317,31 @@ export const DASHBOARD_HTML = `<!doctype html>
         </tr></thead>
         <tbody id="healthBody"></tbody>
       </table>
+      </div>
     </div>
 
     <div class="grid grid-2" id="analyticsTables">
       <div class="card" id="topModelsCard">
         <h2 id="topBreakdownTitle">Top 10 models</h2>
+        <div class="table-scroll" role="region" aria-label="Top models" tabindex="0">
         <table>
           <thead><tr>
             <th id="topBreakdownLabel">Model</th><th>Requests</th><th>Success</th><th>Failed</th>
           </tr></thead>
           <tbody id="topModelsBody"></tbody>
         </table>
+        </div>
       </div>
       <div class="card" id="projectsCard">
         <h2>Projects</h2>
+        <div class="table-scroll" role="region" aria-label="Projects" tabindex="0">
         <table>
           <thead><tr>
             <th>Project</th><th>Requests</th><th>Success</th>
           </tr></thead>
           <tbody id="projectsBody"></tbody>
         </table>
+        </div>
       </div>
     </div>
   </div>

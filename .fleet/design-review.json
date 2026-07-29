@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "free-ai",
-  "target": "AI Gateway changelog",
+  "target": "AI Gateway dashboard density and mobile containment",
   "mode": "preserve",
   "register": "product",
   "context": {
@@ -14,33 +14,33 @@
     "probes": [],
     "selected": "existing-design",
     "approval": "not-required",
-    "before": ".fleet/evidence/changelog/before-1440.png"
+    "before": ".fleet/evidence/dashboard-mobile/before-1440.png"
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": ".fleet/evidence/changelog/after-390.png"
+        "path": ".fleet/evidence/dashboard-mobile/after-390.png"
       },
       {
         "width": 768,
-        "path": ".fleet/evidence/changelog/after-768.png"
+        "path": ".fleet/evidence/dashboard-mobile/after-768.png"
       },
       {
         "width": 1440,
-        "path": ".fleet/evidence/changelog/after-1440.png"
+        "path": ".fleet/evidence/dashboard-mobile/after-1440.png"
       }
     ],
     "projectCheck": {
-      "command": "pnpm --filter @sass-maker/ai-gateway-docs build",
+      "command": "pnpm run typecheck",
       "status": "pass"
     },
     "critique": {
-      "score": 34,
+      "score": 36,
       "maximum": 40
     },
     "audit": {
-      "score": 18,
+      "score": 19,
       "maximum": 20
     },
     "unresolved": {
@@ -49,20 +49,18 @@
     },
     "detector": {
       "posture": "advisory",
-      "findings": [
-        "Instrument Serif is an incumbent AI Gateway landing-page font; the overused-font warning is advisory in preserve mode."
-      ]
+      "findings": []
     },
     "browserReview": {
-      "tool": "Playwright",
+      "tool": "Browser control",
       "viewports": [390, 768, 1440],
       "horizontalOverflow": false,
       "consoleErrors": 0,
-      "note": "The changelog was visually inspected at all required widths. The mobile header wraps deliberately and the release timeline remains a single, legible reading column."
+      "note": "The dashboard is page-contained at 390px, all four data tables scroll inside their cards, controls meet 44px mobile targets, and tablet controls retain a compact operator-console layout."
     }
   },
   "ownerFeedback": {
     "decision": "delegated",
-    "note": "Owner explicitly delegated agents to build first-party changelogs across all projects."
+    "note": "The owner explicitly delegated final judgment for the responsive remediation wave; the existing operator-console visual language was preserved."
   }
 }
