@@ -1,0 +1,68 @@
+{
+  "$schema": "fleet.design-review.v1",
+  "version": 1,
+  "project": "free-ai",
+  "target": "AI Gateway changelog",
+  "mode": "preserve",
+  "register": "product",
+  "context": {
+    "product": "PRODUCT.md",
+    "design": "DESIGN.md"
+  },
+  "direction": {
+    "references": [],
+    "probes": [],
+    "selected": "existing-design",
+    "approval": "not-required",
+    "before": ".fleet/evidence/changelog/before-1440.png"
+  },
+  "evidence": {
+    "screenshots": [
+      {
+        "width": 390,
+        "path": ".fleet/evidence/changelog/after-390.png"
+      },
+      {
+        "width": 768,
+        "path": ".fleet/evidence/changelog/after-768.png"
+      },
+      {
+        "width": 1440,
+        "path": ".fleet/evidence/changelog/after-1440.png"
+      }
+    ],
+    "projectCheck": {
+      "command": "pnpm --filter @sass-maker/ai-gateway-docs build",
+      "status": "pass"
+    },
+    "critique": {
+      "score": 34,
+      "maximum": 40
+    },
+    "audit": {
+      "score": 18,
+      "maximum": 20
+    },
+    "unresolved": {
+      "p0": 0,
+      "p1": 0
+    },
+    "detector": {
+      "posture": "advisory",
+      "findings": [
+        "Instrument Serif is an incumbent AI Gateway landing-page font; the overused-font warning is advisory in preserve mode."
+      ]
+    },
+    "browserReview": {
+      "tool": "Playwright",
+      "viewports": [390, 768, 1440],
+      "horizontalOverflow": false,
+      "consoleErrors": 0,
+      "note": "The changelog was visually inspected at all required widths. The mobile header wraps deliberately and the release timeline remains a single, legible reading column."
+    }
+  },
+  "ownerFeedback": {
+    "decision": "delegated",
+    "note": "Owner explicitly delegated agents to build first-party changelogs across all projects."
+  }
+}

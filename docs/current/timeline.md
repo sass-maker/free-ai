@@ -33,3 +33,6 @@ Append new dated entries at the bottom; do not rewrite history.
 - **2026-07-18** — Repository knowledge system consolidated: `docs/` reorganized
   into product/architecture/development/operations/knowledge/current; `STATUS.md`
   replaces `PROJECT_STATUS.md`; Blume repurposed to render the `docs/` tree.
+- **2026-07-29** — Added the first-party public `/changelog` route, sourced from
+  verified milestones in this timeline. The page keeps planned work in GitHub
+  Issues and links to the canonical `sass-maker/free-ai` repository.

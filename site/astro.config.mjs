@@ -11,9 +11,7 @@ export default defineConfig({
         dark: './src/assets/logo-dark.svg',
         replacesTitle: false,
       },
-      social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/sarthakagrawal/free-ai' },
-      ],
+      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/sass-maker/free-ai' }],
       customCss: ['./src/styles/custom.css'],
       sidebar: [
         {

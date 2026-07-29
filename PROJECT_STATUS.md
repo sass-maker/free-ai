@@ -19,6 +19,9 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
 
 ## Timeline
 
+- **2026-07-29** — Added the first-party public `/changelog` route, sourced
+  from verified milestones in `docs/current/timeline.md`. Planned work remains
+  in GitHub Issues and Source points to the canonical organization repository.
 The shipped timeline lives in
 [`docs/current/timeline.md`](docs/current/timeline.md).
 
