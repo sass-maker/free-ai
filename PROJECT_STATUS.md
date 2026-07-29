@@ -1,0 +1,41 @@
+# free-ai — PROJECT STATUS
+
+Last updated: 2026-07-25
+
+## Why / What
+
+Gateway core is shipped and stable. Active work is operator key-ring hygiene and
+low-risk route splitting. Best-effort free tier, not SLA. `src/index.ts` remains
+monolithic until split has test coverage.
+
+See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrails.
+
+## Dependencies
+
+- Cloudflare Workers, Workers AI, KV, and the provider free tiers routed by the
+  gateway.
+- Fleet consumers use the public gateway contract; architecture details live
+  in [`docs/architecture/overview.md`](docs/architecture/overview.md).
+
+## Timeline
+
+The shipped timeline lives in
+[`docs/current/timeline.md`](docs/current/timeline.md).
+
+## Products
+
+- **Deploy:** manual via `cloudflare-deploy.yml` workflow_dispatch (not auto-on-push).
+- **Cost guard:** `pnpm audit:cloudflare-costs` gates deploys; Workers AI capped at
+  9,500 neurons/day.
+- **Live URL:** `https://ai-gateway.sassmaker.com`.
+
+## Features (shipped)
+
+- **Full feature list:** [`docs/product/features.md`](docs/product/features.md).
+- **Architecture:** [`docs/architecture/overview.md`](docs/architecture/overview.md).
+
+## Work queue
+
+Open work is tracked only in [GitHub Issues](https://github.com/sass-maker/free-ai/issues).
+An open issue is a to-do, a linked pull request is in progress, and merge plus
+issue closure makes the work done.

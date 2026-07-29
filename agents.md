@@ -56,7 +56,8 @@ pnpm keys:generate|list|print-secret|upload   # operator key ring
 
 | Need | Read |
 | --- | --- |
-| Current state + blockers | [`STATUS.md`](STATUS.md) |
+| Current/shipped product truth | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) |
+| Open work and blockers | GitHub Issues |
 | What the product is + features | [`docs/product/features.md`](docs/product/features.md) |
 | System design + why | [`docs/architecture/overview.md`](docs/architecture/overview.md) |
 | Architecture decisions (ADRs) | [`docs/architecture/decisions/adr-001-007.md`](docs/architecture/decisions/adr-001-007.md) |
