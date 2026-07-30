@@ -26,34 +26,199 @@ export const AGENT_SURFACE = {
     "robots": "https://ai-gateway.sassmaker.com/robots.txt",
     "markdown": {
       "suffix": ".md",
-      "negotiation": true
+      "negotiation": false
     },
     "surfaces": [
       {
         "id": "home",
         "url": "https://ai-gateway.sassmaker.com/",
         "md": "https://ai-gateway.sassmaker.com/index.md",
-        "kind": "spa",
+        "kind": "static",
         "description": "Product home"
+      },
+      {
+        "id": "about",
+        "url": "https://ai-gateway.sassmaker.com/about",
+        "md": "https://ai-gateway.sassmaker.com/about.md",
+        "kind": "static",
+        "description": "Why the gateway exists and how it operates"
+      },
+      {
+        "id": "analytics",
+        "url": "https://ai-gateway.sassmaker.com/analytics",
+        "md": "https://ai-gateway.sassmaker.com/analytics.md",
+        "kind": "docs",
+        "description": "Aggregated gateway usage reference"
+      },
+      {
+        "id": "authentication",
+        "url": "https://ai-gateway.sassmaker.com/authentication",
+        "md": "https://ai-gateway.sassmaker.com/authentication.md",
+        "kind": "docs",
+        "description": "Gateway authentication reference"
+      },
+      {
+        "id": "changelog",
+        "url": "https://ai-gateway.sassmaker.com/changelog",
+        "md": "https://ai-gateway.sassmaker.com/changelog.md",
+        "kind": "static",
+        "description": "Verified product updates"
+      },
+      {
+        "id": "chat-completions",
+        "url": "https://ai-gateway.sassmaker.com/chat-completions",
+        "md": "https://ai-gateway.sassmaker.com/chat-completions.md",
+        "kind": "docs",
+        "description": "Chat completions API reference"
+      },
+      {
+        "id": "dashboard",
+        "url": "https://ai-gateway.sassmaker.com/dashboard",
+        "md": "https://ai-gateway.sassmaker.com/dashboard.md",
+        "kind": "docs",
+        "description": "Public gateway dashboard reference"
+      },
+      {
+        "id": "embeddings",
+        "url": "https://ai-gateway.sassmaker.com/embeddings",
+        "md": "https://ai-gateway.sassmaker.com/embeddings.md",
+        "kind": "docs",
+        "description": "Embeddings API reference"
+      },
+      {
+        "id": "error-handling",
+        "url": "https://ai-gateway.sassmaker.com/error-handling",
+        "md": "https://ai-gateway.sassmaker.com/error-handling.md",
+        "kind": "docs",
+        "description": "Gateway error handling reference"
+      },
+      {
+        "id": "faq",
+        "url": "https://ai-gateway.sassmaker.com/faq",
+        "md": "https://ai-gateway.sassmaker.com/faq.md",
+        "kind": "static",
+        "description": "Frequently asked questions"
+      },
+      {
+        "id": "getting-started",
+        "url": "https://ai-gateway.sassmaker.com/getting-started",
+        "md": "https://ai-gateway.sassmaker.com/getting-started.md",
+        "kind": "docs",
+        "description": "Gateway setup guide"
       },
       {
         "id": "health",
         "url": "https://ai-gateway.sassmaker.com/health",
-        "md": null,
-        "kind": "static",
-        "description": "Health probe"
+        "md": "https://ai-gateway.sassmaker.com/health.md",
+        "kind": "docs",
+        "description": "Health endpoint reference"
+      },
+      {
+        "id": "images",
+        "url": "https://ai-gateway.sassmaker.com/images",
+        "md": "https://ai-gateway.sassmaker.com/images.md",
+        "kind": "docs",
+        "description": "Image generation API reference"
       },
       {
         "id": "models",
-        "url": "https://ai-gateway.sassmaker.com/v1/models",
-        "md": null,
+        "url": "https://ai-gateway.sassmaker.com/models",
+        "md": "https://ai-gateway.sassmaker.com/models.md",
+        "kind": "docs",
+        "description": "Model catalog reference"
+      },
+      {
+        "id": "provider-stats",
+        "url": "https://ai-gateway.sassmaker.com/provider-stats",
+        "md": "https://ai-gateway.sassmaker.com/provider-stats.md",
+        "kind": "docs",
+        "description": "Provider telemetry reference"
+      },
+      {
+        "id": "rate-limiting",
+        "url": "https://ai-gateway.sassmaker.com/rate-limiting",
+        "md": "https://ai-gateway.sassmaker.com/rate-limiting.md",
+        "kind": "docs",
+        "description": "Rate limiting reference"
+      },
+      {
+        "id": "responses-api",
+        "url": "https://ai-gateway.sassmaker.com/responses-api",
+        "md": "https://ai-gateway.sassmaker.com/responses-api.md",
+        "kind": "docs",
+        "description": "Responses API reference"
+      },
+      {
+        "id": "speech-to-speech",
+        "url": "https://ai-gateway.sassmaker.com/speech-to-speech",
+        "md": "https://ai-gateway.sassmaker.com/speech-to-speech.md",
+        "kind": "docs",
+        "description": "Speech-to-speech API reference"
+      },
+      {
+        "id": "speech-to-text",
+        "url": "https://ai-gateway.sassmaker.com/speech-to-text",
+        "md": "https://ai-gateway.sassmaker.com/speech-to-text.md",
+        "kind": "docs",
+        "description": "Speech-to-text API reference"
+      },
+      {
+        "id": "status",
+        "url": "https://ai-gateway.sassmaker.com/status",
+        "md": "https://ai-gateway.sassmaker.com/status.md",
         "kind": "static",
-        "description": "OpenAI-compatible models list"
+        "description": "Human-readable gateway status"
+      },
+      {
+        "id": "text-to-speech",
+        "url": "https://ai-gateway.sassmaker.com/text-to-speech",
+        "md": "https://ai-gateway.sassmaker.com/text-to-speech.md",
+        "kind": "docs",
+        "description": "Text-to-speech API reference"
+      },
+      {
+        "id": "videos",
+        "url": "https://ai-gateway.sassmaker.com/videos",
+        "md": "https://ai-gateway.sassmaker.com/videos.md",
+        "kind": "docs",
+        "description": "Video generation API reference"
+      }
+    ],
+    "apiResources": [
+      {
+        "id": "health-json",
+        "url": "https://ai-gateway.sassmaker.com/health",
+        "mediaType": "application/json",
+        "auth": "public"
+      },
+      {
+        "id": "models-json",
+        "url": "https://ai-gateway.sassmaker.com/v1/models",
+        "mediaType": "application/json",
+        "auth": "public"
+      },
+      {
+        "id": "provider-stats-json",
+        "url": "https://ai-gateway.sassmaker.com/v1/stats/providers",
+        "mediaType": "application/json",
+        "auth": "public"
+      },
+      {
+        "id": "routing-status-json",
+        "url": "https://ai-gateway.sassmaker.com/v1/routing/status",
+        "mediaType": "application/json",
+        "auth": "public"
+      },
+      {
+        "id": "openapi",
+        "url": "https://ai-gateway.sassmaker.com/openapi.json",
+        "mediaType": "application/json",
+        "auth": "public"
       }
     ],
     "auth": {
       "public": true,
-      "notes": "Auth-walled app routes are not agent-indexed unless listed here."
+      "notes": "Only the listed documentation, status, and aggregate read-only resources are public. Token-spending and project-scoped API routes require a gateway key and are excluded."
     }
   }
 };
@@ -73,9 +238,6 @@ export function handleAgentEdge(request) {
   if (path === '/llms-full.txt' && AGENT_SURFACE.llmsFullTxt) {
     return text(AGENT_SURFACE.llmsFullTxt, 'text/plain; charset=utf-8');
   }
-  if (path === '/index.md') {
-    return text(AGENT_SURFACE.indexMd, 'text/markdown; charset=utf-8');
-  }
   if (path === '/api/ai') {
     // Re-bind origin so preview/custom domains stay correct
     const catalog = {
@@ -83,34 +245,28 @@ export function handleAgentEdge(request) {
       url: url.origin,
       llms: `${url.origin}/llms.txt`,
       llmsFull: `${url.origin}/llms-full.txt`,
-      sitemap: AGENT_SURFACE.catalog.sitemap
-        ? String(AGENT_SURFACE.catalog.sitemap).replace(AGENT_SURFACE.url, url.origin)
-        : `${url.origin}/sitemap.xml`,
+      sitemap: rebindOrigin(AGENT_SURFACE.catalog.sitemap, url.origin),
+      robots: rebindOrigin(AGENT_SURFACE.catalog.robots, url.origin),
       surfaces: (AGENT_SURFACE.catalog.surfaces || []).map((s) => ({
         ...s,
-        url: s.url ? String(s.url).replace(AGENT_SURFACE.url, url.origin) : s.url,
-        md: s.md ? String(s.md).replace(AGENT_SURFACE.url, url.origin) : s.md,
+        url: rebindOrigin(s.url, url.origin),
+        md: rebindOrigin(s.md, url.origin),
+      })),
+      apiResources: (AGENT_SURFACE.catalog.apiResources || []).map((resource) => ({
+        ...resource,
+        url: rebindOrigin(resource.url, url.origin),
       })),
     };
     return json(catalog);
   }
 
-  // Homepage markdown negotiation
-  if ((path === '/' || path === '') && wantsMarkdown(request)) {
-    return text(AGENT_SURFACE.indexMd, 'text/markdown; charset=utf-8', {
-      Link: '</index.md>; rel="alternate"; type="text/markdown"',
-      Vary: 'Accept',
-    });
-  }
-
   return null;
 }
 
-function wantsMarkdown(request) {
-  const accept = (request.headers.get('accept') || '').toLowerCase();
-  if (!accept.includes('text/markdown')) return false;
-  if (!accept.includes('text/html')) return true;
-  return accept.indexOf('text/markdown') < accept.indexOf('text/html');
+function rebindOrigin(value, origin) {
+  if (!value) return value;
+  const source = new URL(String(value), AGENT_SURFACE.url);
+  return `${origin}${source.pathname}${source.search}${source.hash}`;
 }
 
 function text(body, type, extra = {}) {

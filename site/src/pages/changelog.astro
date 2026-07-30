@@ -5,6 +5,14 @@ const description =
 const gw = 'https://ai-gateway.sassmaker.com';
 const sourceUrl = 'https://github.com/sass-maker/free-ai';
 const roadmapUrl = `${sourceUrl}/issues`;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: title,
+  description,
+  url: `${gw}/changelog`,
+  isPartOf: { '@id': `${gw}/#website` },
+};
 
 const entries = [
   {
@@ -42,6 +50,13 @@ const entries = [
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={`${gw}/changelog`} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={`${gw}/changelog`} />
+    <meta property="og:image" content={`${gw}/icon.svg`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -123,4 +138,3 @@ const entries = [
     </footer>
   </body>
 </html>
-
