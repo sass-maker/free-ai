@@ -109,9 +109,10 @@ operator key-ring workflow.
 `index.ts` remains the main Hono route module. The staged split has moved the
 browser-tested operator HTML routes to `src/routes/operator-ui.ts` and the
 focused gateway auth middleware to `src/middleware/gateway-auth.ts`. Covered
-image and video generation routes live in dedicated modules under `src/routes/`.
-Other JSON/OpenAPI and provider-generation groups stay in `index.ts` until each
-group has focused coverage. See [ADR-003](decisions/adr-001-007.md).
+image, video, and standalone TTS generation routes live in dedicated modules
+under `src/routes/`. Other JSON/OpenAPI and provider-generation groups stay in
+`index.ts` until each group has focused coverage. See
+[ADR-003](decisions/adr-001-007.md).
 
 ## Public vs. internal surfaces
 
