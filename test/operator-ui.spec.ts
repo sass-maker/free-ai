@@ -135,4 +135,47 @@ describe('Operator browser UI routes', () => {
     const body = (await res.json()) as { data: unknown[] };
     expect(body.data.length).toBeGreaterThan(0);
   });
+
+  it.each([
+    ['/dashboard', '<title>AI Gateway — Live</title>'],
+    ['/live', '<title>AI Gateway — Live</title>'],
+    ['/v1/dashboard', '<title>AI Gateway — Live</title>'],
+    ['/benchmark', '<title>AI Gateway - Benchmark &amp; Cost Optimizer</title>'],
+    ['/v1/benchmark', '<title>AI Gateway - Benchmark &amp; Cost Optimizer</title>'],
+  ])('serves the extracted operator surface at %s', async (path, marker) => {
+    const res = await fetchRoute(path);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type') ?? '').toContain('text/html');
+    expect(res.headers.get('cache-control')).toContain('no-store');
+    expect(await res.text()).toContain(marker);
+  });
+
+  it.each([
+    ['/dashboard/', '/dashboard'],
+    ['/benchmark/', '/benchmark'],
+    ['/models/', '/models'],
+  ])('keeps the canonical redirect from %s', async (path, destination) => {
+    const res = await fetchRoute(path);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe(destination);
+  });
+
+  it('serves the health dashboard from the slash route for browser documents', async () => {
+    const res = await fetchRoute('/health/', {
+      accept: 'text/html',
+      'sec-fetch-dest': 'document',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('<title>AI Gateway - Health</title>');
+  });
+
+  it('redirects the health slash route for API clients', async () => {
+    const res = await fetchRoute('/health/');
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/health');
+  });
 });

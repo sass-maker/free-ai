@@ -22,13 +22,10 @@ import {
   hasVideoProviderKey,
   isWorkersAiEnabled,
 } from './config';
-import { BENCHMARK_COST_OPTIMIZER_HTML } from './benchmark-cost-optimizer-html';
 import {
   createBenchmarkExperimentEntry,
   getBenchmarkOptimizerFixture,
 } from './benchmark/cost-optimizer';
-import { DASHBOARD_HTML } from './dashboard-html';
-import { MODEL_CATALOG_HTML, OPERATOR_HEALTH_HTML } from './operator-ui-html';
 import {
   imageProviderCallers,
   providerCallers,
@@ -40,6 +37,7 @@ import {
 import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './providers/quota';
 import { classifyError, isRetriableFailure } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
+import { registerOperatorUiRoutes } from './routes/operator-ui';
 import { buildChatLedgerRecord, queryRoutingLedger, recordRoutingLedger } from './routing/ledger';
 import type { FallbackHop, RoutingOutcome } from './routing/ledger';
 import { deriveRequiredCapabilities, selectCandidates } from './router/select-model';
@@ -3418,22 +3416,6 @@ const modelsRoute = createRoute({
 type ModelListResponse = { data: z.infer<typeof modelItemSchema>[] };
 type HealthResponse = z.infer<typeof healthSchema>;
 
-const setDashboardHeaders = (c: { header: (k: string, v: string) => void }) => {
-  c.header('cache-control', 'no-store, no-cache, must-revalidate, max-age=0');
-  c.header('cdn-cache-control', 'no-store');
-  c.header('cloudflare-cdn-cache-control', 'no-store');
-};
-
-function wantsBrowserHtml(c: { req: { header: (key: string) => string | undefined } }): boolean {
-  const accept = c.req.header('accept') ?? '';
-  if (!accept.toLowerCase().includes('text/html')) {
-    return false;
-  }
-
-  const fetchDest = c.req.header('sec-fetch-dest');
-  return fetchDest === undefined || fetchDest === 'document';
-}
-
 async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
   const registry = getModelRegistry(env);
   const limits = getProviderLimits(env);
@@ -3509,51 +3491,14 @@ async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
   return { data: [...data, ...embeddings] };
 }
 
-app.use('/v1/models', async (c, next) => {
-  if (c.req.method === 'GET' && wantsBrowserHtml(c)) {
-    setDashboardHeaders(c);
-    return c.html(MODEL_CATALOG_HTML);
-  }
-
-  await next();
-});
+registerOperatorUiRoutes(app);
 
 app.openapi(modelsRoute, async (c) => {
   return c.json(await buildModelListResponse(c.env));
 });
 
 app.get('/models', async (c) => {
-  if (wantsBrowserHtml(c)) {
-    setDashboardHeaders(c);
-    return c.html(MODEL_CATALOG_HTML);
-  }
-
   return c.json(await buildModelListResponse(c.env));
-});
-app.get('/models/', (c) => c.redirect('/models'));
-
-app.get('/dashboard', (c) => {
-  setDashboardHeaders(c);
-  return c.html(DASHBOARD_HTML);
-});
-app.get('/dashboard/', (c) => c.redirect('/dashboard'));
-app.get('/live', (c) => {
-  setDashboardHeaders(c);
-  return c.html(DASHBOARD_HTML);
-});
-app.get('/v1/dashboard', (c) => {
-  setDashboardHeaders(c);
-  return c.html(DASHBOARD_HTML);
-});
-
-app.get('/benchmark', (c) => {
-  setDashboardHeaders(c);
-  return c.html(BENCHMARK_COST_OPTIMIZER_HTML);
-});
-app.get('/benchmark/', (c) => c.redirect('/benchmark'));
-app.get('/v1/benchmark', (c) => {
-  setDashboardHeaders(c);
-  return c.html(BENCHMARK_COST_OPTIMIZER_HTML);
 });
 
 const benchmarkOptimizerRoute = createRoute({
@@ -3880,26 +3825,8 @@ async function buildHealthResponse(env: Env): Promise<HealthResponse> {
   };
 }
 
-app.use('/health', async (c, next) => {
-  if (c.req.method === 'GET' && wantsBrowserHtml(c)) {
-    setDashboardHeaders(c);
-    return c.html(OPERATOR_HEALTH_HTML);
-  }
-
-  await next();
-});
-
 app.openapi(healthRoute, async (c) => {
   return c.json(await buildHealthResponse(c.env));
-});
-
-app.get('/health/', (c) => {
-  if (wantsBrowserHtml(c)) {
-    setDashboardHeaders(c);
-    return c.html(OPERATOR_HEALTH_HTML);
-  }
-
-  return c.redirect('/health');
 });
 
 const routingLedgerRoute = createRoute({
