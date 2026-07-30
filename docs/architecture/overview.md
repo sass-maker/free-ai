@@ -106,11 +106,11 @@ operator key-ring workflow.
 
 ## Monolithic `src/index.ts`
 
-`index.ts` remains the main Hono route module. The staged split has started with
-the focused, browser-tested operator HTML routes in
-`src/routes/operator-ui.ts`; JSON/OpenAPI and provider-generation groups stay in
-`index.ts` until each group has focused coverage. See
-[ADR-003](decisions/adr-001-007.md).
+`index.ts` remains the main Hono route module. The staged split has moved the
+browser-tested operator HTML routes to `src/routes/operator-ui.ts` and the
+focused gateway auth middleware to `src/middleware/gateway-auth.ts`.
+JSON/OpenAPI and provider-generation groups stay in `index.ts` until each group
+has focused coverage. See [ADR-003](decisions/adr-001-007.md).
 
 ## Public vs. internal surfaces
 
