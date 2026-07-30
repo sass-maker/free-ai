@@ -4,8 +4,10 @@ import { getModelRegistry, getTtsRegistry, isWorkersAiEnabled } from '../src/con
 import { callWorkersAi } from '../src/providers/workers-ai';
 import { classifyError, isRetriableFailure } from '../src/router/classify-error';
 import {
+  buildBudgetExhaustedResponse,
   estimateChatInputChars,
   estimateNeuronCost,
+  getNeuronUsage,
   tryDebitNeurons,
 } from '../src/state/neuron-budget';
 import type { Env } from '../src/types';
@@ -18,6 +20,13 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
     HEALTH_KV: {} as KVNamespace,
     ...overrides,
   };
+}
+
+function budgetNamespace(fetchMock: ReturnType<typeof vi.fn>): DurableObjectNamespace {
+  return {
+    idFromName: vi.fn(() => ({ toString: () => 'budget-id' })),
+    get: vi.fn(() => ({ fetch: fetchMock })),
+  } as unknown as DurableObjectNamespace;
 }
 
 describe('Workers AI free-tier guard', () => {
@@ -64,6 +73,26 @@ describe('Workers AI free-tier guard', () => {
     expect(long).toBeGreaterThan(short);
   });
 
+  it('covers text defaults, embeddings, fixed prices, and the conservative fallback', () => {
+    expect(estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct')).toBeGreaterThanOrEqual(1);
+    expect(
+      estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
+        inputChars: 0,
+        outputTokens: 0,
+      })
+    ).toBe(1);
+
+    const shortEmbedding = estimateNeuronCost('@cf/baai/bge-small-en-v1.5');
+    const longEmbedding = estimateNeuronCost('@cf/baai/bge-small-en-v1.5', {
+      inputChars: 40_000,
+    });
+    expect(shortEmbedding).toBe(1);
+    expect(longEmbedding).toBeGreaterThan(shortEmbedding);
+
+    expect(estimateNeuronCost('@cf/black-forest-labs/flux-1-schnell')).toBe(200);
+    expect(estimateNeuronCost('@cf/unknown/model')).toBe(80);
+  });
+
   it('adds image parts to chat input estimates', () => {
     const chars = estimateChatInputChars([
       {
@@ -76,6 +105,100 @@ describe('Workers AI free-tier guard', () => {
     ]);
 
     expect(chars).toBeGreaterThan(1_000);
+    expect(
+      estimateChatInputChars([
+        { role: 'system', content: 'system prompt' },
+        { role: 'user', content: '' },
+      ])
+    ).toBe('system prompt'.length);
+  });
+
+  it('debits through the global budget durable object', async () => {
+    const result = {
+      allowed: true,
+      used: 120,
+      remaining: 9_380,
+      retryAfter: 0,
+      dayKey: '2026-07-31',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(result));
+    const env = makeEnv({ NEURON_BUDGET: budgetNamespace(fetchMock) });
+
+    await expect(tryDebitNeurons(env, 12)).resolves.toEqual(result);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://internal.local/try-debit',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ neurons: 12 }),
+      })
+    );
+  });
+
+  it('fails closed when the budget durable object throws', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('DO unavailable'));
+    const env = makeEnv({ NEURON_BUDGET: budgetNamespace(fetchMock) });
+
+    await expect(tryDebitNeurons(env, 12)).resolves.toEqual({
+      allowed: false,
+      used: 0,
+      remaining: 0,
+      retryAfter: 60,
+      dayKey: '',
+    });
+  });
+
+  it('reads usage and degrades to null when usage is unavailable', async () => {
+    await expect(getNeuronUsage(makeEnv())).resolves.toBeNull();
+
+    const usage = {
+      used: 320,
+      remaining: 9_180,
+      cap: 9_500,
+      dayKey: '2026-07-31',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(usage));
+    const env = makeEnv({ NEURON_BUDGET: budgetNamespace(fetchMock) });
+    await expect(getNeuronUsage(env)).resolves.toEqual(usage);
+    expect(fetchMock).toHaveBeenCalledWith('https://internal.local/usage');
+
+    fetchMock.mockRejectedValueOnce(new Error('DO unavailable'));
+    await expect(getNeuronUsage(env)).resolves.toBeNull();
+  });
+
+  it('builds a non-cacheable, retryable budget-exhausted response', async () => {
+    const response = buildBudgetExhaustedResponse({
+      allowed: false,
+      used: 9_500,
+      remaining: 0,
+      retryAfter: 0,
+      dayKey: '2026-07-31',
+    });
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('retry-after')).toBe('60');
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: 'neuron_budget_exhausted',
+        message: 'Daily Workers AI Neuron budget exhausted (9500/9500). Retry after UTC midnight.',
+      },
+      x_budget: {
+        used: 9_500,
+        remaining: 0,
+        day_key: '2026-07-31',
+      },
+    });
+
+    expect(
+      buildBudgetExhaustedResponse({
+        allowed: false,
+        used: 9_500,
+        remaining: 0,
+        retryAfter: 120,
+        dayKey: '2026-07-31',
+      }).headers.get('retry-after')
+    ).toBe('120');
   });
 
   it('does not call Workers AI when the opt-in flag is absent', async () => {

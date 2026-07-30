@@ -20,6 +20,7 @@ export default defineConfig({
         'src/lib/telemetry.ts',
         'src/routing/ledger.ts',
         'src/state/client.ts',
+        'src/state/neuron-budget.ts',
         'src/providers/quota.ts',
         'src/utils/request.ts',
         'src/utils/sse.ts',
