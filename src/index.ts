@@ -7,7 +7,6 @@ import pLimit from 'p-limit';
 import pRetry, { AbortError } from 'p-retry';
 
 import { handleAgentEdge } from './agent-edge.mjs';
-import { isGatewayAuthConfigured, isValidGatewayApiKey } from './auth/gateway';
 import {
   getImageRegistry,
   getModelKey,
@@ -37,6 +36,7 @@ import {
 import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './providers/quota';
 import { classifyError, isRetriableFailure } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
+import { registerGatewayAuthMiddleware } from './middleware/gateway-auth';
 import { registerOperatorUiRoutes } from './routes/operator-ui';
 import { buildChatLedgerRecord, queryRoutingLedger, recordRoutingLedger } from './routing/ledger';
 import type { FallbackHop, RoutingOutcome } from './routing/ledger';
@@ -712,82 +712,9 @@ app.use('*', async (c, next) => {
   c.header('Referrer-Policy', 'no-referrer');
 });
 
-// ── API key authentication on all /v1 mutation endpoints ───────────
-// GATEWAY_API_KEY must be set as a wrangler secret in production. Additional
-// hashed keys can be supplied through GATEWAY_API_KEY_HASHES. Fail closed for
-// token-spending routes if no gateway auth secret is configured; otherwise a
-// misconfigured deploy would silently become public.
-//
-const AUTH_EXEMPT_GET = new Set([
-  '/v1/analytics',
-  '/v1/routing/ledger',
-  '/v1/stats/providers',
-  '/v1/routing/status',
-  '/v1/routing/config',
-  '/v1/provider-quotas',
-  '/v1/models',
-  '/v1/dashboard',
-  '/v1/budget',
-  '/v1/benchmark/optimizer',
-  '/benchmark',
-  '/v1/benchmark',
-]);
+registerGatewayAuthMiddleware(app);
 
 app.use('/v1/*', async (c, next) => {
-  const isExemptGet = c.req.method === 'GET' && AUTH_EXEMPT_GET.has(new URL(c.req.url).pathname);
-
-  if (!isExemptGet) {
-    if (!isGatewayAuthConfigured(c.env)) {
-      capture({
-        distinctId: 'free-ai',
-        event: 'foundry_auth_failure',
-        properties: {
-          project_id: 'free-ai',
-          route: new URL(c.req.url).pathname,
-          stage: 'signin',
-          reason: 'GATEWAY_API_KEY missing',
-          source: 'gateway-auth',
-        },
-      });
-      return c.json(
-        {
-          error: {
-            message: 'Gateway API key is not configured',
-            type: 'configuration_error',
-            code: 'auth_not_configured',
-          },
-        },
-        503
-      );
-    }
-
-    const authHeader = c.req.header('authorization') ?? '';
-    const providedKey = authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7)
-      : (c.req.header('x-api-key') ?? '');
-
-    const isValidKey = await isValidGatewayApiKey(providedKey, c.env);
-    if (!isValidKey) {
-      capture({
-        distinctId: 'free-ai',
-        event: 'foundry_auth_failure',
-        properties: {
-          project_id: 'free-ai',
-          route: new URL(c.req.url).pathname,
-          stage: 'signin',
-          reason: 'Invalid API key',
-          source: 'gateway-auth',
-        },
-      });
-      return c.json(
-        {
-          error: { message: 'Unauthorized', type: 'authentication_error', code: 'invalid_api_key' },
-        },
-        401
-      );
-    }
-  }
-
   if (c.req.method === 'GET' && RATE_LIMIT_EXEMPT_GET.has(new URL(c.req.url).pathname)) {
     return next();
   }
