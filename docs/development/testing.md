@@ -30,6 +30,7 @@ v8 coverage thresholds gate core logic modules at **80% lines/functions/statemen
 - `src/lib/telemetry.ts`
 - `src/routing/ledger.ts`
 - `src/state/client.ts`
+- `src/state/health-do.ts`
 - `src/state/neuron-budget.ts`
 - `src/providers/quota.ts`
 - `src/utils/request.ts`
