@@ -18,6 +18,7 @@ export default defineConfig({
         'src/router/evaluation-weights.ts',
         'src/auth/gateway.ts',
         'src/lib/telemetry.ts',
+        'src/routing/ledger.ts',
         'src/state/client.ts',
         'src/providers/quota.ts',
         'src/utils/request.ts',

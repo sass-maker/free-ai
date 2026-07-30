@@ -6,6 +6,7 @@ import {
   buildFallbackSignature,
   buildQuotaSignature,
   derivePromptClass,
+  queryRoutingLedger,
   recordRoutingLedger,
 } from '../src/routing/ledger';
 import type { ProviderQuotaStatus, TextProvider } from '../src/types';
@@ -69,9 +70,18 @@ describe('routing ledger helpers', () => {
         tools: [{ type: 'function', function: { name: 'lookup' } }],
       })
     ).toBe('text+tools+vision');
+
+    expect(
+      derivePromptClass({
+        messages: [{ role: 'user', content: 'return json' }],
+        response_format: { type: 'json_object' },
+      })
+    ).toBe('json+text');
   });
 
   it('builds compact fallback and quota signatures', () => {
+    expect(buildFallbackSignature([])).toBe('none');
+    expect(buildFallbackSignature([{ provider: 'groq', model: 'llama' }])).toBe('groq/llama');
     expect(
       buildFallbackSignature([
         { provider: 'groq', model: 'llama', outcome: 'failed' },
@@ -101,6 +111,7 @@ describe('routing ledger helpers', () => {
     ]);
 
     expect(buildQuotaSignature(quotas)).toBe('openrouter');
+    expect(buildQuotaSignature(new Map())).toBe('all_ok');
   });
 });
 
@@ -235,5 +246,292 @@ describe('recordRoutingLedger', () => {
     expect(bound.args).toEqual(
       expect.arrayContaining(['text', 'ok', 'groq', 'llama', 'groq/llama:ok', 'all_ok'])
     );
+  });
+
+  it('normalizes optional fields, quota state, latency, and attempts', async () => {
+    const run = vi.fn(async () => ({ success: true }));
+    const bind = vi.fn(function (this: unknown, ...args: unknown[]) {
+      (this as { args?: unknown[] }).args = args;
+      return this;
+    });
+    const prepare = vi.fn(() => ({ bind, run }));
+    const db = { prepare } as unknown as D1Database;
+
+    const record = buildChatLedgerRecord({
+      endpoint: 'chat.completions',
+      projectId: 'ledger-test',
+      normalized: {
+        model: 'auto',
+        messages: [{ role: 'user', content: 'hello' }],
+        stream: false,
+        reasoning_effort: 'auto',
+      },
+      requestedModel: 'auto',
+      quotaStatuses: new Map<TextProvider, ProviderQuotaStatus>([
+        [
+          'openrouter',
+          {
+            provider: 'openrouter',
+            status: 'exhausted',
+            source: 'openrouter_key',
+            checkedAt: '2026-07-31T00:00:00Z',
+            limitRemaining: 0,
+          },
+        ],
+        [
+          'groq',
+          {
+            provider: 'groq',
+            status: 'ok',
+            source: 'not_supported',
+            checkedAt: '2026-07-31T00:00:00Z',
+          },
+        ],
+      ]),
+      fallbackHops: [],
+      outcome: 'quota_exhausted',
+      requestStartedAt: Date.now() + 100,
+      errorClass: 'quota',
+    });
+
+    expect(record).toMatchObject({
+      chosen_provider: undefined,
+      chosen_model: undefined,
+      attempts: 1,
+      error_class: 'quota',
+      quota_state: {
+        openrouter: { status: 'exhausted', limit_remaining: 0 },
+        groq: { status: 'ok', limit_remaining: null },
+      },
+    });
+
+    await recordRoutingLedger(db, { ...record, project_id: undefined, attempts: 0 });
+
+    const bound = bind.mock.results[0]?.value as { args?: unknown[] };
+    expect(bound.args).toEqual(
+      expect.arrayContaining(['', 'quota_exhausted', 'none', 'openrouter', 0, 1])
+    );
+  });
+
+  it('does not change routing behavior when persistence fails', async () => {
+    const db = {
+      prepare: vi.fn(() => {
+        throw new Error('D1 unavailable');
+      }),
+    } as unknown as D1Database;
+
+    await expect(
+      recordRoutingLedger(db, {
+        endpoint: 'chat.completions',
+        prompt_class: 'text',
+        requested_model: 'auto',
+        fallback_chain: [],
+        quota_state: {},
+        latency_ms: 10,
+        outcome: 'ok',
+        attempts: 1,
+      })
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('queryRoutingLedger', () => {
+  function makeQueryDb(options: {
+    totals: Record<string, number | null> | null;
+    rows: Record<string, unknown[] | undefined>;
+  }) {
+    const binds: unknown[][] = [];
+    const prepare = vi.fn((sql: string) => {
+      const statement = {
+        bind: vi.fn((...args: unknown[]) => {
+          binds.push(args);
+          return statement;
+        }),
+        first: vi.fn(async () => options.totals),
+        all: vi.fn(async () => {
+          if (sql.includes('GROUP BY prompt_class')) {
+            return { results: options.rows.prompt };
+          }
+          if (sql.includes('GROUP BY outcome')) {
+            return { results: options.rows.outcome };
+          }
+          if (sql.includes('GROUP BY chosen_provider')) {
+            return { results: options.rows.model };
+          }
+          if (sql.includes('GROUP BY quota_signature')) {
+            return { results: options.rows.quota };
+          }
+          return { results: options.rows.fallback };
+        }),
+      };
+      return statement;
+    });
+
+    return {
+      db: { prepare } as unknown as D1Database,
+      binds,
+    };
+  }
+
+  it('maps populated aggregates and applies a project filter', async () => {
+    const { db, binds } = makeQueryDb({
+      totals: {
+        total_requests: 4,
+        successful_requests: 3,
+        failed_requests: 1,
+        sum_latency_ms: 400,
+        sum_attempts: 6,
+        with_fallback: 2,
+      },
+      rows: {
+        prompt: [
+          {
+            prompt_class: 'text',
+            request_count: 4,
+            sum_latency_ms: 400,
+            sum_attempts: 6,
+            with_fallback: 2,
+            successful_requests: 3,
+          },
+        ],
+        outcome: [
+          {
+            outcome: 'ok',
+            request_count: 3,
+            sum_latency_ms: 270,
+            sum_attempts: 4,
+            with_fallback: 1,
+          },
+          {
+            outcome: 'error',
+            request_count: 1,
+            sum_latency_ms: 130,
+            sum_attempts: 2,
+            with_fallback: 1,
+          },
+        ],
+        model: [
+          {
+            chosen_provider: 'groq',
+            chosen_model: 'llama',
+            request_count: 3,
+            sum_latency_ms: 270,
+            sum_attempts: 4,
+            with_fallback: 1,
+            successful_requests: 3,
+          },
+          {
+            chosen_provider: '',
+            chosen_model: '',
+            request_count: 1,
+            sum_latency_ms: 130,
+            sum_attempts: 2,
+            with_fallback: 1,
+            successful_requests: 0,
+          },
+        ],
+        quota: [
+          {
+            quota_signature: 'all_ok',
+            request_count: 4,
+            sum_latency_ms: 400,
+            sum_attempts: 6,
+            with_fallback: 2,
+            successful_requests: 3,
+          },
+        ],
+        fallback: [
+          {
+            fallback_signature: 'groq/llama:ok',
+            request_count: 3,
+            sum_latency_ms: 300,
+            sum_attempts: 4,
+            with_fallback: 2,
+            successful_requests: 2,
+          },
+          {
+            fallback_signature: 'none',
+            request_count: 0,
+            sum_latency_ms: 0,
+            sum_attempts: 0,
+            with_fallback: 0,
+            successful_requests: 0,
+          },
+        ],
+      },
+    });
+
+    const result = await queryRoutingLedger(db, { days: 14, project_id: 'project-a' });
+
+    expect(result.summary).toEqual({
+      total_requests: 4,
+      successful_requests: 3,
+      failed_requests: 1,
+      success_rate: 0.75,
+      avg_latency_ms: 100,
+      avg_attempts: 1.5,
+      fallback_rate: 0.5,
+    });
+    expect(result.by_prompt_class[0]).toMatchObject({
+      key: 'text',
+      successful: 3,
+      failed: 1,
+      success_rate: 0.75,
+    });
+    expect(result.by_outcome.map((row) => [row.key, row.successful, row.failed])).toEqual([
+      ['ok', 3, 0],
+      ['error', 0, 1],
+    ]);
+    expect(result.by_model.map((row) => row.key)).toEqual(['groq:llama', '(none)']);
+    expect(result.by_quota_signature[0].key).toBe('all_ok');
+    expect(result.top_fallback_signatures).toEqual([
+      {
+        signature: 'groq/llama:ok',
+        requests: 3,
+        success_rate: 2 / 3,
+        avg_latency_ms: 100,
+        fallback_rate: 2 / 3,
+      },
+      {
+        signature: 'none',
+        requests: 0,
+        success_rate: 0,
+        avg_latency_ms: 0,
+        fallback_rate: 0,
+      },
+    ]);
+    expect(binds).toHaveLength(6);
+    expect(binds.every((args) => args[0] === '-14 days' && args[1] === 'project-a')).toBe(true);
+  });
+
+  it('returns zeroed summaries when the rollup has no rows', async () => {
+    const { db, binds } = makeQueryDb({
+      totals: null,
+      rows: {
+        prompt: undefined,
+        outcome: undefined,
+        model: undefined,
+        quota: undefined,
+        fallback: undefined,
+      },
+    });
+
+    const result = await queryRoutingLedger(db, { days: 3 });
+
+    expect(result.summary).toEqual({
+      total_requests: 0,
+      successful_requests: 0,
+      failed_requests: 0,
+      success_rate: 0,
+      avg_latency_ms: 0,
+      avg_attempts: 0,
+      fallback_rate: 0,
+    });
+    expect(result.by_prompt_class).toEqual([]);
+    expect(result.by_outcome).toEqual([]);
+    expect(result.by_model).toEqual([]);
+    expect(result.by_quota_signature).toEqual([]);
+    expect(result.top_fallback_signatures).toEqual([]);
+    expect(binds.every((args) => args.length === 1 && args[0] === '-3 days')).toBe(true);
   });
 });
