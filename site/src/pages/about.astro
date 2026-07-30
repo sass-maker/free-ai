@@ -1,6 +1,15 @@
 ---
 const title = 'About — free-ai gateway';
 const description = 'Why it exists, how it routes, and what the SLOs are.';
+const gw = 'https://ai-gateway.sassmaker.com';
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'AboutPage',
+  name: title,
+  description,
+  url: `${gw}/about`,
+  isPartOf: { '@id': `${gw}/#website` },
+};
 ---
 <!doctype html>
 <html lang="en">
@@ -9,6 +18,14 @@ const description = 'Why it exists, how it routes, and what the SLOs are.';
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="canonical" href={`${gw}/about`} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={`${gw}/about`} />
+    <meta property="og:image" content={`${gw}/icon.svg`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <style>
       body { font-family: ui-sans-serif, system-ui, sans-serif; background: #09090b; color: #e4e4e7; margin: 0; padding: 0; }
       main { max-width: 720px; margin: 0 auto; padding: 64px 24px; line-height: 1.7; }

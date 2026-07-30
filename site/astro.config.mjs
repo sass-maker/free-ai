@@ -1,8 +1,32 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+const origin = 'https://ai-gateway.sassmaker.com';
+const socialImage = `${origin}/icon.svg`;
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': 'https://sassmaker.com/#org',
+      name: 'SaaS Maker (Foundry)',
+      url: 'https://sassmaker.com',
+      sameAs: ['https://github.com/sass-maker/free-ai'],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${origin}/#website`,
+      name: 'sass-maker / AI Gateway',
+      url: origin,
+      description:
+        'OpenAI-compatible AI gateway routing across free-tier providers with health-aware selection.',
+      publisher: { '@id': 'https://sassmaker.com/#org' },
+    },
+  ],
+};
+
 export default defineConfig({
-  site: 'https://ai-gateway.sassmaker.com',
+  site: origin,
   integrations: [
     starlight({
       title: 'sass-maker / AI Gateway',
@@ -65,6 +89,25 @@ export default defineConfig({
             content:
               'OpenAI-compatible AI gateway routing across free-tier providers with health-aware selection.',
           },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:image',
+            content: socialImage,
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'twitter:image',
+            content: socialImage,
+          },
+        },
+        {
+          tag: 'script',
+          attrs: { type: 'application/ld+json' },
+          content: JSON.stringify(structuredData),
         },
       ],
     }),

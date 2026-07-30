@@ -1,6 +1,16 @@
 ---
 const title = 'Gateway Status — Live Model & Provider Health';
-const description = 'Human-readable status page rendering the live /v1/models and /v1/stats/providers endpoints: model registry, health scores, provider request counts, and quota status.';
+const description =
+  'Live model registry and provider health: model scores, request counts, success rates, and quota status.';
+const gw = 'https://ai-gateway.sassmaker.com';
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: title,
+  description,
+  url: `${gw}/status`,
+  isPartOf: { '@id': `${gw}/#website` },
+};
 ---
 
 <!doctype html>
@@ -13,7 +23,11 @@ const description = 'Human-readable status page rendering the live /v1/models an
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <link rel="canonical" href="https://ai-gateway.sassmaker.com/status" />
+    <meta property="og:url" content={`${gw}/status`} />
+    <meta property="og:image" content={`${gw}/icon.svg`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href={`${gw}/status`} />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <style>
       :root {
