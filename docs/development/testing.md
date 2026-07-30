@@ -27,6 +27,7 @@ v8 coverage thresholds gate core logic modules at **80% lines/functions/statemen
 - `src/router/classify-error.ts`
 - `src/router/evaluation-weights.ts`
 - `src/auth/gateway.ts`
+- `src/lib/telemetry.ts`
 - `src/state/client.ts`
 - `src/providers/quota.ts`
 - `src/utils/request.ts`
@@ -44,6 +45,7 @@ to the `coverage.thresholds` glob in `vitest.config.ts`.
 | `classify-error.spec.ts` | error classification (retriable / safety / fatal) |
 | `evaluation-weights.spec.ts` | evaluation parsing, clamping, and routing weight bounds |
 | `auth.spec.ts` | gateway key + hash ring validation |
+| `telemetry.spec.ts` | PostHog capture/flush and traced success/failure lifecycles |
 | `health-do.spec.ts` | HealthStateDO cooldown / history ring |
 | `free-tier-guard.spec.ts` | Workers AI last-rank + neuron budget guard |
 | `routing-ledger.spec.ts` | routing experiment ledger persistence |
