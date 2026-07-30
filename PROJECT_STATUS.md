@@ -19,6 +19,9 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
 
 ## Timeline
 
+- **2026-07-31** — Tightened the public homepage description to a
+  search-result-safe length and verified the Astro build; production deployment
+  remains separate.
 - **2026-07-29** — Added the first-party public `/changelog` route, sourced
   from verified milestones in `docs/current/timeline.md`. Planned work remains
   in GitHub Issues and Source points to the canonical organization repository.
