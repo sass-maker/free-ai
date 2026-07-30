@@ -106,12 +106,11 @@ operator key-ring workflow.
 
 ## Monolithic `src/index.ts`
 
-`index.ts` is ~114KB / 4000+ lines and contains all Hono route handlers. This is a
-known, intentional trade-off — see
+`index.ts` remains the main Hono route module. The staged split has started with
+the focused, browser-tested operator HTML routes in
+`src/routes/operator-ui.ts`; JSON/OpenAPI and provider-generation groups stay in
+`index.ts` until each group has focused coverage. See
 [ADR-003](decisions/adr-001-007.md).
-Splitting is deferred until route groups have focused test coverage. Hono's
-`createRoute` + `app.openapi(...)` pattern makes it easy to split into sub-apps
-later without runtime behavior change.
 
 ## Public vs. internal surfaces
 
