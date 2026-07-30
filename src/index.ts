@@ -2,20 +2,17 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { honoMiddleware } from '@saas-maker/app-health/hono';
 import { capture, configurePostHog, flushPostHog, trace } from './lib/telemetry';
 import { getAppHealthClient } from './lib/app-health';
-import { CostBudget } from './lib/cost-budget';
 import pLimit from 'p-limit';
 import pRetry, { AbortError } from 'p-retry';
 
 import { handleAgentEdge } from './agent-edge.mjs';
 import {
-  getImageRegistry,
   getModelKey,
   getModelRegistry,
   getProviderLimits,
   getRateLimitConfig,
   getSttRegistry,
   getTtsRegistry,
-  hasImageProviderKey,
   hasTtsProviderKey,
   isWorkersAiEnabled,
 } from './config';
@@ -24,7 +21,6 @@ import {
   getBenchmarkOptimizerFixture,
 } from './benchmark/cost-optimizer';
 import {
-  imageProviderCallers,
   providerCallers,
   providerEmbeddingCallers,
   sttProviderCallers,
@@ -34,7 +30,9 @@ import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './provid
 import { classifyError, isRetriableFailure } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
 import { registerGatewayAuthMiddleware } from './middleware/gateway-auth';
+import { registerImageGenerationRoute } from './routes/image-generation';
 import { registerOperatorUiRoutes } from './routes/operator-ui';
+import { sortFallbackLast } from './routes/provider-order';
 import { registerVideoGenerationRoutes } from './routes/video-generation';
 import { buildChatLedgerRecord, queryRoutingLedger, recordRoutingLedger } from './routing/ledger';
 import type { FallbackHop, RoutingOutcome } from './routing/ledger';
@@ -772,23 +770,6 @@ function getForcedEmbeddingProvider(c: {
   }
 
   return undefined;
-}
-
-function sortFallbackLast<T extends { provider: Provider; priority: number }>(
-  items: T[],
-  useFallbackOrder: boolean
-): T[] {
-  return [...items].sort((a, b) => {
-    if (useFallbackOrder) {
-      const fallbackDiff =
-        Number(a.provider === 'workers_ai') - Number(b.provider === 'workers_ai');
-      if (fallbackDiff !== 0) {
-        return fallbackDiff;
-      }
-    }
-
-    return b.priority - a.priority;
-  });
 }
 
 async function getRoutingQuotaStatuses(
@@ -2685,33 +2666,6 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
 // ═══════════════════════════════════════════════════════════════════
 
 // ── Schemas ────────────────────────────────────────────────────────
-const imageGenRequestSchema = z
-  .object({
-    model: z.string().default('auto'),
-    prompt: z.string().min(1).max(2000),
-    n: z.number().int().min(1).max(4).optional(),
-    size: z.enum(['256x256', '512x512', '1024x1024', '1024x1792', '1792x1024']).optional(),
-    response_format: z.enum(['url', 'b64_json']).optional(),
-    quality: z.string().optional(),
-    style: z.string().optional(),
-    project_id: projectIdSchema.optional(),
-  })
-  .openapi('ImageGenerationRequest');
-
-const imageGenResponseSchema = z
-  .object({
-    created: z.number(),
-    data: z.array(
-      z.object({
-        url: z.string().optional(),
-        b64_json: z.string().optional(),
-        revised_prompt: z.string().optional(),
-      })
-    ),
-    x_gateway: gatewayMetaSchema.optional(),
-  })
-  .openapi('ImageGenerationResponse');
-
 const ttsRequestSchema = z
   .object({
     model: z.string().default('auto'),
@@ -2723,186 +2677,7 @@ const ttsRequestSchema = z
   })
   .openapi('TtsRequest');
 
-// ── /v1/images/generations ─────────────────────────────────────────
-const imagesGenRoute = createRoute({
-  method: 'post',
-  path: '/v1/images/generations',
-  request: {
-    body: { content: { 'application/json': { schema: imageGenRequestSchema } } },
-  },
-  responses: {
-    200: {
-      description: 'Image generated',
-      content: { 'application/json': { schema: imageGenResponseSchema } },
-    },
-    400: { description: 'Invalid input', content: { 'application/json': { schema: errorSchema } } },
-    429: {
-      description: 'Rate limited or retriable provider failure',
-      content: { 'application/json': { schema: errorSchema } },
-    },
-    502: {
-      description: 'All providers failed',
-      content: { 'application/json': { schema: errorSchema } },
-    },
-    503: {
-      description: 'No image provider configured',
-      content: { 'application/json': { schema: errorSchema } },
-    },
-  },
-});
-
-app.openapi(imagesGenRoute, async (c) => {
-  const body = c.req.valid('json');
-  const requestId = createRequestId();
-  const headerProjectId = c.req.header('x-gateway-project-id') ?? undefined;
-  const projectId = resolveProjectId(headerProjectId, body.project_id);
-  if (!projectId) {
-    return c.json(
-      {
-        error: {
-          message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
-          type: 'invalid_request_error',
-          code: 'invalid_project_id',
-        },
-      },
-      400
-    );
-  }
-
-  const forcedProvider = c.req.header('x-gateway-force-provider') ?? undefined;
-  const requestedModel = body.model.trim();
-  const requestedLower = requestedModel.toLowerCase();
-
-  const registry = getImageRegistry(c.env).filter((cand) => {
-    if (forcedProvider && cand.provider !== forcedProvider) return false;
-    if (
-      requestedModel &&
-      requestedLower !== 'auto' &&
-      cand.model !== requestedModel &&
-      cand.id !== requestedModel
-    )
-      return false;
-    if (!hasImageProviderKey(c.env, cand.provider)) return false;
-    return true;
-  });
-
-  if (registry.length === 0) {
-    return c.json(
-      {
-        error: {
-          message:
-            'Image generation unavailable: no Together/Gemini/NVIDIA key and Workers AI binding missing',
-          type: 'configuration_error',
-          code: 'no_image_provider',
-        },
-      },
-      503
-    );
-  }
-
-  const sorted = sortFallbackLast(registry, !forcedProvider && requestedLower === 'auto');
-  let lastError = 'Unknown error';
-  let attempts = 0;
-  let chosenProvider: string | undefined;
-  let chosenModel: string | undefined;
-  let lastErrorClass = 'provider_fatal';
-
-  // Per-request cost budget: cap provider attempts and cumulative timeout so a
-  // single image request cannot fan out into unbounded provider work.
-  // 3 attempts × 60s timeout = 180s max — matches the existing sequential cap.
-  const costBudget = new CostBudget({ maxAttempts: 3, maxTotalTimeoutMs: 180_000 });
-
-  for (const cand of sorted.slice(0, 3)) {
-    if (!costBudget.canAttempt()) break;
-
-    attempts += 1;
-    chosenProvider = cand.provider;
-    chosenModel = cand.model;
-    costBudget.recordAttempt(60_000);
-
-    try {
-      const caller = imageProviderCallers[cand.provider];
-      const result = await caller({
-        env: c.env,
-        model: cand.model,
-        prompt: body.prompt,
-        n: body.n,
-        size: body.size,
-        response_format: body.response_format,
-      });
-
-      c.executionCtx.waitUntil(
-        recordAnalytics({
-          db: c.env.GATEWAY_DB,
-          projectId,
-          outcome: 'ok',
-          provider: cand.provider,
-          model: cand.model,
-        })
-      );
-
-      // Degraded-mode label: if we fell back from a primary provider, surface it.
-      const degraded = attempts > 1;
-
-      return c.json(
-        {
-          created: result.created,
-          data: result.data,
-          degraded,
-          x_gateway: {
-            provider: cand.provider,
-            model: cand.model,
-            attempts,
-            reasoning_effort: 'auto' as const,
-            request_id: requestId,
-            project_id: projectId,
-          },
-        } as never,
-        200,
-        degraded ? { 'x-degraded-mode': 'true' } : undefined
-      );
-    } catch (err) {
-      lastError = getErrorMessage(err);
-      const failureClass = classifyError(err);
-      lastErrorClass = failureClass;
-
-      // Non-retriable errors (input_fatal / safety) fail immediately — do not
-      // amplify into another provider attempt.
-      if (!isRetriableFailure(failureClass)) {
-        break;
-      }
-      // Retriable: continue to next provider (jittered by the sequential loop).
-    }
-  }
-
-  c.executionCtx.waitUntil(
-    recordAnalytics({
-      db: c.env.GATEWAY_DB,
-      projectId,
-      outcome: 'error',
-      provider: chosenProvider as Provider | undefined,
-      model: chosenModel,
-    })
-  );
-
-  const errorStatus =
-    lastErrorClass === 'input_nonretriable'
-      ? 400
-      : lastErrorClass === 'usage_retriable'
-        ? 429
-        : 502;
-
-  return c.json(
-    {
-      error: {
-        message: `All image providers failed: ${lastError}`,
-        type: lastErrorClass,
-        cost_budget: costBudget.state(),
-      },
-    } as never,
-    errorStatus as 400 | 429 | 502
-  );
-});
+registerImageGenerationRoute(app, recordAnalytics);
 
 registerVideoGenerationRoutes(app, recordAnalytics);
 
