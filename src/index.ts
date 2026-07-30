@@ -18,11 +18,16 @@ import {
   createBenchmarkExperimentEntry,
   getBenchmarkOptimizerFixture,
 } from './benchmark/cost-optimizer';
-import { providerCallers, providerEmbeddingCallers, sttProviderCallers } from './providers';
+import { providerCallers, sttProviderCallers } from './providers';
 import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './providers/quota';
 import { classifyError, isRetriableFailure } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
 import { registerGatewayAuthMiddleware } from './middleware/gateway-auth';
+import {
+  EMBEDDING_CANDIDATES,
+  embeddingCandidateEnabled,
+  registerEmbeddingGenerationRoute,
+} from './routes/embedding-generation';
 import { registerImageGenerationRoute } from './routes/image-generation';
 import { registerOperatorUiRoutes } from './routes/operator-ui';
 import { sortFallbackLast } from './routes/provider-order';
@@ -50,7 +55,6 @@ import {
 import { NeuronBudgetDO } from './state/neuron-budget-do';
 import type {
   ChatMessage,
-  EmbeddingProvider,
   Env,
   GatewayMeta,
   ModelCandidate,
@@ -191,16 +195,6 @@ const responsesRequestSchema = z
   })
   .openapi('ResponsesRequest');
 
-const embeddingsRequestSchema = z
-  .object({
-    model: z.string().min(1),
-    input: z.union([z.string(), z.array(z.string().min(1)).min(1)]),
-    encoding_format: z.enum(['float']).optional(),
-    dimensions: z.number().int().min(1).max(4096).optional(),
-    project_id: projectIdSchema.optional(),
-  })
-  .openapi('EmbeddingsRequest');
-
 const gatewayMetaSchema = z
   .object({
     provider: z.string(),
@@ -272,27 +266,6 @@ const responsesApiResponseSchema = z
     x_gateway: gatewayMetaSchema.optional(),
   })
   .openapi('ResponsesResponse');
-
-const embeddingsResponseSchema = z
-  .object({
-    object: z.literal('list'),
-    data: z.array(
-      z.object({
-        object: z.literal('embedding'),
-        index: z.number(),
-        embedding: z.array(z.number()),
-      })
-    ),
-    model: z.string(),
-    usage: z
-      .object({
-        prompt_tokens: z.number().optional(),
-        total_tokens: z.number().optional(),
-      })
-      .optional(),
-    x_gateway: gatewayMetaSchema,
-  })
-  .openapi('EmbeddingsResponse');
 
 const errorSchema = z
   .object({
@@ -607,62 +580,6 @@ const replayResponseSchema = z
   })
   .openapi('ReplayResponse');
 
-interface EmbeddingCandidate {
-  provider: EmbeddingProvider;
-  model: string;
-  dimensions: number;
-  supportsDimensions?: boolean;
-  aliases?: string[];
-  priority: number;
-}
-
-const EMBEDDING_CANDIDATES: EmbeddingCandidate[] = [
-  {
-    provider: 'gemini',
-    model: 'gemini-embedding-001',
-    dimensions: 1536,
-    supportsDimensions: true,
-    aliases: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-004'],
-    priority: 0.95,
-  },
-  {
-    provider: 'voyage_ai',
-    model: 'voyage-3.5-lite',
-    dimensions: 1024,
-    priority: 0.91,
-  },
-  {
-    provider: 'voyage_ai',
-    model: 'voyage-3-lite',
-    dimensions: 1024,
-    priority: 0.88,
-  },
-  {
-    provider: 'workers_ai',
-    model: '@cf/baai/bge-large-en-v1.5',
-    dimensions: 1024,
-    priority: 0.87,
-  },
-  {
-    provider: 'workers_ai',
-    model: '@cf/baai/bge-base-en-v1.5',
-    dimensions: 768,
-    priority: 0.85,
-  },
-  {
-    provider: 'workers_ai',
-    model: '@cf/baai/bge-small-en-v1.5',
-    dimensions: 384,
-    priority: 0.8,
-  },
-];
-
-const EMBEDDING_MODEL_ALIASES: Record<string, string> = {
-  'text-embedding-3-small': 'gemini-embedding-001',
-  'text-embedding-3-large': 'gemini-embedding-001',
-  'text-embedding-004': 'gemini-embedding-001',
-};
-
 // Paths exempt from IP rate limiting — public read-only endpoints
 const RATE_LIMIT_EXEMPT_GET = new Set([
   '/v1/analytics',
@@ -751,21 +668,6 @@ function getForcedTextProvider(c: {
   return undefined;
 }
 
-function getForcedEmbeddingProvider(c: {
-  req: { header: (key: string) => string | undefined };
-}): EmbeddingProvider | undefined {
-  const value = c.req.header('x-gateway-force-provider');
-  if (!value) {
-    return undefined;
-  }
-
-  if (['workers_ai', 'gemini', 'voyage_ai'].includes(value)) {
-    return value as EmbeddingProvider;
-  }
-
-  return undefined;
-}
-
 async function getRoutingQuotaStatuses(
   env: Env,
   registry: ModelCandidate[]
@@ -783,98 +685,6 @@ async function getRoutingQuotaStatuses(
   }
 
   return getProviderQuotaStatuses(env, providers);
-}
-
-function workersAiEmbeddingAvailable(env: Env): boolean {
-  if (!isWorkersAiEnabled(env)) {
-    return false;
-  }
-
-  if (env.AI && typeof env.AI.run === 'function') {
-    return true;
-  }
-
-  return Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY);
-}
-
-function embeddingCandidateEnabled(env: Env, candidate: EmbeddingCandidate): boolean {
-  if (candidate.provider === 'gemini') {
-    return Boolean(env.GEMINI_API_KEY);
-  }
-
-  if (candidate.provider === 'workers_ai') {
-    return workersAiEmbeddingAvailable(env);
-  }
-
-  if (candidate.provider === 'voyage_ai') {
-    return Boolean(env.VOYAGE_API_KEY);
-  }
-
-  return false;
-}
-
-function normalizeEmbeddingInput(input: string | string[]): string[] {
-  if (typeof input === 'string') {
-    const trimmed = input.trim();
-    return trimmed ? [trimmed] : [];
-  }
-
-  if (!Array.isArray(input)) {
-    return [];
-  }
-
-  return input.map((value) => value.trim()).filter((value) => value.length > 0);
-}
-
-function resolveEmbeddingCandidates(
-  env: Env,
-  params: {
-    requestedModel: string;
-    forcedProvider?: EmbeddingProvider;
-    forcedModel?: string;
-  }
-): EmbeddingCandidate[] {
-  const requestedModel = params.requestedModel.trim();
-  const alias = EMBEDDING_MODEL_ALIASES[requestedModel];
-  const preferredModel = alias ?? requestedModel;
-
-  const filtered = EMBEDDING_CANDIDATES.filter((candidate) => {
-    if (params.forcedProvider && candidate.provider !== params.forcedProvider) {
-      return false;
-    }
-
-    if (params.forcedModel && candidate.model !== params.forcedModel) {
-      return false;
-    }
-
-    if (candidate.provider === 'gemini' && !env.GEMINI_API_KEY) {
-      return false;
-    }
-
-    if (candidate.provider === 'workers_ai' && !workersAiEmbeddingAvailable(env)) {
-      return false;
-    }
-
-    if (candidate.provider === 'voyage_ai' && !env.VOYAGE_API_KEY) {
-      return false;
-    }
-
-    return true;
-  });
-
-  return filtered.sort((a, b) => {
-    const aPreferred = preferredModel !== 'auto' && a.model === preferredModel;
-    const bPreferred = preferredModel !== 'auto' && b.model === preferredModel;
-
-    if (aPreferred && !bPreferred) {
-      return -1;
-    }
-    if (!aPreferred && bPreferred) {
-      return 1;
-    }
-
-    return b.priority - a.priority;
-  });
 }
 
 function rotateByOffset<T>(items: T[], offset: number): T[] {
@@ -2049,233 +1859,7 @@ app.openapi(responsesRoute, async (c) => {
   return c.json(chatCompletionToResponsesObject(parsedCompletion) as never, 200);
 });
 
-const embeddingsRoute = createRoute({
-  method: 'post',
-  path: '/v1/embeddings',
-  request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: embeddingsRequestSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    200: {
-      description: 'Embeddings response',
-      content: {
-        'application/json': {
-          schema: embeddingsResponseSchema,
-        },
-      },
-    },
-    400: {
-      description: 'Invalid input',
-      content: {
-        'application/json': { schema: errorSchema },
-      },
-    },
-    429: {
-      description: 'Rate limited',
-      content: {
-        'application/json': { schema: errorSchema },
-      },
-    },
-    503: {
-      description: 'No embedding provider available',
-      content: {
-        'application/json': { schema: errorSchema },
-      },
-    },
-    502: {
-      description: 'Provider failure',
-      content: {
-        'application/json': { schema: errorSchema },
-      },
-    },
-  },
-});
-
-app.openapi(embeddingsRoute, async (c) => {
-  const _requestStartedAt = Date.now();
-  const body = c.req.valid('json');
-  const requestId = createRequestId();
-  const normalizedInput = normalizeEmbeddingInput(body.input);
-  const _inputChars = normalizedInput.reduce((sum, item) => sum + item.length, 0);
-  const requestedEmbeddingModel = body.model.trim();
-  const forcedProvider = getForcedEmbeddingProvider(c);
-  const forcedModel = c.req.header('x-gateway-force-model') ?? undefined;
-  const headerProjectId = c.req.header('x-gateway-project-id') ?? undefined;
-  const projectId = resolveProjectId(headerProjectId, body.project_id);
-
-  if (!projectId) {
-    return c.json(
-      {
-        error: {
-          message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
-          type: 'invalid_request_error',
-          code: 'invalid_project_id',
-        },
-      },
-      400
-    );
-  }
-
-  if (!requestedEmbeddingModel || requestedEmbeddingModel.toLowerCase() === 'auto') {
-    return c.json(
-      {
-        error: {
-          message: '`model` is required for embeddings and cannot be "auto"',
-          type: 'invalid_request_error',
-          code: 'invalid_embedding_model',
-        },
-      },
-      400
-    );
-  }
-
-  if (normalizedInput.length === 0) {
-    return c.json(
-      {
-        error: {
-          message: '`input` is required',
-          type: 'invalid_request_error',
-          code: 'missing_input',
-        },
-      },
-      400
-    );
-  }
-
-  const candidates = resolveEmbeddingCandidates(c.env, {
-    requestedModel: requestedEmbeddingModel,
-    forcedProvider,
-    forcedModel,
-  });
-
-  if (candidates.length === 0) {
-    return c.json(
-      {
-        error: {
-          message: 'No embedding provider is configured',
-          type: 'configuration_error',
-          code: 'no_embedding_provider',
-        },
-      },
-      503
-    );
-  }
-
-  let attemptCounter = 0;
-  let chosenMeta: GatewayMeta | undefined;
-  let finalResponse: Record<string, unknown> | null = null;
-  let lastErrorClass = 'provider_fatal';
-  let lastErrorMessage = 'Unknown error';
-  let lastAttemptedProvider: EmbeddingProvider | undefined;
-  let lastAttemptedModel: string | undefined;
-  const maxEmbeddingAttempts = Math.max(1, candidates.length);
-
-  await pRetry(
-    async () => {
-      const candidate = candidates[attemptCounter];
-      if (!candidate || attemptCounter >= maxEmbeddingAttempts) {
-        throw new AbortError('No more embedding candidates');
-      }
-
-      attemptCounter += 1;
-      lastAttemptedProvider = candidate.provider;
-      lastAttemptedModel = candidate.model;
-
-      try {
-        const caller = providerEmbeddingCallers[candidate.provider];
-        if (!caller) {
-          throw new Error(`No embedding caller for provider ${candidate.provider}`);
-        }
-
-        const result = await caller({
-          env: c.env,
-          provider: candidate.provider,
-          model: candidate.model,
-          input: normalizedInput,
-          encoding_format: body.encoding_format,
-          dimensions: body.dimensions,
-        });
-
-        chosenMeta = buildGatewayMeta({
-          provider: candidate.provider,
-          model: candidate.model,
-          attempts: attemptCounter,
-          reasoning: 'auto',
-          requestId,
-          projectId,
-        });
-
-        finalResponse = {
-          ...result.response,
-          x_gateway: chosenMeta,
-        };
-      } catch (error) {
-        const failureClass = classifyError(error);
-        lastErrorClass = failureClass;
-        lastErrorMessage = getErrorMessage(error);
-
-        if (!isRetriableFailure(failureClass) || attemptCounter >= maxEmbeddingAttempts) {
-          throw new AbortError(lastErrorMessage);
-        }
-
-        throw error instanceof Error ? error : new Error(lastErrorMessage);
-      }
-    },
-    {
-      retries: maxEmbeddingAttempts - 1,
-      minTimeout: 500,
-      maxTimeout: 5000,
-      factor: 2,
-      randomize: true,
-    }
-  ).catch(() => undefined);
-
-  if (finalResponse && chosenMeta) {
-    c.executionCtx.waitUntil(
-      recordAnalytics({
-        db: c.env.GATEWAY_DB,
-        projectId,
-        outcome: 'ok',
-        provider: chosenMeta.provider,
-        model: chosenMeta.model,
-      })
-    );
-    return c.json(finalResponse as never, 200);
-  }
-
-  const status =
-    lastErrorClass === 'input_nonretriable'
-      ? 400
-      : lastErrorClass === 'usage_retriable'
-        ? 429
-        : 502;
-
-  c.executionCtx.waitUntil(
-    recordAnalytics({
-      db: c.env.GATEWAY_DB,
-      projectId,
-      outcome: 'error',
-      provider: chosenMeta?.provider ?? lastAttemptedProvider,
-      model: chosenMeta?.model ?? lastAttemptedModel,
-    })
-  );
-
-  return c.json(
-    {
-      error: {
-        message: `All embedding providers failed: ${lastErrorMessage}`,
-        type: lastErrorClass,
-      },
-    },
-    status
-  );
-});
+registerEmbeddingGenerationRoute(app, recordAnalytics);
 
 // ── Speech-to-Text (health-aware routing across providers) ─────────
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB — matches Groq / Whisper upstream limit
