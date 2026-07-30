@@ -28,6 +28,7 @@ v8 coverage thresholds gate core logic modules at **80% lines/functions/statemen
 - `src/auth/gateway.ts`
 - `src/state/client.ts`
 - `src/providers/quota.ts`
+- `src/utils/request.ts`
 
 UI/config/test files are excluded from the gate. The gate is enforced in CI via
 `pnpm test:coverage`. When bringing a new core module up to the threshold, add it
@@ -45,6 +46,7 @@ to the `coverage.thresholds` glob in `vitest.config.ts`.
 | `routing-ledger.spec.ts` | routing experiment ledger persistence |
 | `routing-status.spec.ts` | public routing status endpoint |
 | `provider-quota.spec.ts` | OpenRouter quota polling |
+| `request.spec.ts` | request IDs, prompt normalization, error messages, completion envelopes |
 | `replay-lab.spec.ts` | debug replay skips health/analytics writes |
 | `analytics-failure-recording.spec.ts` | failure recording in D1 |
 | `images.spec.ts` / `videos.spec.ts` / `audio-speech.spec.ts` | multimodal routing |

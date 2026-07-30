@@ -29,7 +29,7 @@ export function getErrorMessage(error: unknown): string {
   }
 
   try {
-    return JSON.stringify(error);
+    return JSON.stringify(error) ?? 'Unknown error';
   } catch {
     return 'Unknown error';
   }

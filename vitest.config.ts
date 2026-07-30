@@ -18,6 +18,7 @@ export default defineConfig({
         'src/auth/gateway.ts',
         'src/state/client.ts',
         'src/providers/quota.ts',
+        'src/utils/request.ts',
       ],
       exclude: [
         // UI bundles (HTML strings, no unit-testable logic)
