@@ -25,10 +25,12 @@ v8 coverage thresholds gate core logic modules at **80% lines/functions/statemen
 
 - `src/router/select-model.ts`
 - `src/router/classify-error.ts`
+- `src/router/evaluation-weights.ts`
 - `src/auth/gateway.ts`
 - `src/state/client.ts`
 - `src/providers/quota.ts`
 - `src/utils/request.ts`
+- `src/utils/sse.ts`
 
 UI/config/test files are excluded from the gate. The gate is enforced in CI via
 `pnpm test:coverage`. When bringing a new core module up to the threshold, add it
@@ -40,6 +42,7 @@ to the `coverage.thresholds` glob in `vitest.config.ts`.
 | --- | --- |
 | `select-model.spec.ts` | scoring, capability filtering, fallback rank |
 | `classify-error.spec.ts` | error classification (retriable / safety / fatal) |
+| `evaluation-weights.spec.ts` | evaluation parsing, clamping, and routing weight bounds |
 | `auth.spec.ts` | gateway key + hash ring validation |
 | `health-do.spec.ts` | HealthStateDO cooldown / history ring |
 | `free-tier-guard.spec.ts` | Workers AI last-rank + neuron budget guard |
@@ -47,6 +50,7 @@ to the `coverage.thresholds` glob in `vitest.config.ts`.
 | `routing-status.spec.ts` | public routing status endpoint |
 | `provider-quota.spec.ts` | OpenRouter quota polling |
 | `request.spec.ts` | request IDs, prompt normalization, error messages, completion envelopes |
+| `sse.spec.ts` | event encoding, completion markers, and producer failure handling |
 | `replay-lab.spec.ts` | debug replay skips health/analytics writes |
 | `analytics-failure-recording.spec.ts` | failure recording in D1 |
 | `images.spec.ts` / `videos.spec.ts` / `audio-speech.spec.ts` | multimodal routing |

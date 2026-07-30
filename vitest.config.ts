@@ -15,10 +15,12 @@ export default defineConfig({
         // follow-ups and added here once they clear 80/80/80/70.
         'src/router/select-model.ts',
         'src/router/classify-error.ts',
+        'src/router/evaluation-weights.ts',
         'src/auth/gateway.ts',
         'src/state/client.ts',
         'src/providers/quota.ts',
         'src/utils/request.ts',
+        'src/utils/sse.ts',
       ],
       exclude: [
         // UI bundles (HTML strings, no unit-testable logic)
