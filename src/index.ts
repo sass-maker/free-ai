@@ -15,10 +15,8 @@ import {
   getRateLimitConfig,
   getSttRegistry,
   getTtsRegistry,
-  getVideoRegistry,
   hasImageProviderKey,
   hasTtsProviderKey,
-  hasVideoProviderKey,
   isWorkersAiEnabled,
 } from './config';
 import {
@@ -31,13 +29,13 @@ import {
   providerEmbeddingCallers,
   sttProviderCallers,
   ttsProviderCallers,
-  videoProviderCallers,
 } from './providers';
 import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './providers/quota';
 import { classifyError, isRetriableFailure } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
 import { registerGatewayAuthMiddleware } from './middleware/gateway-auth';
 import { registerOperatorUiRoutes } from './routes/operator-ui';
+import { registerVideoGenerationRoutes } from './routes/video-generation';
 import { buildChatLedgerRecord, queryRoutingLedger, recordRoutingLedger } from './routing/ledger';
 import type { FallbackHop, RoutingOutcome } from './routing/ledger';
 import { deriveRequiredCapabilities, selectCandidates } from './router/select-model';
@@ -72,7 +70,6 @@ import type {
   ResponseFormat,
   TextProvider,
   Tool,
-  VideoProvider,
 } from './types';
 import {
   buildCompletionEnvelope,
@@ -2715,28 +2712,6 @@ const imageGenResponseSchema = z
   })
   .openapi('ImageGenerationResponse');
 
-const videoGenRequestSchema = z
-  .object({
-    model: z.string().default('auto'),
-    prompt: z.string().min(1).max(2000),
-    duration_seconds: z.number().int().min(1).max(60).optional(),
-    aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional(),
-    image_url: z.string().url().optional(),
-    project_id: projectIdSchema.optional(),
-  })
-  .openapi('VideoGenerationRequest');
-
-const videoGenResponseSchema = z
-  .object({
-    id: z.string(),
-    status: z.enum(['processing', 'completed', 'failed']),
-    video_url: z.string().optional(),
-    poll_url: z.string().optional(),
-    error: z.string().optional(),
-    x_gateway: gatewayMetaSchema.optional(),
-  })
-  .openapi('VideoGenerationResponse');
-
 const ttsRequestSchema = z
   .object({
     model: z.string().default('auto'),
@@ -2929,264 +2904,7 @@ app.openapi(imagesGenRoute, async (c) => {
   );
 });
 
-// ── /v1/videos/generations (async: submit) ──────────────────────────
-const videosGenRoute = createRoute({
-  method: 'post',
-  path: '/v1/videos/generations',
-  request: {
-    body: { content: { 'application/json': { schema: videoGenRequestSchema } } },
-  },
-  responses: {
-    202: {
-      description: 'Video job submitted',
-      content: { 'application/json': { schema: videoGenResponseSchema } },
-    },
-    200: {
-      description: 'Video completed synchronously',
-      content: { 'application/json': { schema: videoGenResponseSchema } },
-    },
-    400: { description: 'Invalid input', content: { 'application/json': { schema: errorSchema } } },
-    429: {
-      description: 'Rate limited or retriable provider failure',
-      content: { 'application/json': { schema: errorSchema } },
-    },
-    502: {
-      description: 'Provider failure',
-      content: { 'application/json': { schema: errorSchema } },
-    },
-    503: {
-      description: 'No video provider',
-      content: { 'application/json': { schema: errorSchema } },
-    },
-  },
-});
-
-app.openapi(videosGenRoute, async (c) => {
-  const body = c.req.valid('json');
-  const requestId = createRequestId();
-  const headerProjectId = c.req.header('x-gateway-project-id') ?? undefined;
-  const projectId = resolveProjectId(headerProjectId, body.project_id);
-  if (!projectId) {
-    return c.json(
-      {
-        error: {
-          message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
-          type: 'invalid_request_error',
-          code: 'invalid_project_id',
-        },
-      },
-      400
-    );
-  }
-
-  const requestedModel = body.model.trim();
-  const requestedLower = requestedModel.toLowerCase();
-
-  const registry = getVideoRegistry(c.env).filter((cand) => {
-    if (
-      requestedModel &&
-      requestedLower !== 'auto' &&
-      cand.model !== requestedModel &&
-      cand.id !== requestedModel
-    )
-      return false;
-    if (!hasVideoProviderKey(c.env, cand.provider)) return false;
-    return true;
-  });
-
-  if (registry.length === 0) {
-    return c.json(
-      {
-        error: {
-          message:
-            'Video generation unavailable: TOGETHER_API_KEY not configured or model not found',
-          type: 'configuration_error',
-          code: 'no_video_provider',
-        },
-      },
-      503
-    );
-  }
-
-  const chosen = registry.sort((a, b) => b.priority - a.priority)[0];
-
-  // Per-request cost budget: video submit is the most expensive compute op.
-  // 1 attempt × 30s timeout — no retry on submit (async job, not a sync result).
-  const costBudget = new CostBudget({ maxAttempts: 1, maxTotalTimeoutMs: 30_000 });
-  costBudget.recordAttempt(30_000);
-
-  try {
-    const submitter = videoProviderCallers[chosen.provider].submit;
-    const job = await submitter({
-      env: c.env,
-      model: chosen.model,
-      prompt: body.prompt,
-      duration_seconds: body.duration_seconds,
-      aspect_ratio: body.aspect_ratio,
-      image_url: body.image_url,
-    });
-
-    const statusCode = job.status === 'completed' ? 200 : 202;
-
-    c.executionCtx.waitUntil(
-      recordAnalytics({
-        db: c.env.GATEWAY_DB,
-        projectId,
-        outcome: job.status === 'failed' ? 'error' : 'ok',
-        provider: chosen.provider,
-        model: chosen.model,
-      })
-    );
-
-    // Persist job mapping to KV so polling can recover project_id context (best-effort).
-    try {
-      await c.env.HEALTH_KV.put(
-        `video_job:${job.id}`,
-        JSON.stringify({ provider: chosen.provider, model: chosen.model, project_id: projectId }),
-        { expirationTtl: 60 * 60 * 24 }
-      );
-    } catch {
-      // Ignore KV failures
-    }
-
-    return c.json(
-      {
-        id: job.id,
-        status: job.status,
-        video_url: job.video_url,
-        poll_url: `/v1/videos/generations/${job.id}`,
-        error: job.error,
-        x_gateway: {
-          provider: chosen.provider,
-          model: chosen.model,
-          attempts: 1,
-          reasoning_effort: 'auto' as const,
-          request_id: requestId,
-          project_id: projectId,
-        },
-      } as never,
-      statusCode as 200 | 202
-    );
-  } catch (err) {
-    const failureClass = classifyError(err);
-    c.executionCtx.waitUntil(
-      recordAnalytics({
-        db: c.env.GATEWAY_DB,
-        projectId,
-        outcome: 'error',
-        provider: chosen.provider,
-        model: chosen.model,
-      })
-    );
-    const errorStatus =
-      failureClass === 'input_nonretriable' ? 400 : failureClass === 'usage_retriable' ? 429 : 502;
-    return c.json(
-      {
-        error: {
-          message: `Video submit failed: ${getErrorMessage(err)}`,
-          type: failureClass,
-          cost_budget: costBudget.state(),
-        },
-      } as never,
-      errorStatus as 400 | 429 | 502
-    );
-  }
-});
-
-// ── /v1/videos/generations/{id} (poll) ──────────────────────────────
-const videosPollRoute = createRoute({
-  method: 'get',
-  path: '/v1/videos/generations/{id}',
-  request: { params: z.object({ id: z.string().min(1).max(256) }) },
-  responses: {
-    200: {
-      description: 'Video job status',
-      content: { 'application/json': { schema: videoGenResponseSchema } },
-    },
-    404: { description: 'Job not found', content: { 'application/json': { schema: errorSchema } } },
-    501: {
-      description: 'Not implemented — upstream poll endpoint undocumented',
-      content: { 'application/json': { schema: errorSchema } },
-    },
-    502: {
-      description: 'Provider failure',
-      content: { 'application/json': { schema: errorSchema } },
-    },
-    503: {
-      description: 'Provider not configured',
-      content: { 'application/json': { schema: errorSchema } },
-    },
-  },
-});
-
-app.openapi(videosPollRoute, async (c) => {
-  const { id } = c.req.valid('param');
-
-  let provider: VideoProvider = 'together';
-  let model = '';
-  let projectId: string | undefined;
-
-  try {
-    const meta = (await c.env.HEALTH_KV.get(`video_job:${id}`, 'json')) as {
-      provider?: VideoProvider;
-      model?: string;
-      project_id?: string;
-    } | null;
-    if (meta?.provider) provider = meta.provider;
-    if (meta?.model) model = meta.model;
-    if (meta?.project_id) projectId = meta.project_id;
-  } catch {
-    // Ignore KV lookup failure — fall back to default (together).
-  }
-
-  if (!hasVideoProviderKey(c.env, provider)) {
-    return c.json(
-      {
-        error: {
-          message: 'Video provider not configured',
-          type: 'configuration_error',
-          code: 'no_video_provider',
-        },
-      },
-      503
-    );
-  }
-
-  try {
-    const poller = videoProviderCallers.together.poll;
-    const job = await poller(c.env, id);
-    return c.json(
-      {
-        id: job.id,
-        status: job.status,
-        video_url: job.video_url,
-        error: job.error,
-        x_gateway: {
-          provider,
-          model,
-          attempts: 1,
-          reasoning_effort: 'auto' as const,
-          request_id: createRequestId(),
-          project_id: projectId,
-        },
-      } as never,
-      200
-    );
-  } catch (err) {
-    // Together's video poll endpoint is undocumented upstream — returns 404 on all known paths.
-    // Mark explicitly as "pending upstream support" so callers know it's not a transient error.
-    return c.json(
-      {
-        error: {
-          message: `Video poll not yet supported by Together upstream (undocumented GET endpoint). Submit works; retrieval pending. Underlying error: ${getErrorMessage(err)}`,
-          type: 'not_implemented',
-          code: 'video_poll_pending_upstream',
-        },
-      },
-      501
-    );
-  }
-});
+registerVideoGenerationRoutes(app, recordAnalytics);
 
 // ── /v1/audio/speech (TTS standalone) ───────────────────────────────
 const audioSpeechRoute = createRoute({
