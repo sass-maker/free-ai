@@ -99,7 +99,7 @@ pnpm keys:generate|list|print-secret|upload   # operator key ring
 src/                  gateway implementation (authoritative for code behavior)
   index.ts            main Hono app + remaining route handlers (staged split)
   middleware/         covered cross-route middleware such as gateway auth
-  routes/             covered route groups such as operator UI
+  routes/             covered route groups such as operator UI and video generation
   config.ts           chat/image/video/audio model registry (80+ chat models; embedding registry lives in index.ts)
   providers/          one file per provider
   router/             select-model.ts (scoring), classify-error.ts
