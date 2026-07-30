@@ -28,6 +28,7 @@ v8 coverage thresholds gate core logic modules at **80% lines/functions/statemen
 - `src/router/evaluation-weights.ts`
 - `src/auth/gateway.ts`
 - `src/lib/telemetry.ts`
+- `src/routing/ledger.ts`
 - `src/state/client.ts`
 - `src/providers/quota.ts`
 - `src/utils/request.ts`
