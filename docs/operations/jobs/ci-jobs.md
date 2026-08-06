@@ -20,14 +20,6 @@ files (cron) — those are authoritative, not this page.
   (cost audit + Starlight build + `wrangler deploy`) → smoke `curl /health`.
 - **Permissions:** `contents: read`.
 
-## `weekly.yml` — Weekly quality check
-
-- **Schedule:** `0 9 * * 1` (every Monday 09:00 UTC).
-- **Trigger:** schedule + `workflow_dispatch`.
-- **Steps:** runs `lint`, `typecheck`, `test`, `build` if the script exists in
-  `package.json`. Tolerates pnpm/npm/yarn lockfiles.
-- **Purpose:** catches drift / rot on a cadence without blocking deploys.
-
 ## `check-models.yml` — Weekly provider resync
 
 - **Schedule:** `0 9 * * 0` (every Sunday 09:00 UTC).
@@ -48,36 +40,6 @@ files (cron) — those are authoritative, not this page.
   `OPENROUTER_API_KEY`; optional `GATEWAY_API_KEY` for the bounded smoke.
 - **Activation boundary:** generated candidates stay disabled. The workflow
   never commits, opens a PR, activates routing, uploads keys, or deploys.
-
-## `provider-health.yml` — Daily no-spend provider health
-
-- **Schedule:** `20 4 * * *` (every day at 04:20 UTC).
-- **Trigger:** schedule + `workflow_dispatch`.
-- **Permissions:** `contents: read`, `issues: write`.
-- **Steps:** runs `pnpm check:provider-health` logic against public
-  `/v1/routing/status`, `/v1/provider-quotas`, and `/v1/analytics?days=7`.
-  Reports response freshness, fallback readiness, model availability, exhausted
-  providers, seven-day/day-level failure evidence, and successful-request
-  concentration by provider.
-- **Failure thresholds:** stale or invalid routing evidence, fewer than two
-  routable models, fallback readiness false, endpoint failure, or a seven-day
-  failure rate over 20% once at least 20 requests exist.
-- **Concentration warning:** reports (without failing solely for it) when one
-  provider supplies more than 85% of at least 100 attributed successes. This
-  avoids shifting traffic from a healthy provider to a degraded one merely to
-  improve distribution.
-- **Issue lifecycle:** maintains `[provider-health] Live gateway degradation`
-  while unhealthy and closes it on recovery.
-- **Spend:** no provider secret is supplied and no token-spending route is used.
-
-## `provider-landscape.yml` — Monthly provider review
-
-- **Schedule:** `40 8 1 * *` (first day of each UTC month at 08:40 UTC).
-- **Trigger:** schedule + `workflow_dispatch`.
-- **Permissions:** `contents: read`, `issues: write`.
-- Creates at most one `[provider-landscape] YYYY-MM review` issue per UTC month
-  with official candidate sources and an activation checklist. It does not
-  change the registry or approve spend/deployment.
 
 ## `docs-check.yml` — Documentation validation
 
