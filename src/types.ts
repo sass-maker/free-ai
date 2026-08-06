@@ -10,7 +10,9 @@ export type TextProvider =
   | 'pollinations'
   | 'cohere'
   | 'mistral'
-  | 'zai';
+  | 'zai'
+  | 'modelscope'
+  | 'siliconflow';
 
 export type EmbeddingProvider = 'workers_ai' | 'gemini' | 'voyage_ai';
 
@@ -226,6 +228,8 @@ export interface Env {
   MISTRAL_API_KEY?: string;
   TOGETHER_API_KEY?: string;
   ZAI_API_KEY?: string;
+  MODELSCOPE_API_KEY?: string;
+  SILICONFLOW_API_KEY?: string;
   MODEL_REGISTRY_JSON?: string;
   MODEL_EVALUATIONS_JSON?: string;
   PROVIDER_LIMITS_JSON?: string;

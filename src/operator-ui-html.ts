@@ -167,7 +167,7 @@ function render(health, routing, providerStats, ledger) {
   $('kGateway').textContent = fallbackReady ? 'Ready' : 'Limited';
   $('kGatewaySub').textContent = models.length + ' health snapshots';
   $('kAvailable').textContent = fmt(available);
-  $('kAvailableSub').textContent = routing && routing.summary ? fmt(routing.summary.degraded_models || 0) + ' degraded' : 'from health snapshots';
+  $('kAvailableSub').textContent = routing && routing.summary ? fmt(routing.summary.degraded_models || 0) + ' degraded · ' + fmt(routing.summary.manual_only_models || 0) + ' manual-only' : 'from health snapshots';
   $('kRisk').textContent = fmt(risky + ((routing && routing.summary && routing.summary.exhausted_models) || 0));
   $('kRiskSub').textContent = 'cooldown, exhausted, or degraded';
   $('kProvider').textContent = (routing && routing.summary && routing.summary.top_provider) || '-';
@@ -191,7 +191,7 @@ function renderProviders(routing) {
   $('providers').innerHTML = providers.length ? providers.map(([name, item]) => {
     const status = item.available_models > 0 ? 'ok' : item.degraded_models > 0 ? 'warn' : 'err';
     return '<article class="provider"><strong>' + esc(name) + ' <span class="status ' + status + '">' + (status === 'ok' ? 'ready' : status === 'warn' ? 'degraded' : 'blocked') + '</span></strong>' +
-      '<dl><dt>configured</dt><dd>' + fmt(item.configured_models) + '</dd><dt>available</dt><dd>' + fmt(item.available_models) + '</dd><dt>degraded</dt><dd>' + fmt(item.degraded_models) + '</dd><dt>best</dt><dd>' + esc(item.best_model || '-') + '</dd></dl></article>';
+      '<dl><dt>configured</dt><dd>' + fmt(item.configured_models) + '</dd><dt>manual-only</dt><dd>' + fmt(item.manual_only_models) + '</dd><dt>available</dt><dd>' + fmt(item.available_models) + '</dd><dt>degraded</dt><dd>' + fmt(item.degraded_models) + '</dd><dt>best</dt><dd>' + esc(item.best_model || '-') + '</dd></dl></article>';
   }).join('') : '<div class="muted">No routing snapshot available.</div>';
 }
 
@@ -306,7 +306,7 @@ export const MODEL_CATALOG_HTML = `<!doctype html>
     <input id="search" type="search" placeholder="Search model, provider, capability" autocomplete="off" />
     <select id="provider"><option value="">All providers</option></select>
     <select id="reasoning"><option value="">All reasoning</option><option value="high">High reasoning</option><option value="medium">Medium reasoning</option><option value="low">Low reasoning</option></select>
-    <select id="status"><option value="">All statuses</option><option value="ready">Ready</option><option value="degraded">Degraded</option><option value="cooldown">Cooldown</option><option value="exhausted">Exhausted</option></select>
+    <select id="status"><option value="">All statuses</option><option value="ready">Ready</option><option value="manual only">Manual only</option><option value="degraded">Degraded</option><option value="cooldown">Cooldown</option><option value="exhausted">Exhausted</option></select>
     <label><input id="streaming" type="checkbox" /> Streaming</label>
     <label><input id="tools" type="checkbox" /> Tools</label>
     <label><input id="jsonMode" type="checkbox" /> JSON</label>
@@ -334,6 +334,7 @@ const state = { models: [] };
 
 function statusOf(model) {
   const now = Date.now();
+  if (model.automatic_routing === false) return ['manual only', 'warn'];
   if (Number(model.cooldown_until || 0) > now) return ['cooldown', 'err'];
   if (Number(model.headroom || 0) <= 0) return ['exhausted', 'err'];
   if (!model.enabled || Number(model.success_rate || 0) < 0.75) return ['degraded', 'warn'];
@@ -366,7 +367,8 @@ function readFilters() {
 
 function matches(model, filters) {
   const status = statusOf(model)[0];
-  const haystack = [model.id, model.provider, model.model, model.reasoning, capabilityText(model).join(' ')].join(' ').toLowerCase();
+  const routingMode = model.automatic_routing === false ? 'manual only' : 'automatic routing';
+  const haystack = [model.id, model.provider, model.model, model.reasoning, routingMode, capabilityText(model).join(' ')].join(' ').toLowerCase();
   if (filters.q && !haystack.includes(filters.q)) return false;
   if (filters.provider && model.provider !== filters.provider) return false;
   if (filters.reasoning && model.reasoning !== filters.reasoning) return false;

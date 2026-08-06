@@ -1,5 +1,8 @@
 import { devices, defineConfig } from '@playwright/test';
 
+const e2ePort = Number(process.env.FREE_AI_E2E_PORT ?? 4399);
+const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -7,13 +10,13 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: e2eBaseUrl,
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'vite --config playground/vite.config.ts --host 127.0.0.1 --port 4173',
-    url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    command: `vite --config playground/vite.config.ts --host 127.0.0.1 --port ${e2ePort} --strictPort`,
+    url: e2eBaseUrl,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

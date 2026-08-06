@@ -69,7 +69,7 @@ work.
 
 | Provider class | Members | Required env | Free-tier posture |
 | --- | --- | --- | --- |
-| Text chat | `workers_ai`, `groq`, `gemini`, `openrouter`, `cerebras`, `sambanova`, `nvidia`, `github_models`, `pollinations`, `cohere`, `mistral`, `zai` | per-provider API key | free tiers; Workers AI is **fallback-only** |
+| Text chat | `workers_ai`, `groq`, `gemini`, `openrouter`, `cerebras`, `sambanova`, `nvidia`, `github_models`, `pollinations`, `cohere`, `mistral`, `zai`, `modelscope`, `siliconflow` | per-provider API key | free tiers; Workers AI is **fallback-only**; ModelScope seed is disabled; SiliconFlow has no routing candidate |
 | Embedding | `workers_ai`, `gemini`, `voyage_ai` | per-provider API key | free tiers |
 | Image / video / TTS / STT | `together`, `workers_ai`, `pollinations`, `gemini`, `nvidia`, `groq` | per-provider API key | free tiers |
 
@@ -123,6 +123,9 @@ only background work is:
 | Neuron budget accounting | `NeuronBudgetDO` | 9,500 Neurons/day | DO alarm | single DO | n/a | DO is the source of truth | `503` when cap exhausted | `src/state/neuron-budget.ts` |
 | CI gate | GitHub Actions `ci.yml` | push/PR | job-level | 1 concurrent | n/a | n/a | red CI | `.github/workflows/ci.yml` |
 | Weekly quality | GitHub Actions `weekly.yml` | `0 9 * * 1` | job-level | 1 | n/a | n/a | yellow check | `.github/workflows/weekly.yml` |
+| Daily provider health | GitHub Actions `provider-health.yml` | `20 4 * * *` | three public reads | 1 | n/a | fixed issue title | red check + maintained issue | `.github/workflows/provider-health.yml` |
+| Weekly provider resync | GitHub Actions `check-models.yml` | `0 9 * * 0` | 12 official catalogs + optional one tiny replay/provider | 1 | n/a | fixed issue title | red check + report/patch artifact | `.github/workflows/check-models.yml` |
+| Monthly provider landscape | GitHub Actions `provider-landscape.yml` | `40 8 1 * *` | one issue/month | 1 | n/a | UTC month in title | review issue | `.github/workflows/provider-landscape.yml` |
 | Production deploy | GitHub Actions `cloudflare-deploy.yml` | `workflow_dispatch` only | job-level | 1 per ref | n/a | n/a | blocked deploy | manual |
 
 **Freshness:** health state is a rolling per-model window maintained by

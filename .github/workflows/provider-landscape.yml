@@ -1,0 +1,55 @@
+name: Monthly Provider Landscape
+
+on:
+  schedule:
+    - cron: '40 8 1 * *' # First day of each month at 08:40 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: provider-landscape-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Create this month's provider review once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          month=$(date -u +%Y-%m)
+          title="[provider-landscape] ${month} review"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "\"$title\" in:title" --limit 10 --json title --jq ".[] | select(.title == \"$title\") | .title")
+          if [ -n "$existing" ]; then
+            echo "Reusing existing issue: $title"
+            exit 0
+          fi
+          cat > provider-landscape.md <<'EOF'
+          Review changes in official free inference offerings. This issue is discovery only; it does not approve keys, spend, activation, or deployment.
+
+          Candidate sources:
+
+          - [ModelScope inference API](https://www.modelscope.cn/learn/434591)
+          - [SiliconFlow quickstart](https://docs.siliconflow.com/en/userguide/quickstart)
+          - [SiliconFlow rate limits](https://docs.siliconflow.com/en/userguide/rate-limits/rate-limit-and-upgradation)
+          - [Scaleway Generative APIs FAQ](https://www.scaleway.com/en/docs/generative-apis/faq/)
+          - [Hugging Face inference providers](https://huggingface.co/docs/inference-providers/index)
+
+          Activation checklist:
+
+          - [ ] Confirm current terms, free quota, geography, privacy, and overage behavior from official sources.
+          - [ ] Confirm an official model-list API and add catalog evidence.
+          - [ ] Stage provider and models disabled with conservative limits.
+          - [ ] Add the repository secret manually; never place credentials in an issue or artifact.
+          - [ ] Run one bounded `/v1/debug/replay` smoke per candidate provider.
+          - [ ] Review capabilities, rate limits, failure behavior, and routing priority.
+          - [ ] Approve activation in a separate code review.
+          - [ ] Deploy only through the manual Cloudflare workflow after approval.
+          EOF
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file provider-landscape.md

@@ -1,0 +1,99 @@
+name: Daily Provider Health
+
+on:
+  schedule:
+    - cron: '20 4 * * *' # Every day at 04:20 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: provider-health-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Check public no-spend provider health
+        id: health
+        env:
+          FREE_AI_BASE_URL: https://ai-gateway.sassmaker.com
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-live-provider-health.mjs > provider-health-report.json
+          health_exit=$?
+          set -e
+          node -e "JSON.parse(require('fs').readFileSync('provider-health-report.json', 'utf8'))"
+          echo "exit=$health_exit" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize health
+        if: always() && steps.health.outcome == 'success'
+        run: |
+          node - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const report = JSON.parse(require('fs').readFileSync('provider-health-report.json', 'utf8'));
+          console.log('## Daily provider health');
+          console.log(`- Result: ${report.ok ? 'healthy' : 'degraded'}`);
+          console.log(`- Freshness: ${report.freshness_seconds ?? 'unknown'} seconds`);
+          console.log(`- Models: ${report.routing.available_models} available, ${report.routing.degraded_models} degraded, ${report.routing.exhausted_models} exhausted`);
+          console.log(`- Fallback ready: ${report.routing.fallback_ready}`);
+          console.log(`- 7-day failure rate: ${(report.analytics_7d.failure_rate * 100).toFixed(1)}% (${report.analytics_7d.failed_requests}/${report.analytics_7d.total_requests})`);
+          if (report.errors.length) {
+            console.log('\n### Failures');
+            for (const error of report.errors) console.log(`- ${error}`);
+          }
+          NODE
+
+      - name: Upload health evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: provider-health-${{ github.run_id }}
+          path: provider-health-report.json
+          if-no-files-found: error
+
+      - name: Maintain live-health issue
+        if: always() && steps.health.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: '[provider-health] Live gateway degradation'
+          UNHEALTHY: ${{ steps.health.outputs.exit != '0' }}
+        shell: bash
+        run: |
+          node - <<'NODE' > issue-body.md
+          const report = JSON.parse(require('fs').readFileSync('provider-health-report.json', 'utf8'));
+          console.log(`Daily no-spend health check: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`);
+          console.log(`\n- Fallback ready: ${report.routing.fallback_ready}`);
+          console.log(`- Models: ${report.routing.available_models} available, ${report.routing.degraded_models} degraded, ${report.routing.exhausted_models} exhausted`);
+          console.log(`- Exhausted providers: ${report.quotas.exhausted_providers.join(', ') || 'none'}`);
+          console.log(`- 7-day failure rate: ${(report.analytics_7d.failure_rate * 100).toFixed(1)}%`);
+          console.log('\nFailures:');
+          for (const error of report.errors) console.log(`- ${error}`);
+          NODE
+          issues=$(gh issue list --state all --search "\"$TITLE\" in:title" --limit 10 --json number,title,state)
+          number=$(jq -r --arg title "$TITLE" '.[] | select(.title == $title) | .number' <<< "$issues" | head -n 1)
+          state=$(jq -r --arg title "$TITLE" '.[] | select(.title == $title) | .state' <<< "$issues" | head -n 1)
+          if [ "$UNHEALTHY" = "true" ]; then
+            if [ -z "$number" ]; then
+              gh issue create --title "$TITLE" --body-file issue-body.md
+            else
+              if [ "$state" = "CLOSED" ]; then gh issue reopen "$number"; fi
+              gh issue comment "$number" --body-file issue-body.md
+            fi
+          elif [ -n "$number" ] && [ "$state" = "OPEN" ]; then
+            gh issue close "$number" --comment "Recovered in workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
+          fi
+
+      - name: Fail when provider health is degraded
+        if: steps.health.outputs.exit != '0'
+        run: exit 1

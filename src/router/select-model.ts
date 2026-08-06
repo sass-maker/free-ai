@@ -1,4 +1,4 @@
-import { getTierOrder } from '../config';
+import { getTierOrder, isAutomaticRoutingEligible } from '../config';
 import type {
   ChatMessage,
   ContentPart,
@@ -158,6 +158,16 @@ function fallbackRank(candidate: ModelCandidate, options: SelectOptions): number
   return candidate.provider === 'workers_ai' ? 1 : 0;
 }
 
+function reliabilityRank(state: ModelStateSnapshot | undefined): number {
+  if (!state || state.attempts === 0) {
+    return 1;
+  }
+
+  const degraded =
+    state.successRate < 0.75 || state.shortRetriableFailures > 0 || state.avgLatencyMs > 5_000;
+  return degraded ? 2 : 0;
+}
+
 export function selectCandidates(
   registry: ModelCandidate[],
   stateMap: Map<string, ModelStateSnapshot>,
@@ -170,6 +180,10 @@ export function selectCandidates(
   const caps = options.requiredCapabilities;
 
   const available = registry.filter((candidate) => {
+    if (!options.modelOverride && !isAutomaticRoutingEligible(candidate)) {
+      return false;
+    }
+
     if (options.stream && !candidate.supportsStreaming) {
       return false;
     }
@@ -221,7 +235,12 @@ export function selectCandidates(
     return true;
   });
 
-  const ranked: Array<{ candidate: ModelCandidate; score: number; tierIndex: number }> = [];
+  const ranked: Array<{
+    candidate: ModelCandidate;
+    score: number;
+    tierIndex: number;
+    reliabilityRank: number;
+  }> = [];
 
   for (const candidate of available) {
     const key = `${candidate.provider}:${candidate.model}`;
@@ -236,6 +255,7 @@ export function selectCandidates(
       candidate,
       score: computeScore(scoringReasoning, candidate, state, evaluation),
       tierIndex,
+      reliabilityRank: reliabilityRank(state),
     });
   }
 
@@ -243,6 +263,10 @@ export function selectCandidates(
     const fallbackDiff = fallbackRank(a.candidate, options) - fallbackRank(b.candidate, options);
     if (fallbackDiff !== 0) {
       return fallbackDiff;
+    }
+
+    if (a.reliabilityRank !== b.reliabilityRank) {
+      return a.reliabilityRank - b.reliabilityRank;
     }
 
     if (a.tierIndex !== b.tierIndex) {
