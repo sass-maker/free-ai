@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getModelRegistry } from '../src/config';
+import { getModelRegistry, isAutomaticRoutingEligible } from '../src/config';
 import {
   computeScore,
   deriveRequiredCapabilities,
@@ -183,6 +183,85 @@ describe('selectCandidates', () => {
     );
 
     expect(selected[0]?.provider).toBe('gemini');
+  });
+
+  it('prefers recent healthy evidence over a degraded automatic reasoning tier', () => {
+    const selected = selectCandidates(
+      [
+        registry[0]!,
+        {
+          ...registry[1]!,
+          id: 'healthy-high',
+          model: 'healthy-high',
+          reasoning: 'high',
+        },
+      ],
+      new Map([
+        ['groq:model-a', snapshot('groq:model-a', 0.05, 200, 0)],
+        ['gemini:healthy-high', snapshot('gemini:healthy-high', 0.95, 1_000, 0)],
+      ]),
+      {
+        stream: false,
+        now: Date.now(),
+      }
+    );
+
+    expect(selected.map((candidate) => candidate.id)).toEqual(['healthy-high', 'a']);
+  });
+
+  it('keeps an explicit model override authoritative when its health is degraded', () => {
+    const selected = selectCandidates(
+      registry,
+      new Map([
+        ['groq:model-a', snapshot('groq:model-a', 0.05, 200, 0)],
+        ['gemini:model-b', snapshot('gemini:model-b', 0.95, 1_000, 0)],
+      ]),
+      {
+        stream: false,
+        now: Date.now(),
+        modelOverride: 'model-a',
+      }
+    );
+
+    expect(selected.map((candidate) => candidate.id)).toEqual(['a']);
+  });
+
+  it('keeps reviewed failing paths out of automatic routing but explicitly probeable', () => {
+    const candidates: ModelCandidate[] = [
+      registry[0]!,
+      {
+        ...registry[0]!,
+        id: 'github-manual',
+        provider: 'github_models',
+        model: 'openai/gpt-5-mini',
+      },
+      {
+        ...registry[0]!,
+        id: 'zai-manual',
+        provider: 'zai',
+        model: 'glm-4.7-flash',
+      },
+      {
+        ...registry[0]!,
+        id: 'nvidia-maverick-manual',
+        provider: 'nvidia',
+        model: 'meta/llama-4-maverick-17b-128e-instruct',
+      },
+    ];
+
+    const automatic = selectCandidates(candidates, new Map(), {
+      stream: false,
+      now: Date.now(),
+    });
+    const explicit = selectCandidates(candidates, new Map(), {
+      stream: false,
+      now: Date.now(),
+      modelOverride: 'nvidia-maverick-manual',
+    });
+
+    expect(automatic.map((candidate) => candidate.id)).toEqual(['a']);
+    expect(explicit.map((candidate) => candidate.id)).toEqual(['nvidia-maverick-manual']);
+    expect(candidates.map(isAutomaticRoutingEligible)).toEqual([true, false, false, false]);
   });
 
   it('keeps Workers AI behind non-Cloudflare providers for automatic routing', () => {
@@ -462,7 +541,7 @@ describe('default registry vision coverage', () => {
     MISTRAL_API_KEY: 'test',
   } as Env;
 
-  it('keeps a broad vision-capable pool for high-effort image requests', () => {
+  it('keeps the proven vision-capable pool for high-effort image requests', () => {
     const selected = selectCandidates(getModelRegistry(allProviderKeysEnv), new Map(), {
       min_reasoning_level: 'high',
       stream: false,
@@ -475,10 +554,12 @@ describe('default registry vision coverage', () => {
     const models = selected.map((candidate) => candidate.model);
 
     expect(selected.every((candidate) => candidate.reasoning === 'high')).toBe(true);
-    // Pool shrank 2026-06: dead vision models (gemini-2.5-pro/2.0-*, nvidia) removed from registry
-    expect(selected.length).toBeGreaterThanOrEqual(3);
-    expect(highTier.length).toBeGreaterThanOrEqual(3);
-    expect(providers.size).toBeGreaterThanOrEqual(3);
+    // GitHub Models is manual-only after its 100% observed failure window, so
+    // automatic high-tier vision currently relies on Gemini and Mistral.
+    expect(selected.length).toBeGreaterThanOrEqual(2);
+    expect(highTier.length).toBeGreaterThanOrEqual(2);
+    expect(providers).toEqual(new Set(['gemini', 'mistral']));
+    expect(selected.every((candidate) => candidate.provider !== 'github_models')).toBe(true);
     expect(models).not.toContain('openai/gpt-5-mini');
     expect(models).not.toContain('openai/o4-mini');
   });

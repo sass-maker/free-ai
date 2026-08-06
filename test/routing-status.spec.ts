@@ -132,4 +132,31 @@ describe('GET /v1/routing/status', () => {
         .every((item) => item.reasons.includes('provider_quota_exhausted'))
     ).toBe(true);
   });
+
+  it('reports manual-only models without presenting them as automatic fallbacks', async () => {
+    const { env } = makeTestEnv({
+      GROQ_API_KEY: 'groq-test-key',
+      NVIDIA_API_KEY: 'nvidia-test-key',
+    });
+
+    const res = await app.fetch(
+      new Request('https://gateway.test/v1/routing/status'),
+      env,
+      makeCtx()
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      summary: { manual_only_models: number };
+      fallback_order: Array<{ id: string }>;
+      providers: Record<string, { configured_models: number; manual_only_models: number }>;
+    };
+
+    expect(body.summary.manual_only_models).toBe(1);
+    expect(body.fallback_order.some((item) => item.id === 'nvidia-llama4-maverick')).toBe(false);
+    expect(body.providers.nvidia).toMatchObject({
+      configured_models: expect.any(Number),
+      manual_only_models: 1,
+    });
+  });
 });

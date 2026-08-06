@@ -12,6 +12,7 @@ import {
   getProviderLimits,
   getRateLimitConfig,
   getSttRegistry,
+  isAutomaticRoutingEligible,
   isWorkersAiEnabled,
 } from './config';
 import {
@@ -104,6 +105,8 @@ const TEXT_PROVIDER_VALUES = [
   'cohere',
   'mistral',
   'zai',
+  'modelscope',
+  'siliconflow',
 ] as const;
 
 const QUOTA_POLLING_PROVIDERS: readonly TextProvider[] = ['openrouter'];
@@ -297,6 +300,7 @@ const modelItemSchema = z.object({
   evaluation_sample_count: z.number(),
   evaluated_at: z.string().nullable(),
   enabled: z.boolean(),
+  automatic_routing: z.boolean(),
   dimensions: z.number().optional(),
   supports_dimensions: z.boolean().optional(),
   aliases: z.array(z.string()).optional(),
@@ -308,6 +312,7 @@ const routingStatusSchema = z.object({
   generated_at: z.string(),
   summary: z.object({
     configured_models: z.number(),
+    manual_only_models: z.number(),
     available_models: z.number(),
     degraded_models: z.number(),
     cooldown_models: z.number(),
@@ -340,6 +345,7 @@ const routingStatusSchema = z.object({
     z.string(),
     z.object({
       configured_models: z.number(),
+      manual_only_models: z.number(),
       available_models: z.number(),
       cooldown_models: z.number(),
       exhausted_models: z.number(),
@@ -427,6 +433,18 @@ const analyticsResponseSchema = z.object({
       requests: z.number(),
       successful: z.number(),
       failed: z.number(),
+      failure_rate: z.number(),
+    })
+  ),
+  group_by: z.enum(['provider', 'model', 'project']).nullable(),
+  daily_breakdown: z.array(
+    z.object({
+      date: z.string(),
+      key: z.string(),
+      requests: z.number(),
+      successful: z.number(),
+      failed: z.number(),
+      failure_rate: z.number(),
     })
   ),
 });
@@ -2309,6 +2327,7 @@ async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
           evaluation_sample_count: evaluation?.sampleCount ?? 0,
           evaluated_at: evaluation?.evaluatedAt ?? null,
           enabled: candidate.enabled,
+          automatic_routing: isAutomaticRoutingEligible(candidate),
         };
       })
     )
@@ -2334,6 +2353,7 @@ async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
     evaluation_sample_count: 0,
     evaluated_at: null,
     enabled: embeddingCandidateEnabled(env, candidate),
+    automatic_routing: embeddingCandidateEnabled(env, candidate),
     dimensions: candidate.dimensions,
     supports_dimensions: candidate.supportsDimensions ?? false,
     aliases: candidate.aliases ?? [],
@@ -2478,7 +2498,8 @@ app.openapi(routingStatusRoute, async (c) => {
   const stateMap = await healthLookup(c.env, keys, lookupLimits, now);
   const evaluationMap = parseEvaluationWeights(c.env.MODEL_EVALUATIONS_JSON);
   const quotaStatuses = await getRoutingQuotaStatuses(c.env, registry);
-  const routableRegistry = registry.filter((candidate) =>
+  const automaticRegistry = registry.filter(isAutomaticRoutingEligible);
+  const routableRegistry = automaticRegistry.filter((candidate) =>
     providerQuotaAllowsCandidate(candidate, quotaStatuses)
   );
   const selected = selectCandidates(routableRegistry, stateMap, {
@@ -2489,12 +2510,13 @@ app.openapi(routingStatusRoute, async (c) => {
   const selectedIds = new Set(selected.map((candidate) => candidate.id));
   const fallbackCandidates = [
     ...selected,
-    ...registry.filter((candidate) => !selectedIds.has(candidate.id)),
+    ...automaticRegistry.filter((candidate) => !selectedIds.has(candidate.id)),
   ];
   const providers: Record<
     string,
     {
       configured_models: number;
+      manual_only_models: number;
       available_models: number;
       cooldown_models: number;
       exhausted_models: number;
@@ -2502,6 +2524,23 @@ app.openapi(routingStatusRoute, async (c) => {
       best_model: string | null;
     }
   > = {};
+
+  for (const candidate of registry) {
+    const provider = providers[candidate.provider] ?? {
+      configured_models: 0,
+      manual_only_models: 0,
+      available_models: 0,
+      cooldown_models: 0,
+      exhausted_models: 0,
+      degraded_models: 0,
+      best_model: null,
+    };
+    provider.configured_models += 1;
+    if (!isAutomaticRoutingEligible(candidate)) {
+      provider.manual_only_models += 1;
+    }
+    providers[candidate.provider] = provider;
+  }
 
   const fallbackOrder = fallbackCandidates.map((candidate, index) => {
     const key = getModelKey(candidate.provider, candidate.model);
@@ -2511,6 +2550,7 @@ app.openapi(routingStatusRoute, async (c) => {
       quotaStatus?.status === 'exhausted' ? 'exhausted' : routingModelStatus(snapshot, now);
     const provider = providers[candidate.provider] ?? {
       configured_models: 0,
+      manual_only_models: 0,
       available_models: 0,
       cooldown_models: 0,
       exhausted_models: 0,
@@ -2518,7 +2558,6 @@ app.openapi(routingStatusRoute, async (c) => {
       best_model: null,
     };
 
-    provider.configured_models += 1;
     if (status === 'available') {
       provider.available_models += 1;
       provider.best_model ??= candidate.id;
@@ -2564,6 +2603,7 @@ app.openapi(routingStatusRoute, async (c) => {
     generated_at: new Date(now).toISOString(),
     summary: {
       configured_models: registry.length,
+      manual_only_models: registry.length - automaticRegistry.length,
       available_models: availableModels,
       degraded_models: degradedModels,
       cooldown_models: fallbackOrder.filter((item) => item.status === 'cooldown').length,
@@ -2741,6 +2781,7 @@ const analyticsRoute = createRoute({
     query: z.object({
       project_id: z.string().optional(),
       days: z.coerce.number().int().min(1).max(365).optional(),
+      group_by: z.enum(['provider', 'model', 'project']).optional(),
     }),
   },
   responses: {
@@ -2756,6 +2797,7 @@ app.openapi(analyticsRoute, async (c) => {
   const query = c.req.valid('query');
   const projectId = query.project_id;
   const days = query.days;
+  const groupBy = query.group_by;
 
   const filters: string[] = [];
   const params: unknown[] = [];
@@ -2799,6 +2841,23 @@ app.openapi(analyticsRoute, async (c) => {
     .bind(...params)
     .all<{ date: string; requests: number; successful: number; failed: number }>();
 
+  const groupColumn = groupBy
+    ? ({ provider: 'provider', model: 'model', project: 'project_id' } as const)[groupBy]
+    : null;
+  const dailyBreakdown = groupColumn
+    ? await c.env.GATEWAY_DB.prepare(
+        `SELECT date, ${groupColumn} as key, SUM(total_requests) as requests, SUM(successful_requests) as successful, SUM(failed_requests) as failed FROM project_analytics ${where} GROUP BY date, ${groupColumn} ORDER BY date ASC, requests DESC`
+      )
+        .bind(...params)
+        .all<{
+          date: string;
+          key: string;
+          requests: number;
+          successful: number;
+          failed: number;
+        }>()
+    : { results: [] };
+
   const providers: Record<string, unknown> = {};
   providerStats.results.forEach((p) => {
     providers[p.provider] = { requests: p.requests, successful: p.successful, failed: p.failed };
@@ -2813,6 +2872,10 @@ app.openapi(analyticsRoute, async (c) => {
   });
 
   const total = stats?.total ?? 0;
+  const withFailureRate = <T extends { requests: number; failed: number }>(row: T) => ({
+    ...row,
+    failure_rate: row.requests > 0 ? row.failed / row.requests : 0,
+  });
   return c.json({
     total_requests: total,
     successful_requests: stats?.successful ?? 0,
@@ -2821,7 +2884,9 @@ app.openapi(analyticsRoute, async (c) => {
     providers,
     models,
     projects,
-    daily: dailyStats.results,
+    daily: dailyStats.results.map(withFailureRate),
+    group_by: groupBy ?? null,
+    daily_breakdown: dailyBreakdown.results.map(withFailureRate),
   });
 });
 

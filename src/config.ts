@@ -236,70 +236,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── OpenRouter (needs OPENROUTER_API_KEY) ────────────────────────────
   {
-    id: 'openrouter-hermes-405b-free',
-    provider: 'openrouter',
-    model: 'nousresearch/hermes-3-llama-3.1-405b:free',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.79,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-llama-70b-free',
-    provider: 'openrouter',
-    model: 'meta-llama/llama-3.3-70b-instruct:free',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.78,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-qwen3-next-80b-free',
-    provider: 'openrouter',
-    model: 'qwen/qwen3-next-80b-a3b-instruct:free',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.76,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'openrouter-qwen3-coder-free',
-    provider: 'openrouter',
-    model: 'qwen/qwen3-coder:free',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.73,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
     id: 'openrouter-nvidia-nemotron-12b-free',
     provider: 'openrouter',
     model: 'nvidia/nemotron-nano-12b-v2-vl:free',
@@ -312,22 +248,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       jsonMode: true,
       vision: true,
       contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-llama-3.2-3b-free',
-    provider: 'openrouter',
-    model: 'meta-llama/llama-3.2-3b-instruct:free',
-    reasoning: 'low',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.68,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
       maxOutputTokens: 4096,
     },
   },
@@ -1227,44 +1147,12 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       maxOutputTokens: 4096,
     },
   },
-  {
-    id: 'openrouter-cognitivecomputations-dolphin-mistral-24b-venice-',
-    provider: 'openrouter',
-    model: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
   {
     id: 'openrouter-nvidia-nemotron-3-nano-omni-30b-a3b-reasoning-fre',
     provider: 'openrouter',
     model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-poolside-laguna-m-1-free',
-    provider: 'openrouter',
-    model: 'poolside/laguna-m.1:free',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
@@ -1381,22 +1269,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
   },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
-  {
-    id: 'openrouter-tencent-hy3-free',
-    provider: 'openrouter',
-    model: 'tencent/hy3:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 262_144,
-      maxOutputTokens: 262_144,
-    },
-  },
 
   // ── Z.ai / Zhipu GLM (free Flash models, OpenAI-compatible) ──────────
   // GLM-4.7-Flash and GLM-4.5-Flash are free; GLM-4.6V-Flash is a free
@@ -1449,6 +1321,61 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       maxOutputTokens: 8_192,
     },
   },
+
+  // ── Auto-added by weekly model check (review priority + capabilities) ──
+  {
+    id: 'openrouter-inclusionai-ling-3-0-tiny-free',
+    provider: 'openrouter',
+    model: 'inclusionai/ling-3.0-tiny:free',
+    reasoning: 'low',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: true,
+      jsonMode: false,
+      vision: false,
+      nativeReasoning: true,
+      contextWindow: 262_144,
+      maxOutputTokens: 32_768,
+    },
+  },
+  {
+    id: 'openrouter-poolside-laguna-s-2-1-free',
+    provider: 'openrouter',
+    model: 'poolside/laguna-s-2.1:free',
+    reasoning: 'high',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: true,
+      jsonMode: false,
+      vision: false,
+      nativeReasoning: true,
+      contextWindow: 262_144,
+      maxOutputTokens: 32_768,
+    },
+  },
+
+  // ── Staged provider candidates (disabled until authenticated smoke) ──
+  {
+    id: 'modelscope-qwen3-32b',
+    provider: 'modelscope',
+    model: 'Qwen/Qwen3-32B',
+    reasoning: 'high',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5,
+    capabilities: {
+      toolCalling: false,
+      jsonMode: false,
+      vision: false,
+      nativeReasoning: true,
+      contextWindow: 32_768,
+      maxOutputTokens: 8_192,
+    },
+  },
 ];
 
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
@@ -1469,12 +1396,9 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'gemini:gemini-2.5-flash': { requestsPerDay: 500 },
   'gemini:gemini-2.5-flash-lite': { requestsPerDay: 1500 },
   // OpenRouter (free models, rate-limited upstream)
-  'openrouter:nousresearch/hermes-3-llama-3.1-405b:free': { requestsPerDay: 50 },
-  'openrouter:meta-llama/llama-3.3-70b-instruct:free': { requestsPerDay: 50 },
-  'openrouter:qwen/qwen3-next-80b-a3b-instruct:free': { requestsPerDay: 50 },
-  'openrouter:qwen/qwen3-coder:free': { requestsPerDay: 50 },
+
   'openrouter:nvidia/nemotron-nano-12b-v2-vl:free': { requestsPerDay: 100 },
-  'openrouter:meta-llama/llama-3.2-3b-instruct:free': { requestsPerDay: 100 },
+
   // Cerebras
   'cerebras:gpt-oss-120b': { requestsPerDay: 300 },
   // SambaNova (free tier, 10-20 RPM)
@@ -1538,11 +1462,9 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:nvidia/nemotron-3-nano-30b-a3b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-nano-9b-v2:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:openai/gpt-oss-20b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free': {
-    requestsPerDay: 100,
-  }, // AUTO-ADDED — tune
+
   'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:poolside/laguna-m.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+
   'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'cerebras:zai-glm-4.7': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'groq:qwen/qwen3.6-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
@@ -1550,11 +1472,15 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:poolside/laguna-xs-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'cerebras:gemma-4-31b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   // AUTO-ADDED limits
-  'openrouter:tencent/hy3:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+
   // Z.ai / Zhipu GLM — free Flash models, rate-limited upstream
   'zai:glm-4.7-flash': { requestsPerDay: 200 }, // AUTO-ADDED — tune
   'zai:glm-4.5-flash': { requestsPerDay: 200 }, // AUTO-ADDED — tune
   'zai:glm-4.6v-flash': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  // AUTO-ADDED limits
+  'openrouter:inclusionai/ling-3.0-tiny:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:poolside/laguna-s-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'modelscope:Qwen/Qwen3-32B': { requestsPerDay: 50 },
 };
 
 export interface RateLimitConfig {
@@ -1580,7 +1506,26 @@ const PROVIDER_KEY_REQUIRED: Record<TextProvider, boolean> = {
   cohere: true,
   mistral: true,
   zai: true,
+  modelscope: true,
+  siliconflow: true,
 };
+
+// These paths remain enabled for explicit diagnostics, but repeated production
+// failures make them unsafe for model=auto until bounded smokes prove recovery.
+const AUTOMATIC_ROUTING_QUARANTINED_PROVIDERS: ReadonlySet<TextProvider> = new Set([
+  'github_models',
+  'zai',
+]);
+const AUTOMATIC_ROUTING_QUARANTINED_MODELS = new Set([
+  'nvidia:meta/llama-4-maverick-17b-128e-instruct',
+]);
+
+export function isAutomaticRoutingEligible(candidate: ModelCandidate): boolean {
+  return (
+    !AUTOMATIC_ROUTING_QUARANTINED_PROVIDERS.has(candidate.provider) &&
+    !AUTOMATIC_ROUTING_QUARANTINED_MODELS.has(`${candidate.provider}:${candidate.model}`)
+  );
+}
 
 export function isWorkersAiEnabled(env: Env): boolean {
   return env.WORKERS_AI_ENABLED === 'true';
@@ -1627,6 +1572,10 @@ function hasProviderKey(env: Env, provider: TextProvider): boolean {
       return Boolean(env.MISTRAL_API_KEY);
     case 'zai':
       return Boolean(env.ZAI_API_KEY);
+    case 'modelscope':
+      return Boolean(env.MODELSCOPE_API_KEY);
+    case 'siliconflow':
+      return Boolean(env.SILICONFLOW_API_KEY);
     default:
       return false;
   }

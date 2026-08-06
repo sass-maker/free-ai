@@ -42,14 +42,16 @@ describe('Dashboard HTML routes', () => {
     const res = await fetchRoute('/dashboard');
     const html = await res.text();
 
-    expect(html).toContain('Group: Project ID');
-    expect(html).toContain('Timeline — Successful vs Failed (weekly)');
+    expect(html).toContain('Break down by: Project ID');
+    expect(html).toContain('Daily gateway outcomes');
+    expect(html).toContain('Daily failure rate');
+    expect(html).toContain('Daily provider attribution');
     expect(html).toContain('Gateway success');
     expect(html).toContain(
       '<th>Samples</th><th>Upstream success</th><th>Avg</th><th>P90</th><th>P99</th>'
     );
     expect(html).toContain('Usage analytics are public');
-    expect(html).toContain('/v1/analytics?days=');
+    expect(html).toContain("'/v1/analytics?days=' + state.days + '&group_by='");
     expect(html).toContain('/v1/routing/status');
     expect(html).toContain('Provider quota status');
     expect(html).toContain('quota exhausted');

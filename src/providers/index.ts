@@ -16,6 +16,7 @@ import { callGithubModels } from './github';
 import { callGroq } from './groq';
 import { callGroqTts } from './groq-tts';
 import { callMistral } from './mistral';
+import { callModelScope } from './modelscope';
 import { callNvidia } from './nvidia';
 import { callNvidiaImages, type NvidiaImageInput, type NvidiaImageOutput } from './nvidia-images';
 import { callOpenRouter } from './openrouter';
@@ -26,6 +27,7 @@ import {
   type PollinationsImageOutput,
 } from './pollinations-images';
 import { callSambanova } from './sambanova';
+import { callSiliconFlow } from './siliconflow';
 import {
   callTogetherImages,
   type TogetherImageInput,
@@ -57,6 +59,8 @@ export const providerCallers: Record<TextProvider, ProviderCaller> = {
   cohere: callCohere,
   mistral: callMistral,
   zai: callZai,
+  modelscope: callModelScope,
+  siliconflow: callSiliconFlow,
 };
 
 export const providerEmbeddingCallers: Record<EmbeddingProvider, ProviderEmbeddingCaller> = {

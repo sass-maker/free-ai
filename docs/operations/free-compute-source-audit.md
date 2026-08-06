@@ -1,10 +1,10 @@
 # Free Compute Source Audit
 
-Checked on 2026-05-28; newly wired-in providers section refreshed 2026-07-19.
+Checked on 2026-05-28; provider resync posture refreshed 2026-08-07.
 
 ## Current Coverage
 
-The gateway already has active adapters for these text providers:
+The gateway has adapters for these text providers:
 
 - Workers AI
 - Groq
@@ -18,12 +18,82 @@ The gateway already has active adapters for these text providers:
 - Cohere
 - Mistral
 - Z.ai / Zhipu GLM (added 2026-07)
+- ModelScope (staged, disabled)
+- SiliconFlow (adapter staged; no routing candidate)
 
-It also has modality-specific providers for embeddings, images, video, TTS, and STT. The provider directory is structurally consistent with the TypeScript unions in `src/types.ts` and the caller maps in `src/providers/index.ts`: every current text provider has an adapter file, and each modality registry filters providers through an availability check before routing.
+ModelScope and SiliconFlow are integration candidates, not active routing
+capacity. The ModelScope seed remains `enabled: false`; SiliconFlow has no
+model candidate because the previously considered `Qwen/Qwen3-8B` is currently
+pay-as-you-go. Adding either key cannot make these providers selectable.
+Activation requires successful catalog evidence, a bounded authenticated
+replay, capability/limit review, and a separate code change.
+
+The gateway also has modality-specific providers for embeddings, images,
+video, TTS, and STT. The provider directory is structurally consistent with
+the TypeScript unions in `src/types.ts` and the caller maps in
+`src/providers/index.ts`: every declared text provider has an adapter file, and
+each modality registry filters providers through an availability check before
+routing.
+
+## Registry Resync — 2026-08-07
+
+The OpenRouter catalog can be read without a credential, so
+`scripts/check-model-ids.mjs` checks it even when `OPENROUTER_API_KEY` is absent.
+The checker manages official catalogs for Groq, OpenRouter, Cerebras, Gemini,
+SambaNova, NVIDIA, GitHub Models, Cohere, Mistral, Z.ai, ModelScope, and
+SiliconFlow. Every catalog returns a structured `ok`, `missing_key`, or `error`
+state. Missing credentials or malformed/upstream failures make coverage
+incomplete, but never count configured models as stale.
+
+The 2026-08-07 public-catalog resync produced these reviewed changes:
+
+- Removed eight OpenRouter models no longer present upstream: Hermes 3 405B,
+  Llama 3.3 70B, Qwen3 Next 80B, Qwen3 Coder, Llama 3.2 3B, Dolphin Mistral
+  Venice, Laguna M 1, and Tencent HY 3 free variants.
+- Staged `inclusionai/ling-3.0-tiny:free` and
+  `poolside/laguna-s-2.1:free` as disabled candidates. OpenRouter currently
+  lists both at zero prompt/completion price with text output, tool calling,
+  optional reasoning, 262K context, and up to 32K output.
+- New catalog discoveries are now generated with `enabled: false`. Listing by a
+  provider proves discoverability, not runtime compatibility; an authenticated
+  provider smoke is required before default routing activation.
+
+The user-supplied `no-cost-ai` repository remains useful as a discovery index,
+not as provider evidence. Its web interfaces and third-party aggregators are not
+added without an official API contract, sustainable free allowance, privacy
+review, and a kill switch. The user-supplied Ling collection became actionable
+only because the existing OpenRouter provider independently listed Ling 3.0
+Tiny in its API catalog.
 
 ## Historical Usage
 
 D1 `project_analytics` currently records request counts, not exact token or neuron consumption. Historical Workers AI cost can therefore be bounded only from request volume and the `NeuronBudgetDO` estimator, not reconstructed exactly.
+
+The 30-day production window reviewed on 2026-08-07 contained 8,856 requests,
+6,948 successes, and 1,908 failures. The incident was concentrated rather than
+capacity-wide:
+
+| Provider/path | Requests | Successful | Failed | Decision |
+| --- | ---: | ---: | ---: | --- |
+| Mistral | 5,223 | 5,219 | 4 | Keep serving while healthy |
+| NVIDIA Maverick | 1,701 | 26 | 1,675 | Manual-only pending recovery smoke |
+| Cerebras | 636 | 635 | 1 | Keep serving while healthy |
+| Workers AI | 267 | 267 | 0 | Keep fallback-only and neuron-capped |
+| GitHub Models | 73 | 0 | 73 | Manual-only pending recovery smoke |
+| Z.ai | 31 | 0 | 31 | Manual-only pending recovery smoke |
+
+`model=auto` excludes the three failing paths above. They remain enabled for
+explicit `/v1/debug/replay` diagnostics, and `/v1/models` exposes their
+`automatic_routing: false` state. A path returns to automatic routing only
+after bounded repeated smoke evidence and a reviewed policy change.
+
+Mistral's share is monitored instead of forcibly redistributed to degraded
+providers. The daily health report warns when one provider supplies more than
+85% of at least 100 attributed successful requests; concentration alone does
+not make the health check fail.
+
+The following table is the earlier cumulative snapshot retained for historical
+comparison:
 
 Observed provider totals in production D1:
 
@@ -83,6 +153,20 @@ GitHub Models includes rate-limited free usage for GitHub accounts, but paid usa
 
 Groq and Cerebras publish free-tier or free-trial rate limits and should stay near the front of routing while healthy. They also return useful rate-limit headers, so the gateway can eventually learn headroom from headers instead of static request/day estimates.
 
+## Staged provider opportunities (2026-08)
+
+- **ModelScope** — the official inference API is OpenAI-compatible and advertises
+  a daily free invocation allowance for selected models. `Qwen/Qwen3-32B` is
+  staged disabled behind `MODELSCOPE_API_KEY`.
+- **SiliconFlow** — the official API is OpenAI-compatible and documents a
+  free-model rate-limit class, but its current `Qwen/Qwen3-8B` page lists
+  pay-as-you-go pricing. The adapter remains staged without a model candidate
+  until an official zero-price model is identified and smoke-tested.
+
+These integrations add no default traffic. ModelScope's conservative daily
+limit remains a placeholder until authenticated smoke and account-level quota
+evidence are reviewed.
+
 ## Newly wired-in providers (2026-07)
 
 One OpenAI-compatible provider was integrated as a first-class adapter in 2026-07 and is documented in [`docs/product/free-ai-credits-guide.md`](../product/free-ai-credits-guide.md):
@@ -93,10 +177,12 @@ The integration added one `src/providers/zai.ts` adapter, a `TextProvider` union
 
 ## Evaluated and rejected for low ROI (2026-07)
 
-Six OpenAI-compatible providers were evaluated and deliberately **not** wired in, because each adds an env var + adapter + routing entries in exchange for little or no recurring free capacity we don't already have. Full rationale in [`docs/product/free-ai-credits-guide.md#not-integrated-evaluated-and-rejected-for-low-roi`](../product/free-ai-credits-guide.md#not-integrated-evaluated-and-rejected-for-low-roi):
+Five OpenAI-compatible providers remain deliberately **not** wired in, because
+each adds an env var + adapter + routing entries in exchange for little or no
+recurring free capacity we do not already have. Full rationale is in
+[`docs/product/free-ai-credits-guide.md#not-integrated-evaluated-and-rejected-for-low-roi`](../product/free-ai-credits-guide.md#not-integrated-evaluated-and-rejected-for-low-roi):
 
 - **DeepSeek** — the "free" offer is a one-time 5M-token grant (30 days, then paid). Not a recurring free tier; after the grant it's just another paid provider. We already have free frontier-class routing via Groq/Cerebras/Gemini/Z.ai.
-- **SiliconFlow** — $1 one-time credit; models overlap with Cerebras/OpenRouter.
 - **Alibaba DashScope** — 1M tokens/model, 90 days; Qwen3 already reachable via Groq/Cerebras/OpenRouter.
 - **01.AI (Yi)** — vague small signup tokens; not frontier.
 - **OVH AI Endpoints** — same Llama 3.1 we already reach four other ways; only novel value is EU residency.
@@ -140,3 +226,6 @@ This keeps routing latency and provider health cleaner without making an externa
 - GitHub Models billing: https://docs.github.com/en/billing/concepts/product-billing/github-models
 - Groq rate limits: https://console.groq.com/docs/rate-limits
 - Cerebras rate limits: https://inference-docs.cerebras.ai/support/rate-limits
+- ModelScope inference API: https://www.modelscope.cn/learn/434591
+- SiliconFlow quickstart: https://docs.siliconflow.com/en/userguide/quickstart
+- SiliconFlow rate limits: https://docs.siliconflow.com/en/userguide/rate-limits/rate-limit-and-upgradation

@@ -4,7 +4,10 @@
  * Outputs a report of stale/missing models and optionally patches config.ts.
  *
  * Usage:
- *   GROQ_API_KEY=... OPENROUTER_API_KEY=... CEREBRAS_API_KEY=... GEMINI_API_KEY=... node scripts/check-model-ids.mjs
+ *   GROQ_API_KEY=... CEREBRAS_API_KEY=... GEMINI_API_KEY=... node scripts/check-model-ids.mjs
+ *
+ * OpenRouter's model catalog is public. OPENROUTER_API_KEY is optional and is
+ * sent only when present; the other checked catalogs still require keys.
  *
  * Flags:
  *   --patch   Rewrite config.ts, removing models that no longer exist
@@ -22,87 +25,211 @@ const JSON_OUT = process.argv.includes('--json');
 
 // ── Provider API fetchers ────────────────────────────────────────────────────
 
-// Each fetcher returns { all: Set (every id upstream, for stale check),
-//                         addable: Set (filtered for new-add candidates) }
-async function fetchGroqModels() {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return null;
-  const res = await fetch('https://api.groq.com/openai/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const all = new Set(data.data.map((m) => m.id));
-  // Only chat-suitable models added automatically
-  const isChat = (id) => !/whisper|playai-tts|prompt-guard|guard|orpheus|allam|compound/i.test(id);
-  const addable = new Set(data.data.filter((m) => isChat(m.id)).map((m) => m.id));
-  return { all, addable };
+const MODEL_LIST_TIMEOUT_MS = 10_000;
+const NON_CHAT_MODEL =
+  /image|audio|tts|search-preview|deep-research|moderation|guard|content-safety|palmyra|embed|speech|whisper|voxtral|lyria|playai|orpheus/i;
+
+function asModelItems(body) {
+  if (Array.isArray(body?.data)) return body.data;
+  if (Array.isArray(body?.models)) return body.models;
+  if (Array.isArray(body)) return body;
+  return null;
 }
 
-async function fetchOpenRouterModels() {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return null;
-  const res = await fetch('https://openrouter.ai/api/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const all = new Set(data.data.map((m) => m.id));
-  const isFree = (m) => {
-    const p = m.pricing || {};
-    return String(p.prompt) === '0' && String(p.completion) === '0';
-  };
-  const isTextChat = (m) => {
-    const id = String(m.id).toLowerCase();
-    if (
-      /image|audio|tts|search-preview|deep-research|moderation|guard|content-safety|palmyra|embed|speech|voxtral|lyria|reka-edge/.test(
-        id
-      )
-    )
-      return false;
-    if (m.architecture?.output_modalities) {
-      if (!m.architecture.output_modalities.includes('text')) return false;
+function modelId(item) {
+  if (typeof item === 'string') return item;
+  if (typeof item?.id === 'string') return item.id;
+  if (typeof item?.name === 'string') return item.name.replace(/^models\//, '');
+  return null;
+}
+
+function isTextModel(item) {
+  const id = modelId(item);
+  if (!id || NON_CHAT_MODEL.test(id)) return false;
+  const outputs = item?.architecture?.output_modalities;
+  return !Array.isArray(outputs) || outputs.includes('text');
+}
+
+function isOpenRouterFree(item) {
+  const pricing = item?.pricing ?? {};
+  return String(pricing.prompt) === '0' && String(pricing.completion) === '0';
+}
+
+const CATALOG_SPECS = [
+  {
+    provider: 'workers_ai',
+    unsupported: 'model discovery uses the Cloudflare binding rather than an HTTP catalog',
+  },
+  {
+    provider: 'groq',
+    secret: 'GROQ_API_KEY',
+    url: () => 'https://api.groq.com/openai/v1/models',
+    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+    discover: (item) => isTextModel(item) && !/allam|compound/i.test(modelId(item)),
+  },
+  {
+    provider: 'openrouter',
+    secret: 'OPENROUTER_API_KEY',
+    optionalSecret: true,
+    url: () => 'https://openrouter.ai/api/v1/models',
+    headers: ({ key }) => (key ? { Authorization: `Bearer ${key}` } : {}),
+    discover: (item) => isTextModel(item) && isOpenRouterFree(item),
+  },
+  {
+    provider: 'cerebras',
+    secret: 'CEREBRAS_API_KEY',
+    url: () => 'https://api.cerebras.ai/v1/models',
+    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+    discover: isTextModel,
+  },
+  {
+    provider: 'gemini',
+    secret: 'GEMINI_API_KEY',
+    url: ({ key }) =>
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
+    headers: () => ({}),
+    discover: (item) => /^gemini-/.test(modelId(item)) && isTextModel(item),
+  },
+  {
+    provider: 'sambanova',
+    secret: 'SAMBANOVA_API_KEY',
+    url: () => 'https://api.sambanova.ai/v1/models',
+    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+  },
+  {
+    provider: 'nvidia',
+    secret: 'NVIDIA_API_KEY',
+    url: () => 'https://integrate.api.nvidia.com/v1/models',
+    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+  },
+  {
+    provider: 'github_models',
+    secret: 'GITHUB_MODELS_TOKEN',
+    url: () => 'https://models.github.ai/catalog/models',
+    headers: ({ key }) => ({
+      Authorization: `Bearer ${key}`,
+      Accept: 'application/vnd.github+json',
+    }),
+  },
+  {
+    provider: 'pollinations',
+    unsupported: 'no stable official text model-list contract is configured',
+  },
+  {
+    provider: 'cohere',
+    secret: 'COHERE_API_KEY',
+    url: () => 'https://api.cohere.ai/compatibility/v1/models',
+    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+  },
+  {
+    provider: 'mistral',
+    secret: 'MISTRAL_API_KEY',
+    url: () => 'https://api.mistral.ai/v1/models',
+    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+  },
+  {
+    provider: 'zai',
+    secret: 'ZAI_API_KEY',
+    url: () => 'https://api.z.ai/api/paas/v4/models',
+    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+  },
+  {
+    provider: 'modelscope',
+    secret: 'MODELSCOPE_API_KEY',
+    url: () => 'https://api-inference.modelscope.cn/v1/models',
+    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+  },
+  {
+    provider: 'siliconflow',
+    secret: 'SILICONFLOW_API_KEY',
+    url: () => 'https://api.siliconflow.com/v1/models?type=text',
+    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+  },
+];
+
+async function fetchCatalog(spec, env = process.env, fetchImpl = fetch) {
+  if (spec.unsupported) {
+    return {
+      provider: spec.provider,
+      status: 'unsupported',
+      reason: spec.unsupported,
+      all: new Set(),
+      addable: new Set(),
+    };
+  }
+
+  const key = env[spec.secret];
+  if (!key && !spec.optionalSecret) {
+    return {
+      provider: spec.provider,
+      status: 'missing_key',
+      reason: `${spec.secret} is not configured`,
+      all: new Set(),
+      addable: new Set(),
+    };
+  }
+
+  try {
+    const response = await fetchImpl(spec.url({ key }), {
+      headers: spec.headers({ key }),
+      signal: AbortSignal.timeout(MODEL_LIST_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      return {
+        provider: spec.provider,
+        status: 'error',
+        reason: `catalog returned HTTP ${response.status}`,
+        all: new Set(),
+        addable: new Set(),
+      };
     }
-    return true;
-  };
-  const addable = new Set(data.data.filter((m) => isFree(m) && isTextChat(m)).map((m) => m.id));
-  return { all, addable };
+
+    const body = await response.json();
+    const items = asModelItems(body);
+    if (!items) {
+      return {
+        provider: spec.provider,
+        status: 'error',
+        reason: 'catalog response did not contain a model array',
+        all: new Set(),
+        addable: new Set(),
+      };
+    }
+
+    const validItems = items.filter((item) => modelId(item));
+    const all = new Set(validItems.map(modelId));
+    const addable = new Set(spec.discover ? validItems.filter(spec.discover).map(modelId) : []);
+    return {
+      provider: spec.provider,
+      status: 'ok',
+      reason: null,
+      all,
+      addable,
+    };
+  } catch (error) {
+    return {
+      provider: spec.provider,
+      status: 'error',
+      reason: error instanceof Error ? error.message : 'catalog request failed',
+      all: new Set(),
+      addable: new Set(),
+    };
+  }
 }
 
-async function fetchCerebrasModels() {
-  const key = process.env.CEREBRAS_API_KEY;
-  if (!key) return null;
-  const res = await fetch('https://api.cerebras.ai/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const all = new Set(data.data.map((m) => m.id));
-  return { all, addable: all };
-}
-
-async function fetchGeminiModels() {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`, {
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const all = new Set(data.models.map((m) => m.name.replace('models/', '')));
-  // Only chat-capable generative models for addition (skip embedding / tts / imagen variants here via name prefix)
-  const isChat = (id) => /^gemini-/.test(id) && !/embedding|image/i.test(id);
-  const addable = new Set([...all].filter(isChat));
-  return { all, addable };
+export async function fetchCatalogs(env = process.env, fetchImpl = fetch) {
+  return Promise.all(CATALOG_SPECS.map((spec) => fetchCatalog(spec, env, fetchImpl)));
 }
 
 // ── Parse current config ─────────────────────────────────────────────────────
 
-function parseConfigModels() {
-  const src = readFileSync(CONFIG_PATH, 'utf-8');
+export function parseConfigModels(source = readFileSync(CONFIG_PATH, 'utf-8')) {
+  const registryStart = source.indexOf('const DEFAULT_MODELS: ModelCandidate[] = [');
+  const limitsStart = source.indexOf('const DEFAULT_LIMITS:', registryStart);
+  const src =
+    registryStart >= 0 && limitsStart > registryStart
+      ? source.slice(registryStart, limitsStart)
+      : source;
   const models = [];
   // Match each object in DEFAULT_MODELS array
   const blockRe =
@@ -114,62 +241,77 @@ function parseConfigModels() {
   return models;
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
-
-async function main() {
-  const [groq, openrouter, cerebras, gemini] = await Promise.all([
-    fetchGroqModels(),
-    fetchOpenRouterModels(),
-    fetchCerebrasModels(),
-    fetchGeminiModels(),
-  ]);
-
-  const providerSets = { groq, openrouter, cerebras, gemini };
-  const configModels = parseConfigModels();
-
-  const report = { stale: [], ok: [], skipped: [], new: [] };
-
-  // Build a map of provider -> configured model IDs (for new-detection)
-  const configured = {
-    groq: new Set(),
-    openrouter: new Set(),
-    cerebras: new Set(),
-    gemini: new Set(),
+export function buildRegistryReport(configModels, catalogResults) {
+  const catalogMap = new Map(catalogResults.map((catalog) => [catalog.provider, catalog]));
+  const configured = new Map();
+  const report = {
+    catalogs: [],
+    stale: [],
+    ok: [],
+    skipped: [],
+    new: [],
+    summary: {
+      configuredModels: configModels.length,
+      managedCatalogs: CATALOG_SPECS.length,
+      checkedCatalogs: 0,
+      incompleteCatalogs: 0,
+      unsupportedCatalogs: 0,
+    },
   };
-  for (const entry of configModels) {
-    if (configured[entry.provider]) configured[entry.provider].add(entry.model);
+
+  for (const catalog of catalogResults) {
+    report.catalogs.push({
+      provider: catalog.provider,
+      status: catalog.status,
+      reason: catalog.reason,
+      upstreamModels: catalog.all.size,
+      discoverableModels: catalog.addable.size,
+    });
+    if (catalog.status === 'ok') report.summary.checkedCatalogs += 1;
+    else if (catalog.status === 'unsupported') report.summary.unsupportedCatalogs += 1;
+    else report.summary.incompleteCatalogs += 1;
   }
 
   for (const entry of configModels) {
-    const sets = providerSets[entry.provider];
-    if (sets === null || sets === undefined) {
-      report.skipped.push({ ...entry, reason: 'no API key / fetch failed' });
-      continue;
-    }
-    // Use .all for stale check — if ANY upstream list has the id, it's valid
-    if (sets.all.has(entry.model)) {
+    if (!configured.has(entry.provider)) configured.set(entry.provider, new Set());
+    configured.get(entry.provider).add(entry.model);
+
+    const catalog = catalogMap.get(entry.provider);
+    if (!catalog) {
+      report.skipped.push({ ...entry, reason: 'catalog unsupported' });
+    } else if (catalog.status !== 'ok') {
+      report.skipped.push({ ...entry, reason: `${catalog.status}: ${catalog.reason}` });
+    } else if (catalog.all.has(entry.model)) {
       report.ok.push(entry);
     } else {
       report.stale.push(entry);
     }
   }
 
-  // Detect new models — use .addable (filtered) so we only auto-add chat/free ones
-  for (const [provider, sets] of Object.entries(providerSets)) {
-    if (!sets) continue;
-    for (const model of sets.addable) {
-      if (!configured[provider].has(model)) {
-        report.new.push({ provider, model });
-      }
+  for (const catalog of catalogResults) {
+    if (catalog.status !== 'ok') continue;
+    const providerModels = configured.get(catalog.provider) ?? new Set();
+    for (const model of catalog.addable) {
+      if (!providerModels.has(model)) report.new.push({ provider: catalog.provider, model });
     }
   }
+
+  return report;
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+async function main() {
+  const configModels = parseConfigModels();
+  const catalogs = await fetchCatalogs();
+  const report = buildRegistryReport(configModels, catalogs);
 
   if (JSON_OUT) {
     console.log(JSON.stringify(report, null, 2));
   } else {
     if (report.stale.length === 0) {
       console.log(
-        `✓ All ${report.ok.length} checked models are valid (${report.skipped.length} skipped)`
+        `✓ All ${report.ok.length} checked models are valid (${report.skipped.length} skipped; ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs} catalogs checked)`
       );
     } else {
       console.log(`⚠ ${report.stale.length} stale model(s) found:\n`);
@@ -177,6 +319,9 @@ async function main() {
         console.log(`  ${m.provider}/${m.model}  (id: ${m.id})`);
       }
       console.log(`\n✓ ${report.ok.length} valid, ${report.skipped.length} skipped`);
+    }
+    for (const catalog of report.catalogs.filter((item) => item.status !== 'ok')) {
+      console.log(`⚠ ${catalog.provider}: ${catalog.status} (${catalog.reason})`);
     }
     if (report.new.length > 0) {
       console.log(`\n✨ ${report.new.length} new model(s) upstream not in config:`);
@@ -238,13 +383,22 @@ async function main() {
       src = src.replace(limitRe, '\n');
     }
 
-    // Add new — inject safe defaults just before DEFAULT_MODELS closing `];`
+    // Stage new models disabled. Provider metadata is discovery evidence, not
+    // runtime compatibility proof; enable only after a provider-level smoke.
     if (report.new.length > 0) {
       const _provComment = {
         groq: 'Groq',
         openrouter: 'OpenRouter',
         cerebras: 'Cerebras',
         gemini: 'Gemini',
+        sambanova: 'SambaNova',
+        nvidia: 'NVIDIA',
+        github_models: 'GitHub Models',
+        cohere: 'Cohere',
+        mistral: 'Mistral',
+        zai: 'Z.ai',
+        modelscope: 'ModelScope',
+        siliconflow: 'SiliconFlow',
       };
       const stubs = report.new
         .map((m) => {
@@ -258,8 +412,8 @@ async function main() {
     model: '${m.model}',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true,
-    priority: 0.50, // AUTO-ADDED by check-model-ids — review caps + priority
+    enabled: false,
+    priority: 0.50, // AUTO-STAGED — smoke before enabling; then review caps + priority
     capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
   },`;
         })
@@ -291,15 +445,22 @@ async function main() {
     writeFileSync(CONFIG_PATH, src);
     const parts = [];
     if (report.stale.length) parts.push(`removed ${report.stale.length} stale`);
-    if (report.new.length) parts.push(`added ${report.new.length} new`);
+    if (report.new.length) parts.push(`staged ${report.new.length} new (disabled)`);
     console.log(`\nPatched config.ts — ${parts.join(', ')}`);
   }
 
-  // Signal CI to act only when read-only and there's drift
-  if (!PATCH && (report.stale.length > 0 || report.new.length > 0)) process.exit(1);
+  // Signal CI when drift or catalog coverage needs review.
+  if (
+    !PATCH &&
+    (report.stale.length > 0 || report.new.length > 0 || report.summary.incompleteCatalogs > 0)
+  )
+    process.exit(1);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(2);
-});
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';
+if (invokedPath === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(2);
+  });
+}

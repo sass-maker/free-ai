@@ -58,6 +58,27 @@ describe('Operator browser UI routes', () => {
     expect(body.data[0]).toHaveProperty('id');
     expect(body.data[0]).toHaveProperty('provider');
     expect(body.data[0]).toHaveProperty('type');
+    expect(body.data[0]).toHaveProperty('automatic_routing');
+  });
+
+  it('identifies enabled models that are manual-only', async () => {
+    const res = await fetchRouteWithEnv('/v1/models', {
+      NVIDIA_API_KEY: 'nvidia-test-key',
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ id: string; enabled: boolean; automatic_routing: boolean }>;
+    };
+
+    expect(body.data.find((model) => model.id === 'nvidia-llama4-maverick')).toMatchObject({
+      enabled: true,
+      automatic_routing: false,
+    });
+    expect(body.data.find((model) => model.id === 'nvidia-nemotron-70b')).toMatchObject({
+      enabled: true,
+      automatic_routing: true,
+    });
   });
 
   it('includes embedding models with dimensions and provider availability', async () => {
@@ -123,6 +144,8 @@ describe('Operator browser UI routes', () => {
       expect(html).toContain('<title>AI Gateway - Model Catalog</title>');
       expect(html).toContain('Model Catalog');
       expect(html).toContain('Search model, provider, capability');
+      expect(html).toContain('Manual only');
+      expect(html).toContain('automatic_routing');
       expect(html).toContain("fetch('/v1/models'");
     }
   );

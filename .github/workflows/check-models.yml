@@ -1,81 +1,161 @@
-name: Check Model IDs
+name: Check Provider Catalogs
 
 on:
   schedule:
-    - cron: '0 9 * * 0' # Every Sunday at 9am UTC
-  workflow_dispatch: # Manual trigger
+    - cron: '0 9 * * 0' # Every Sunday at 09:00 UTC
+  workflow_dispatch:
 
 permissions:
   contents: read
+  issues: write
+
+concurrency:
+  group: provider-catalog-resync-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: '22'
 
-      - name: Check model IDs against live APIs
-        id: check
+      - name: Check configured models against official catalogs
+        id: catalog
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          GITHUB_MODELS_TOKEN: ${{ secrets.GITHUB_MODELS_TOKEN }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+        shell: bash
         run: |
-          node scripts/check-model-ids.mjs --json > report.json 2>&1 || true
-          STALE=$(node -e "const r=JSON.parse(require('fs').readFileSync('report.json','utf-8')); console.log(r.stale.length)")
-          NEW=$(node -e "const r=JSON.parse(require('fs').readFileSync('report.json','utf-8')); console.log((r.new||[]).length)")
-          echo "stale=$STALE" >> "$GITHUB_OUTPUT"
-          echo "new=$NEW" >> "$GITHUB_OUTPUT"
-          echo "drift=$((STALE + NEW))" >> "$GITHUB_OUTPUT"
-          cat report.json
+          set +e
+          node scripts/check-model-ids.mjs --json > catalog-report.json
+          checker_exit=$?
+          set -e
+          node -e "JSON.parse(require('fs').readFileSync('catalog-report.json', 'utf8'))"
+          node - <<'NODE' >> "$GITHUB_OUTPUT"
+          const report = JSON.parse(require('fs').readFileSync('catalog-report.json', 'utf8'));
+          console.log(`stale=${report.stale.length}`);
+          console.log(`new=${report.new.length}`);
+          console.log(`drift=${report.stale.length + report.new.length}`);
+          console.log(`incomplete=${report.summary.incompleteCatalogs}`);
+          NODE
+          echo "checker_exit=$checker_exit" >> "$GITHUB_OUTPUT"
 
-      - name: Patch config and preserve evidence
-        if: steps.check.outputs.drift != '0'
+      - name: Build conservative registry patch
+        if: steps.catalog.outputs.drift != '0'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          GITHUB_MODELS_TOKEN: ${{ secrets.GITHUB_MODELS_TOKEN }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
         run: |
           node scripts/check-model-ids.mjs --patch
           git diff --binary -- src/config.ts > model-sync.patch
 
-          STALE_LIST=$(node -e "
-            const r=JSON.parse(require('fs').readFileSync('report.json','utf-8'));
-            r.stale.forEach(m => console.log('- \`'+m.provider+'/'+m.model+'\` (id: '+m.id+')'));
-          ")
-          NEW_LIST=$(node -e "
-            const r=JSON.parse(require('fs').readFileSync('report.json','utf-8'));
-            (r.new||[]).forEach(m => console.log('- \`'+m.provider+'/'+m.model+'\`'));
-          ")
+      - name: Run bounded provider replay smoke
+        id: smoke
+        env:
+          FREE_AI_BASE_URL: https://ai-gateway.sassmaker.com
+          GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
+        shell: bash
+        run: |
+          set +e
+          node scripts/smoke-text-providers.mjs > smoke-report.json
+          smoke_exit=$?
+          set -e
+          node -e "JSON.parse(require('fs').readFileSync('smoke-report.json', 'utf8'))"
+          echo "exit=$smoke_exit" >> "$GITHUB_OUTPUT"
+          echo "status=$(node -p \"JSON.parse(require('fs').readFileSync('smoke-report.json', 'utf8')).status\")" >> "$GITHUB_OUTPUT"
 
-          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## Model registry drift detected
+      - name: Summarize provider resync
+        shell: bash
+        run: |
+          node - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('catalog-report.json', 'utf8'));
+          const smoke = JSON.parse(fs.readFileSync('smoke-report.json', 'utf8'));
+          const incomplete = report.catalogs.filter((catalog) => catalog.status !== 'ok');
+          console.log('## Provider resync');
+          console.log(`- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
+          console.log(`- Registry drift: ${report.stale.length} stale, ${report.new.length} new`);
+          console.log(`- Replay smoke: ${smoke.status}`);
+          if (incomplete.length) {
+            console.log('\n### Incomplete catalogs');
+            for (const item of incomplete) console.log(`- ${item.provider}: ${item.status} - ${item.reason}`);
+          }
+          NODE
 
-          ### Stale models
-
-          ${STALE_LIST:-_none_}
-
-          ### New models
-
-          ${NEW_LIST:-_none_}
-
-          Download \`model-sync.patch\` from the workflow artifacts, review the
-          conservative defaults, and apply it manually.
-          EOF
-
-      - name: Upload model drift evidence
-        if: steps.check.outputs.drift != '0'
+      - name: Upload provider resync evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: model-drift-${{ github.run_id }}
+          name: provider-resync-${{ github.run_id }}
           path: |
-            report.json
+            catalog-report.json
+            smoke-report.json
             model-sync.patch
-          if-no-files-found: error
+          if-no-files-found: warn
+
+      - name: Maintain registry issue
+        if: always() && steps.catalog.outcome == 'success' && steps.smoke.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: '[provider-registry] Catalog drift or coverage gap'
+          HAS_PROBLEM: ${{ steps.catalog.outputs.drift != '0' || steps.catalog.outputs.incomplete != '0' || steps.catalog.outputs.checker_exit == '2' || steps.smoke.outputs.exit != '0' }}
+        shell: bash
+        run: |
+          node - <<'NODE' > issue-body.md
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('catalog-report.json', 'utf8'));
+          const smoke = JSON.parse(fs.readFileSync('smoke-report.json', 'utf8'));
+          console.log(`Automated provider resync found a condition requiring review in run ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}.`);
+          console.log(`\n- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
+          console.log(`- Stale models: ${report.stale.length}`);
+          console.log(`- New models: ${report.new.length}`);
+          console.log(`- Replay smoke: ${smoke.status}`);
+          console.log('\nIncomplete catalogs:');
+          const incomplete = report.catalogs.filter((catalog) => catalog.status !== 'ok');
+          if (!incomplete.length) console.log('- None');
+          for (const item of incomplete) console.log(`- ${item.provider}: ${item.status} - ${item.reason}`);
+          console.log('\nDownload the workflow artifact for the full reports and optional conservative patch. Review before enabling any model.');
+          NODE
+          issues=$(gh issue list --state all --search "\"$TITLE\" in:title" --limit 10 --json number,title,state)
+          number=$(jq -r --arg title "$TITLE" '.[] | select(.title == $title) | .number' <<< "$issues" | head -n 1)
+          state=$(jq -r --arg title "$TITLE" '.[] | select(.title == $title) | .state' <<< "$issues" | head -n 1)
+          if [ "$HAS_PROBLEM" = "true" ]; then
+            if [ -z "$number" ]; then
+              gh issue create --title "$TITLE" --body-file issue-body.md
+            else
+              if [ "$state" = "CLOSED" ]; then gh issue reopen "$number"; fi
+              gh issue comment "$number" --body-file issue-body.md
+            fi
+          elif [ -n "$number" ] && [ "$state" = "OPEN" ]; then
+            gh issue close "$number" --comment "Recovered in workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
+          fi
+
+      - name: Fail on drift, incomplete coverage, or smoke failure
+        if: steps.catalog.outputs.drift != '0' || steps.catalog.outputs.incomplete != '0' || steps.catalog.outputs.checker_exit == '2' || steps.smoke.outputs.exit != '0'
+        run: exit 1

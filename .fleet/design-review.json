@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "free-ai",
-  "target": "AI Gateway dashboard density and mobile containment",
+  "target": "AI Gateway daily failure analytics and attributed grouping",
   "mode": "preserve",
   "register": "product",
   "context": {
@@ -14,21 +14,21 @@
     "probes": [],
     "selected": "existing-design",
     "approval": "not-required",
-    "before": ".fleet/evidence/dashboard-mobile/before-1440.png"
+    "before": ".fleet/evidence/provider-analytics-dashboard/before-1440.png"
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": ".fleet/evidence/dashboard-mobile/after-390.png"
+        "path": ".fleet/evidence/provider-analytics-dashboard/after-390.png"
       },
       {
         "width": 768,
-        "path": ".fleet/evidence/dashboard-mobile/after-768.png"
+        "path": ".fleet/evidence/provider-analytics-dashboard/after-768.png"
       },
       {
         "width": 1440,
-        "path": ".fleet/evidence/dashboard-mobile/after-1440.png"
+        "path": ".fleet/evidence/provider-analytics-dashboard/after-1440.png"
       }
     ],
     "projectCheck": {
@@ -52,15 +52,15 @@
       "findings": []
     },
     "browserReview": {
-      "tool": "Browser control",
+      "tool": "Playwright fallback",
       "viewports": [390, 768, 1440],
       "horizontalOverflow": false,
       "consoleErrors": 0,
-      "note": "The dashboard is page-contained at 390px, all four data tables scroll inside their cards, controls meet 44px mobile targets, and tablet controls retain a compact operator-console layout."
+      "note": "The selected breakdown changes both the chart and daily attribution evidence; exact daily rates, no-traffic states, and page containment were reviewed at all three widths. Chrome DevTools could not acquire its shared profile, so the existing Playwright browser lane was used."
     }
   },
   "ownerFeedback": {
     "decision": "delegated",
-    "note": "The owner explicitly delegated final judgment for the responsive remediation wave; the existing operator-console visual language was preserved."
+    "note": "The owner explicitly delegated redoing the previously failed analytics and dashboard work; the established operator-console visual language was preserved."
   }
 }

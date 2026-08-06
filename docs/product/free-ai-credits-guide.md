@@ -2,7 +2,7 @@
 
 No VC funding? No problem. Here's every source of free AI API credits available in 2025-2026, organized by effort required.
 
-Last reviewed: 2026-07-19.
+Last reviewed: 2026-08-07.
 
 ---
 
@@ -28,6 +28,7 @@ Providers marked **[integrated]** are built into this gateway — just add the A
 | **Together AI** [integrated: images/video] | FLUX image gen + video; chat reachable via OpenRouter | Image/video generation | https://api.together.ai |
 | **Voyage AI** [integrated: embeddings] | Free embedding tier | High-quality embeddings | https://www.voyageai.com |
 | **Z.ai / Zhipu GLM** [integrated] | GLM-4.7-Flash, GLM-4.5-Flash, GLM-4.6V-Flash all **free** | Free vision model, free tool calling | https://z.ai |
+| **ModelScope** [staged, inactive] | Selected models advertise at least 50 free invocations/day | Additional direct Qwen capacity after smoke | https://www.modelscope.cn/learn/434591 |
 | **HuggingFace** | Free serverless inference, thousands of models | Open-source model experimentation | https://huggingface.co/inference-api |
 | **Modal** | $30/month free compute credits | Self-host any open-source LLM | https://modal.com |
 
@@ -39,12 +40,15 @@ DeepSeek, Z.ai, Alibaba Qwen, SiliconFlow, and 01.AI all expose OpenAI-compatibl
 
 ## Not integrated — evaluated and rejected for low ROI
 
-The following OpenAI-compatible providers were evaluated in 2026-07 and deliberately **not** wired into the gateway. Each adds an env var, an adapter, and routing-pool entries in exchange for little or no recurring free capacity we don't already have via Groq, Cerebras, Gemini, OpenRouter, or the one new adapter (Z.ai). Revisit only if the stated blocker changes.
+The following OpenAI-compatible providers were evaluated and deliberately kept
+out of routing. ModelScope has a staged disabled seed. SiliconFlow has a staged
+adapter but no model candidate, and still requires a verified zero-price model
+plus catalog/smoke evidence before activation.
 
 | Provider | Why rejected | What would change the verdict |
 |----------|-------------|------------------------------|
 | **DeepSeek** | The "free" offer is a one-time 5M-token grant (~$3-8, 30 days, then paid). Not a recurring free tier. After the grant it's just another paid provider — cheap, but not free, and we already have free frontier-class routing via Groq/Cerebras/Gemini/Z.ai. | A genuine recurring free tier (not a one-time grant) for a model we don't already route for free |
-| **SiliconFlow** | $1 one-time credit is tiny; "free models" (DeepSeek, Qwen, GLM) overlap with what we already reach via Cerebras/OpenRouter | A genuine recurring free tier (not credits) for a model we don't already route |
+| **SiliconFlow routing candidate** | The adapter is ready, but the current official `Qwen/Qwen3-8B` page lists $0.06/M input and output tokens. A generic free-model rate-limit policy is not evidence that this model is free. | An official zero-price chat model confirmed through the authenticated catalog and account billing UI |
 | **Alibaba Qwen / DashScope** | 1M tokens per model, 90 days, then paid. Qwen3 already reachable via Groq/Cerebras/OpenRouter | A permanent free Qwen variant not available through existing providers |
 | **01.AI (Yi)** | Vague "free signup tokens," small. Yi-large/lightning aren't frontier | A free Yi tier with frontier-class quality and clear limits |
 | **OVH AI Endpoints** | Same Llama 3.1 70B/8B we already have via Groq/Cerebras/SambaNova/OpenRouter. Only novel value is EU residency, which isn't a routing concern for this gateway | A model on OVH that we can't reach through existing providers, or a hard EU-residency product requirement |

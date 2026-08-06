@@ -37,6 +37,10 @@ export const DASHBOARD_HTML = `<!doctype html>
     background: var(--success); margin-right: 8px; box-shadow: 0 0 8px var(--success);
     animation: pulse 2s infinite; vertical-align: middle; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  @media (prefers-reduced-motion: reduce) {
+    .topbar h1 .dot { animation: none; }
+    .progress > div { transition: none; }
+  }
   .topbar .spacer { flex: 1; }
   .topbar input, .topbar select, .topbar button {
     background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
@@ -44,6 +48,8 @@ export const DASHBOARD_HTML = `<!doctype html>
     outline: none; transition: border-color .15s;
   }
   .topbar input:focus, .topbar select:focus { border-color: var(--accent); }
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible,
+  [tabindex="0"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .topbar button { cursor: pointer; }
   .topbar button:hover { border-color: var(--accent); }
   .topbar label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; cursor: pointer; }
@@ -83,6 +89,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
   .card h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--muted);
     text-transform: uppercase; letter-spacing: 0.05em; }
+  .card-note { margin: -6px 0 12px; color: var(--muted); font-size: 12px; }
   .chart-wrap { position: relative; height: 280px; }
   .chart-wrap.tall { height: 320px; }
 
@@ -200,12 +207,12 @@ export const DASHBOARD_HTML = `<!doctype html>
   <div class="topbar">
     <h1><span class="dot"></span>AI Gateway — Live</h1>
     <div class="spacer"></div>
-    <select id="groupBySel" title="Breakdown grouping">
-      <option value="providers" selected>Group: Provider</option>
-      <option value="models">Group: Model</option>
-      <option value="projects">Group: Project ID</option>
+    <select id="groupBySel" title="Choose the analytics breakdown" aria-label="Analytics breakdown">
+      <option value="providers" selected>Break down by: Provider</option>
+      <option value="models">Break down by: Model</option>
+      <option value="projects">Break down by: Project ID</option>
     </select>
-    <select id="rangeSel">
+    <select id="rangeSel" aria-label="Analytics time range">
       <option value="1">1d</option>
       <option value="7" selected>7d</option>
       <option value="30">30d</option>
@@ -241,13 +248,41 @@ export const DASHBOARD_HTML = `<!doctype html>
 
     <div class="grid grid-2" id="analyticsCharts">
       <div class="card" id="timelineCard">
-        <h2>Timeline — Successful vs Failed (weekly)</h2>
-        <div class="chart-wrap"><canvas id="chartTimeline"></canvas></div>
+        <h2>Daily gateway outcomes</h2>
+        <p class="card-note">UTC · stacked request outcomes with failure rate on the right axis</p>
+        <div class="chart-wrap"><canvas id="chartTimeline" role="img" aria-label="Daily successful and failed gateway requests with failure rate"></canvas></div>
       </div>
       <div class="card" id="providersCard">
         <h2 id="breakdownTitle">Provider breakdown</h2>
-        <div class="chart-wrap"><canvas id="chartProviders"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartProviders" role="img" aria-label="Request outcomes for the selected analytics breakdown"></canvas></div>
         <div id="providerBadges" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+    </div>
+
+    <div class="grid grid-2" id="dailyAnalyticsTables">
+      <div class="card">
+        <h2>Daily failure rate</h2>
+        <p class="card-note">UTC · zero-traffic days are labelled instead of shown as 0% failures</p>
+        <div class="table-scroll" role="region" aria-label="Daily gateway failure rate" tabindex="0">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Requests</th><th>Successful</th><th>Failed</th><th>Failure rate</th>
+          </tr></thead>
+          <tbody id="dailyTotalsBody"></tbody>
+        </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2 id="dailyBreakdownTitle">Daily provider attribution</h2>
+        <p class="card-note" id="dailyBreakdownNote">UTC · highest-volume rows first within each day</p>
+        <div class="table-scroll" role="region" aria-label="Daily grouped analytics" tabindex="0">
+        <table>
+          <thead><tr>
+            <th>Date</th><th id="dailyBreakdownLabel">Provider</th><th>Requests</th><th>Failed</th><th>Failure rate</th>
+          </tr></thead>
+          <tbody id="dailyBreakdownBody"></tbody>
+        </table>
+        </div>
       </div>
     </div>
 
@@ -278,7 +313,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     <div class="card">
       <h2>Request replay lab</h2>
       <div class="lab-grid">
-        <select id="replayProvider">
+        <select id="replayProvider" aria-label="Replay provider">
           <option value="groq">groq</option>
           <option value="gemini">gemini</option>
           <option value="workers_ai">workers_ai</option>
@@ -292,11 +327,11 @@ export const DASHBOARD_HTML = `<!doctype html>
           <option value="mistral">mistral</option>
           <option value="zai">zai</option>
         </select>
-        <input id="replayModel" placeholder="model or auto" value="auto" />
-        <input id="replayProject" placeholder="project_id" value="replay-lab" />
-        <input id="replayApiKey" type="password" placeholder="API key for replay" autocomplete="off" />
+        <input id="replayModel" aria-label="Replay model" placeholder="model or auto" value="auto" />
+        <input id="replayProject" aria-label="Replay project ID" placeholder="project_id" value="replay-lab" />
+        <input id="replayApiKey" aria-label="Replay API key" type="password" placeholder="API key for replay" autocomplete="off" />
         <button id="replayBtn">Replay</button>
-        <textarea id="replayPayload" spellcheck="false">{
+        <textarea id="replayPayload" aria-label="Replay request payload" spellcheck="false">{
   "messages": [
     { "role": "user", "content": "Reply with one short diagnostic sentence." }
   ],
@@ -326,7 +361,7 @@ export const DASHBOARD_HTML = `<!doctype html>
         <div class="table-scroll" role="region" aria-label="Top models" tabindex="0">
         <table>
           <thead><tr>
-            <th id="topBreakdownLabel">Model</th><th>Requests</th><th>Success</th><th>Failed</th>
+            <th id="topBreakdownLabel">Model</th><th>Requests</th><th>Success rate</th><th>Failed</th>
           </tr></thead>
           <tbody id="topModelsBody"></tbody>
         </table>
@@ -370,10 +405,12 @@ export const DASHBOARD_HTML = `<!doctype html>
   const fmt = (n) => (n ?? 0).toLocaleString();
   const pct = (n) => (isFinite(n) ? (n * 100).toFixed(1) + '%' : '—');
   const ms = (n) => (n > 0 ? Math.round(n) + ' ms' : '—');
+  const supportedGroups = ['providers', 'models', 'projects'];
+  const savedGroup = localStorage.getItem('freeai.groupBy');
 
   const state = {
     days: Number(localStorage.getItem('freeai.days') || 7),
-    groupBy: localStorage.getItem('freeai.groupBy') || 'providers',
+    groupBy: supportedGroups.includes(savedGroup) ? savedGroup : 'providers',
     replayApiKey: localStorage.getItem('freeai.replayApiKey') || '',
     autoRefresh: localStorage.getItem('freeai.autoRefresh') !== 'false',
     charts: { timeline: null, providers: null },
@@ -428,6 +465,12 @@ export const DASHBOARD_HTML = `<!doctype html>
     b.classList.add('show');
   }
 
+  function analyticsGroupParam() {
+    if (state.groupBy === 'models') return 'model';
+    if (state.groupBy === 'projects') return 'project';
+    return 'provider';
+  }
+
   function authHeaders() {
     return state.replayApiKey ? { Authorization: 'Bearer ' + state.replayApiKey } : {};
   }
@@ -469,7 +512,7 @@ export const DASHBOARD_HTML = `<!doctype html>
       fetch('/health', { signal }),
       fetch('/v1/stats/providers', { signal }).catch(() => null),
       fetch('/v1/routing/status', { signal }).catch(() => null),
-      fetch('/v1/analytics?days=' + state.days, { signal }),
+      fetch('/v1/analytics?days=' + state.days + '&group_by=' + analyticsGroupParam(), { signal }),
     ]);
 
     if (!healthRes.ok) {
@@ -539,12 +582,16 @@ export const DASHBOARD_HTML = `<!doctype html>
     if (!analytics) {
       renderRoutingKpis(routing);
       renderTimeline([]);
+      renderDailyTotals([]);
+      renderDailyBreakdown([]);
       renderBreakdown({});
       renderTopBreakdown({});
       renderProjects({});
     } else {
       renderAnalyticsKpis(analytics, healthItems, activeModels);
       renderTimeline(analytics.daily || []);
+      renderDailyTotals(analytics.daily || []);
+      renderDailyBreakdown(analytics.daily_breakdown || []);
       renderBreakdown(getActiveBreakdown(analytics));
       renderTopBreakdown(getActiveBreakdown(analytics));
       renderProjects(analytics.projects || {});
@@ -754,18 +801,50 @@ export const DASHBOARD_HTML = `<!doctype html>
   };
 
   function renderTimeline(daily) {
-    const weekly = groupDailyByWeek(daily);
-    const labels = weekly.map((d) => d.week);
-    const succ = weekly.map((d) => d.successful || 0);
-    const fail = weekly.map((d) => d.failed || 0);
+    const normalized = fillDailyRange(daily);
+    const labels = normalized.map((d) => d.date);
+    const succ = normalized.map((d) => d.successful || 0);
+    const fail = normalized.map((d) => d.failed || 0);
+    const failureRates = normalized.map((d) =>
+      (d.requests || 0) > 0 ? (d.failure_rate ?? (d.failed || 0) / d.requests) * 100 : null
+    );
     const data = {
       labels,
       datasets: [
-        { label: 'Successful', data: succ, backgroundColor: chartColors.success, stack: 's' },
-        { label: 'Failed', data: fail, backgroundColor: chartColors.danger, stack: 's' },
+        { type: 'bar', label: 'Successful', data: succ, backgroundColor: chartColors.success, stack: 'requests' },
+        { type: 'bar', label: 'Failed', data: fail, backgroundColor: chartColors.danger, stack: 'requests' },
+        {
+          type: 'line',
+          label: 'Failure rate',
+          data: failureRates,
+          borderColor: chartColors.accent,
+          backgroundColor: chartColors.accent,
+          borderWidth: 2,
+          pointRadius: 3,
+          tension: 0.25,
+          yAxisID: 'rate',
+        },
       ],
     };
-    const opts = { ...baseOpts, scales: { x: { ...baseOpts.scales.x, stacked: true }, y: { ...baseOpts.scales.y, stacked: true } } };
+    const opts = {
+      ...baseOpts,
+      scales: {
+        x: { ...baseOpts.scales.x, stacked: true },
+        y: {
+          ...baseOpts.scales.y,
+          stacked: true,
+          title: { display: true, text: 'Requests', color: chartColors.tick },
+        },
+        rate: {
+          position: 'right',
+          beginAtZero: true,
+          max: 100,
+          grid: { drawOnChartArea: false },
+          ticks: { color: chartColors.accent, callback: (value) => value + '%' },
+          title: { display: true, text: 'Failure rate', color: chartColors.accent },
+        },
+      },
+    };
     if (state.charts.timeline) {
       state.charts.timeline.data = data;
       state.charts.timeline.options = opts;
@@ -775,23 +854,76 @@ export const DASHBOARD_HTML = `<!doctype html>
     }
   }
 
-  function groupDailyByWeek(daily) {
-    const byWeek = new Map();
-    for (const day of daily || []) {
-      const week = weekLabel(day.date);
-      const current = byWeek.get(week) || { week, successful: 0, failed: 0 };
-      current.successful += day.successful || 0;
-      current.failed += day.failed || 0;
-      byWeek.set(week, current);
+  function fillDailyRange(daily) {
+    const byDate = new Map((daily || []).map((day) => [day.date, day]));
+    const today = new Date();
+    const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - Math.max(0, state.days - 1));
+    const result = [];
+    for (const date = new Date(start); date <= end; date.setUTCDate(date.getUTCDate() + 1)) {
+      const key = date.toISOString().slice(0, 10);
+      result.push(
+        byDate.get(key) || {
+          date: key,
+          requests: 0,
+          successful: 0,
+          failed: 0,
+          failure_rate: null,
+        }
+      );
     }
-    return [...byWeek.values()].sort((a, b) => a.week.localeCompare(b.week));
+    return result;
   }
 
-  function weekLabel(dateString) {
-    const date = new Date(dateString + 'T00:00:00Z');
-    const day = date.getUTCDay() || 7;
-    date.setUTCDate(date.getUTCDate() - day + 1);
-    return date.toISOString().slice(0, 10);
+  function renderDailyTotals(daily) {
+    const body = $('dailyTotalsBody');
+    body.innerHTML = '';
+    const rows = fillDailyRange(daily).reverse();
+    for (const day of rows) {
+      const requests = day.requests || 0;
+      const rate = requests > 0 ? day.failure_rate ?? (day.failed || 0) / requests : null;
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="mono">' + escape(day.date) + '</td>' +
+        '<td>' + fmt(requests) + '</td>' +
+        '<td>' + fmt(day.successful || 0) + '</td>' +
+        '<td>' + fmt(day.failed || 0) + '</td>' +
+        '<td>' + (rate === null ? '<span class="badge mute">No traffic</span>' : failureRateBadge(rate)) + '</td>';
+      body.appendChild(tr);
+    }
+  }
+
+  function renderDailyBreakdown(rows) {
+    const body = $('dailyBreakdownBody');
+    body.innerHTML = '';
+    const label = activeBreakdownLabel();
+    $('dailyBreakdownTitle').textContent = 'Daily ' + label.toLowerCase() + ' attribution';
+    $('dailyBreakdownLabel').textContent = label;
+    if (!rows || rows.length === 0) {
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">No grouped traffic in this range</td></tr>';
+      return;
+    }
+    const sorted = [...rows]
+      .sort((a, b) => b.date.localeCompare(a.date) || (b.requests || 0) - (a.requests || 0))
+      .slice(0, 50);
+    for (const row of sorted) {
+      const requests = row.requests || 0;
+      const rate = requests > 0 ? row.failure_rate ?? (row.failed || 0) / requests : null;
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="mono">' + escape(row.date) + '</td>' +
+        '<td class="mono">' + escape(row.key || '—') + '</td>' +
+        '<td>' + fmt(requests) + '</td>' +
+        '<td>' + fmt(row.failed || 0) + '</td>' +
+        '<td>' + (rate === null ? '—' : failureRateBadge(rate)) + '</td>';
+      body.appendChild(tr);
+    }
+  }
+
+  function failureRateBadge(rate) {
+    const cls = rate <= 0.05 ? 'ok' : rate <= 0.2 ? 'warn' : 'err';
+    return '<span class="badge ' + cls + '">' + pct(rate) + '</span>';
   }
 
   function getActiveBreakdown(analytics) {
