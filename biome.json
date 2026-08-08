@@ -1,10 +1,14 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/react",
+    "ultracite/biome/vitest"
+  ],
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": true,
     "includes": [
-      "**",
       "!**/.wrangler",
       "!**/dist",
       "!**/build",
@@ -38,11 +42,14 @@
       "jsxQuoteStyle": "double"
     }
   },
+  "html": { "formatter": { "enabled": false } },
+  "json": { "formatter": { "enabled": false } },
   "linter": {
     "enabled": true,
     "rules": {
       "preset": "recommended",
       "a11y": {
+        "noNoninteractiveElementInteractions": "off",
         "noSvgWithoutTitle": "off",
         "useButtonType": "off",
         "useKeyWithClickEvents": "off",
@@ -51,18 +58,73 @@
         "useAriaPropsSupportedByRole": "off"
       },
       "suspicious": {
-        "noShadowRestrictedNames": "off",
+        "noAssignInExpressions": "off",
+        "noBitwiseOperators": "off",
+        "noEmptyBlockStatements": "off",
+        "noEmptySource": "off",
+        "noEvolvingTypes": "off",
         "noExplicitAny": "off",
-        "noAssignInExpressions": "off"
+        "noLeakedRender": "off",
+        "noShadow": "off",
+        "noShadowRestrictedNames": "off",
+        "noSkippedTests": "off",
+        "noUnnecessaryConditions": "off",
+        "useArraySortCompare": "off",
+        "useAwait": "off",
+        "useStrictMode": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "noForEach": "off",
+        "noUselessCatchBinding": "off",
+        "noUselessUndefined": "off",
+        "noVoid": "off",
+        "useSimplifiedLogicExpression": "off"
+      },
+      "nursery": { "useSortedClasses": "off" },
+      "performance": {
+        "noAwaitInLoops": "off",
+        "noBarrelFile": "off",
+        "noJsxPropsBind": "off",
+        "noSyncScripts": "off",
+        "useTopLevelRegex": "off"
       },
       "style": {
+        "noExportedImports": "off",
+        "noIncrementDecrement": "off",
+        "noNegationElse": "off",
+        "noNestedTernary": "off",
         "noNonNullAssertion": "off",
-        "useImportType": "off"
+        "noParameterProperties": "off",
+        "useBlockStatements": "off",
+        "useConsistentArrayType": "off",
+        "useConsistentArrowReturn": "off",
+        "useConsistentObjectDefinitions": "off",
+        "useConsistentTypeDefinitions": "off",
+        "useDestructuring": "off",
+        "useErrorCause": "off",
+        "useFilenamingConvention": "off",
+        "useImportType": "off",
+        "useNumericSeparators": "off",
+        "useReadonlyClassProperties": "off"
       },
       "correctness": {
+        "noGlobalDirnameFilename": "off",
+        "noUndeclaredVariables": "off",
         "noUnusedVariables": "warn"
       }
     }
   },
-  "assist": { "enabled": true, "actions": { "source": { "organizeImports": "off" } } }
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "off",
+        "useSortedAttributes": "off",
+        "useSortedInterfaceMembers": "off",
+        "useSortedKeys": "off",
+        "useSortedPackageJson": "off"
+      }
+    }
+  }
 }
