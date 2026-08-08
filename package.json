@@ -72,6 +72,7 @@
     "husky": "9.1.7",
     "knip": "^6.29.0",
     "typescript": "6.0.3",
+    "ultracite": "7.10.2",
     "vite": "8.1.5",
     "vitest": "4.1.10",
     "wrangler": "4.114.0"

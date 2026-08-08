@@ -1,6 +1,6 @@
 # free-ai — PROJECT STATUS
 
-Last updated: 2026-07-25
+Last updated: 2026-08-09
 
 ## Why / What
 
@@ -16,9 +16,16 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
   gateway.
 - Fleet consumers use the public gateway contract; architecture details live
   in [`docs/architecture/overview.md`](docs/architecture/overview.md).
+- Ultracite 7.10.2 is an exact development-only Biome preset dependency. Local
+  exceptions preserve Free AI's established gateway and documentation style;
+  it does not affect runtime routing or provider behavior.
 
 ## Timeline
 
+- **2026-08-09** — Adopted the verified Ultracite-backed Biome baseline through
+  the existing read-only lint gate, with explicit compatibility exceptions and
+  no source rewrite, production dependency, routing, cost-cap, or deployment
+  change.
 - **2026-07-31** — Tightened the public homepage description to a
   search-result-safe length and verified the Astro build; production deployment
   remains separate.
@@ -39,6 +46,8 @@ The shipped timeline lives in
 
 - **Full feature list:** [`docs/product/features.md`](docs/product/features.md).
 - **Architecture:** [`docs/architecture/overview.md`](docs/architecture/overview.md).
+- **Quality gate:** exact Ultracite-backed Biome presets with explicit local
+  compatibility exceptions; `pnpm lint` remains non-writing.
 
 ## Work queue
 
