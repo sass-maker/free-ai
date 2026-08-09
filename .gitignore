@@ -39,3 +39,4 @@ docs-blume/package-lock.json
 .agent-logs/
 .agent-scratch/
 *.agent-log
+.codevetter/
