@@ -21,11 +21,19 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Type Check
-        run: pnpm run typecheck
+      - name: Install complexity analyzer
+        run: pip install lizard==1.23.0
 
-      - name: Run Tests
-        run: pnpm run test:coverage
+      - name: Run quality gate
+        run: pnpm run quality
+
+      - name: Build playground
+        run: pnpm run build

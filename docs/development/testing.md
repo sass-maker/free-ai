@@ -14,9 +14,10 @@ pnpm test:all             # check + test:e2e
 
 ## Unit tests (Vitest)
 
-Uses `@cloudflare/vitest-pool-workers` so tests run inside the Workers runtime with
-access to Durable Objects, KV, and D1 stubs. Test files live in `test/` and match
-`*.spec.ts` (or `*.spec.mjs` for plain Node scripts like the cost audit).
+Vitest runs the unit suite in Node. Shared helpers provide minimal fake Durable
+Object, KV, D1, and execution-context bindings, so unit tests never need live
+Cloudflare resources. Test files live in `test/` and match `*.spec.ts` (or
+`*.spec.mjs` for plain Node scripts like the cost audit).
 
 ### Coverage gate
 

@@ -10,9 +10,6 @@ export default defineConfig({
       // UI/config/test files are excluded (see `exclude`).
       include: [
         // Core logic modules with established test coverage.
-        // Modules below threshold today (evaluation-weights, sse,
-        // ledger, telemetry, neuron-budget, health-do) are tracked as
-        // follow-ups and added here once they clear 80/80/80/70.
         'src/router/select-model.ts',
         'src/router/classify-error.ts',
         'src/router/evaluation-weights.ts',
