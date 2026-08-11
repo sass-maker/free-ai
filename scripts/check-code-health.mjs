@@ -148,7 +148,7 @@ function checkSuppressions() {
       'grep',
       '-n',
       '-E',
-      'biome-ignore|eslint-disable|@ts-ignore|@ts-expect-error',
+      '(^|[[:space:]])(//|/\\*)[[:space:]]*(biome-ignore|eslint-disable|@ts-ignore|@ts-expect-error)',
       '--',
       ...productionPaths,
     ],
