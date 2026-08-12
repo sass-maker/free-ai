@@ -29,22 +29,29 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "build": "pnpm run build:playground",
-    "check": "pnpm run audit:cloudflare-costs && pnpm run typecheck && pnpm test",
+    "check": "pnpm run quality",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:live": "playwright test -c playwright.live.config.ts",
     "test:e2e:live:update": "playwright test -c playwright.live.config.ts --update-snapshots",
     "test:all": "pnpm run check && pnpm run test:e2e",
     "prepare": "husky",
-    "lint": "biome check .",
+    "lint": "biome lint .",
     "lint:fix": "biome check . --write --unsafe",
     "format": "biome format . --write",
     "format:check": "biome format .",
     "docs:check": "node scripts/validate-docs.mjs",
-    "docs:build": "cd docs-blume && npm install --silent && npm run build",
+    "docs:build": "pnpm --filter @free-ai/docs-blume build",
     "docs:sync-api-ref": "node scripts/sync-blume-api-ref.mjs",
     "knip": "knip --no-exit-code --reporter symbols",
-    "knip:strict": "knip --reporter symbols"
+    "knip:strict": "knip --reporter symbols --no-config-hints",
+    "quality:unused": "pnpm run knip:strict",
+    "quality:complexity": "node scripts/check-code-health.mjs complexity",
+    "quality:duplication": "node scripts/check-code-health.mjs duplication",
+    "quality:cycles": "knip --cycles --no-config-hints",
+    "quality:dependencies": "node scripts/check-code-health.mjs dependencies",
+    "quality:suppressions": "node scripts/check-code-health.mjs suppressions",
+    "quality": "pnpm run audit:cloudflare-costs && pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run quality:unused && pnpm run quality:complexity && pnpm run quality:duplication && pnpm run quality:cycles && pnpm run quality:dependencies && pnpm run quality:suppressions"
   },
   "dependencies": {
     "@hono/zod-openapi": "1.5.1",
@@ -63,19 +70,31 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
-    "@cloudflare/vitest-pool-workers": "0.16.3",
     "@cloudflare/workers-types": "4.20260509.1",
     "@playwright/test": "1.62.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "19",
     "@vitest/coverage-v8": "^4.1.10",
     "husky": "9.1.7",
+    "jscpd": "5.0.14",
     "knip": "^6.29.0",
     "typescript": "6.0.3",
     "ultracite": "7.10.2",
     "vite": "8.1.5",
     "vitest": "4.1.10",
     "wrangler": "4.114.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "js-yaml@>=4.0.0 <5.0.0": "4.3.1",
+      "nanoid@>=3.0.0 <4.0.0": "3.3.17",
+      "path-to-regexp@>=6.0.0 <7.0.0": "6.3.0",
+      "postcss@>=8.0.0 <9.0.0": "8.5.23",
+      "sharp@>=0.34.0 <0.35.0": "0.35.0",
+      "svgo@>=4.0.0 <5.0.0": "4.0.2",
+      "undici@>=7.0.0 <8.0.0": "7.29.0",
+      "ws@>=8.0.0 <9.0.0": "8.21.0"
+    }
   },
   "packageManager": "pnpm@10.33.2"
 }

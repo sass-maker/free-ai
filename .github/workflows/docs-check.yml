@@ -46,16 +46,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: docs-blume/package.json
+          cache: 'pnpm'
 
-      - name: Install Blume deps
-        working-directory: docs-blume
-        run: npm install --no-audit --no-fund
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Blume build (presentation smoke)
-        working-directory: docs-blume
-        run: npm run build
+        run: pnpm docs:build
