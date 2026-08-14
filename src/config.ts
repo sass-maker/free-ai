@@ -1543,42 +1543,33 @@ function safeParse<T>(value: string | undefined): T | null {
   }
 }
 
+const SIMPLE_PROVIDER_KEY_CHECKERS: Partial<Record<TextProvider, (env: Env) => boolean>> = {
+  groq: (env) => Boolean(env.GROQ_API_KEY),
+  gemini: (env) => Boolean(env.GEMINI_API_KEY),
+  openrouter: (env) => Boolean(env.OPENROUTER_API_KEY),
+  cerebras: (env) => Boolean(env.CEREBRAS_API_KEY),
+  sambanova: (env) => Boolean(env.SAMBANOVA_API_KEY),
+  nvidia: (env) => Boolean(env.NVIDIA_API_KEY),
+  github_models: (env) => Boolean(env.GITHUB_TOKEN),
+  cohere: (env) => Boolean(env.COHERE_API_KEY),
+  mistral: (env) => Boolean(env.MISTRAL_API_KEY),
+  zai: (env) => Boolean(env.ZAI_API_KEY),
+  modelscope: (env) => Boolean(env.MODELSCOPE_API_KEY),
+  siliconflow: (env) => Boolean(env.SILICONFLOW_API_KEY),
+};
+
 function hasProviderKey(env: Env, provider: TextProvider): boolean {
-  switch (provider) {
-    case 'workers_ai':
-      return (
-        isWorkersAiEnabled(env) &&
-        (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY))
-      );
-    case 'groq':
-      return Boolean(env.GROQ_API_KEY);
-    case 'gemini':
-      return Boolean(env.GEMINI_API_KEY);
-    case 'openrouter':
-      return Boolean(env.OPENROUTER_API_KEY);
-    case 'cerebras':
-      return Boolean(env.CEREBRAS_API_KEY);
-    case 'sambanova':
-      return Boolean(env.SAMBANOVA_API_KEY);
-    case 'nvidia':
-      return Boolean(env.NVIDIA_API_KEY);
-    case 'github_models':
-      return Boolean(env.GITHUB_TOKEN);
-    case 'pollinations':
-      return true;
-    case 'cohere':
-      return Boolean(env.COHERE_API_KEY);
-    case 'mistral':
-      return Boolean(env.MISTRAL_API_KEY);
-    case 'zai':
-      return Boolean(env.ZAI_API_KEY);
-    case 'modelscope':
-      return Boolean(env.MODELSCOPE_API_KEY);
-    case 'siliconflow':
-      return Boolean(env.SILICONFLOW_API_KEY);
-    default:
-      return false;
+  if (provider === 'workers_ai') {
+    return (
+      isWorkersAiEnabled(env) &&
+      (Boolean(env.AI) || Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_WORKERS_AI_API_KEY))
+    );
   }
+  if (provider === 'pollinations') {
+    return true;
+  }
+  const checker = SIMPLE_PROVIDER_KEY_CHECKERS[provider];
+  return checker ? checker(env) : false;
 }
 
 function modelHasNativeReasoning(candidate: ModelCandidate): boolean {

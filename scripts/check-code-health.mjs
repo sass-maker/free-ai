@@ -70,7 +70,7 @@ function checkComplexity() {
     maxParams: Math.max(...rows.map((row) => row[3])),
   };
   // Ratcheted ADR-approved debt: https://github.com/sass-maker/free-ai/issues/53
-  const baseline = { violations: 28, maxCcn: 34, maxLength: 448, maxParams: 4 };
+  const baseline = { violations: 26, maxCcn: 28, maxLength: 448, maxParams: 4 };
   console.log(
     `Complexity: ${observed.functions} functions, ${observed.nloc} NLOC, ` +
       `${observed.violations} violations; max CCN ${observed.maxCcn}, ` +
@@ -106,9 +106,9 @@ function checkDuplication() {
     .statistics.total;
   // Ratcheted protocol/monolith debt: https://github.com/sass-maker/free-ai/issues/53
   const baseline = {
-    clones: 28,
-    duplicatedLines: 454,
-    percentage: 3.3470952521380126,
+    clones: 21,
+    duplicatedLines: 323,
+    percentage: 2.3920610234762645,
   };
   console.log(
     `Duplication: ${observed.duplicatedLines}/${observed.lines} lines ` +

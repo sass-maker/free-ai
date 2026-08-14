@@ -2468,6 +2468,90 @@ function routingReasons(
   return reasons;
 }
 
+type RoutingProviderStats = {
+  configured_models: number;
+  manual_only_models: number;
+  available_models: number;
+  cooldown_models: number;
+  exhausted_models: number;
+  degraded_models: number;
+  best_model: string | null;
+};
+
+function emptyProviderStats(): RoutingProviderStats {
+  return {
+    configured_models: 0,
+    manual_only_models: 0,
+    available_models: 0,
+    cooldown_models: 0,
+    exhausted_models: 0,
+    degraded_models: 0,
+    best_model: null,
+  };
+}
+
+function updateProviderStats(
+  providers: Record<string, RoutingProviderStats>,
+  candidate: ModelCandidate,
+  status: ReturnType<typeof routingModelStatus>
+): void {
+  const provider = providers[candidate.provider] ?? emptyProviderStats();
+  if (status === 'available') {
+    provider.available_models += 1;
+    provider.best_model ??= candidate.id;
+  } else if (status === 'degraded') {
+    provider.degraded_models += 1;
+    provider.best_model ??= candidate.id;
+  } else if (status === 'cooldown') {
+    provider.cooldown_models += 1;
+  } else if (status === 'exhausted') {
+    provider.exhausted_models += 1;
+  }
+  providers[candidate.provider] = provider;
+}
+
+function snapshotMetrics(snapshot: ModelStateSnapshot | undefined) {
+  return {
+    success_rate: snapshot?.successRate ?? 0.5,
+    headroom: snapshot?.headroom ?? 1,
+    avg_latency_ms: snapshot?.avgLatencyMs ?? 1_500,
+    p90_latency_ms: snapshot?.p90LatencyMs ?? 1_500,
+    p99_latency_ms: snapshot?.p99LatencyMs ?? 1_500,
+    cooldown_until: snapshot?.cooldownUntil ?? 0,
+    daily_used: snapshot?.dailyUsed ?? 0,
+  };
+}
+
+function buildRoutingFallbackEntry(
+  candidate: ModelCandidate,
+  index: number,
+  ctx: {
+    snapshot: ModelStateSnapshot | undefined;
+    quotaStatus: ProviderQuotaStatus | undefined;
+    lookupLimits: Record<string, ProviderLimitConfig>;
+    key: string;
+    status: ReturnType<typeof routingModelStatus>;
+  }
+) {
+  const { snapshot, quotaStatus, lookupLimits, key, status } = ctx;
+  return {
+    rank: index + 1,
+    id: candidate.id,
+    provider: candidate.provider,
+    model: candidate.model,
+    reasoning: candidate.reasoning,
+    native_reasoning: candidate.capabilities.nativeReasoning ?? false,
+    status,
+    ...snapshotMetrics(snapshot),
+    daily_limit: snapshot?.dailyLimit ?? lookupLimits[key]?.requestsPerDay ?? 200,
+    quota_status: quotaStatus?.status,
+    reasons: [
+      ...routingReasons(snapshot, status),
+      ...(quotaStatus?.status === 'exhausted' ? ['provider_quota_exhausted'] : []),
+    ],
+  };
+}
+
 const routingStatusRoute = createRoute({
   method: 'get',
   path: '/v1/routing/status',
@@ -2512,29 +2596,10 @@ app.openapi(routingStatusRoute, async (c) => {
     ...selected,
     ...automaticRegistry.filter((candidate) => !selectedIds.has(candidate.id)),
   ];
-  const providers: Record<
-    string,
-    {
-      configured_models: number;
-      manual_only_models: number;
-      available_models: number;
-      cooldown_models: number;
-      exhausted_models: number;
-      degraded_models: number;
-      best_model: string | null;
-    }
-  > = {};
+  const providers: Record<string, RoutingProviderStats> = {};
 
   for (const candidate of registry) {
-    const provider = providers[candidate.provider] ?? {
-      configured_models: 0,
-      manual_only_models: 0,
-      available_models: 0,
-      cooldown_models: 0,
-      exhausted_models: 0,
-      degraded_models: 0,
-      best_model: null,
-    };
+    const provider = providers[candidate.provider] ?? emptyProviderStats();
     provider.configured_models += 1;
     if (!isAutomaticRoutingEligible(candidate)) {
       provider.manual_only_models += 1;
@@ -2548,51 +2613,14 @@ app.openapi(routingStatusRoute, async (c) => {
     const quotaStatus = quotaStatuses.get(candidate.provider);
     const status =
       quotaStatus?.status === 'exhausted' ? 'exhausted' : routingModelStatus(snapshot, now);
-    const provider = providers[candidate.provider] ?? {
-      configured_models: 0,
-      manual_only_models: 0,
-      available_models: 0,
-      cooldown_models: 0,
-      exhausted_models: 0,
-      degraded_models: 0,
-      best_model: null,
-    };
-
-    if (status === 'available') {
-      provider.available_models += 1;
-      provider.best_model ??= candidate.id;
-    } else if (status === 'degraded') {
-      provider.degraded_models += 1;
-      provider.best_model ??= candidate.id;
-    } else if (status === 'cooldown') {
-      provider.cooldown_models += 1;
-    } else if (status === 'exhausted') {
-      provider.exhausted_models += 1;
-    }
-    providers[candidate.provider] = provider;
-
-    return {
-      rank: index + 1,
-      id: candidate.id,
-      provider: candidate.provider,
-      model: candidate.model,
-      reasoning: candidate.reasoning,
-      native_reasoning: candidate.capabilities.nativeReasoning ?? false,
+    updateProviderStats(providers, candidate, status);
+    return buildRoutingFallbackEntry(candidate, index, {
+      snapshot,
+      quotaStatus,
+      lookupLimits,
+      key,
       status,
-      success_rate: snapshot?.successRate ?? 0.5,
-      headroom: snapshot?.headroom ?? 1,
-      avg_latency_ms: snapshot?.avgLatencyMs ?? 1_500,
-      p90_latency_ms: snapshot?.p90LatencyMs ?? 1_500,
-      p99_latency_ms: snapshot?.p99LatencyMs ?? 1_500,
-      cooldown_until: snapshot?.cooldownUntil ?? 0,
-      daily_used: snapshot?.dailyUsed ?? 0,
-      daily_limit: snapshot?.dailyLimit ?? lookupLimits[key]?.requestsPerDay ?? 200,
-      quota_status: quotaStatus?.status,
-      reasons: [
-        ...routingReasons(snapshot, status),
-        ...(quotaStatus?.status === 'exhausted' ? ['provider_quota_exhausted'] : []),
-      ],
-    };
+    });
   });
 
   const availableModels = fallbackOrder.filter((item) => item.status === 'available').length;

@@ -1,4 +1,4 @@
-import { createRoute, type OpenAPIHono, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 import pRetry, { AbortError } from 'p-retry';
 
 import { isWorkersAiEnabled } from '../config';
@@ -6,16 +6,7 @@ import { providerEmbeddingCallers } from '../providers';
 import { classifyError, isRetriableFailure } from '../router/classify-error';
 import type { EmbeddingProvider, Env, GatewayMeta, Provider } from '../types';
 import { createRequestId, getErrorMessage } from '../utils/request';
-
-type GatewayApp = OpenAPIHono<{ Bindings: Env }>;
-
-type RecordAnalytics = (params: {
-  db: D1Database;
-  projectId?: string;
-  outcome: 'ok' | 'error';
-  provider?: Provider;
-  model?: string;
-}) => Promise<void>;
+import { type GatewayApp, type RecordAnalytics, projectIdSchema } from './shared-schemas';
 
 export interface EmbeddingCandidate {
   provider: EmbeddingProvider;
@@ -72,12 +63,6 @@ const EMBEDDING_MODEL_ALIASES: Record<string, string> = {
   'text-embedding-3-large': 'gemini-embedding-001',
   'text-embedding-004': 'gemini-embedding-001',
 };
-
-const projectIdSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-zA-Z0-9._:-]+$/);
 
 const gatewayMetaSchema = z
   .object({

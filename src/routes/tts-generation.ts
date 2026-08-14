@@ -1,34 +1,16 @@
-import { createRoute, type OpenAPIHono, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 
 import { getTtsRegistry, hasTtsProviderKey } from '../config';
 import { ttsProviderCallers } from '../providers';
-import type { Env, Provider } from '../types';
+import type { Provider } from '../types';
 import { getErrorMessage } from '../utils/request';
 import { sortFallbackLast } from './provider-order';
-
-type GatewayApp = OpenAPIHono<{ Bindings: Env }>;
-
-type RecordAnalytics = (params: {
-  db: D1Database;
-  projectId?: string;
-  outcome: 'ok' | 'error';
-  provider?: Provider;
-  model?: string;
-}) => Promise<void>;
-
-const projectIdSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-zA-Z0-9._:-]+$/);
-
-const errorSchema = z.object({
-  error: z.object({
-    message: z.string(),
-    type: z.string(),
-    code: z.string().optional(),
-  }),
-});
+import {
+  type GatewayApp,
+  type RecordAnalytics,
+  errorSchema,
+  projectIdSchema,
+} from './shared-schemas';
 
 const ttsRequestSchema = z
   .object({

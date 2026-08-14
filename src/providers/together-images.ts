@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { parseSize } from './image-utils';
 
 export interface TogetherImageInput {
   env: Env;
@@ -12,13 +13,6 @@ export interface TogetherImageInput {
 export interface TogetherImageOutput {
   created: number;
   data: Array<{ url?: string; b64_json?: string; revised_prompt?: string }>;
-}
-
-function parseSize(size?: string): { width: number; height: number } {
-  if (!size) return { width: 1024, height: 1024 };
-  const match = /^(\d+)x(\d+)$/.exec(size);
-  if (!match) return { width: 1024, height: 1024 };
-  return { width: Number(match[1]), height: Number(match[2]) };
 }
 
 export async function callTogetherImages(input: TogetherImageInput): Promise<TogetherImageOutput> {
