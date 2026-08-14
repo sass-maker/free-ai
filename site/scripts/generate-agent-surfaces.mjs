@@ -136,7 +136,9 @@ async function validateGeneratedSurfaces() {
 
     if (surface.sitemap !== false) {
       const htmlPath =
-        routePath === '/' ? join(DIST_ROOT, 'index.html') : join(DIST_ROOT, routePath, 'index.html');
+        routePath === '/'
+          ? join(DIST_ROOT, 'index.html')
+          : join(DIST_ROOT, routePath, 'index.html');
       const html = await readFile(htmlPath, 'utf8');
       const canonical =
         firstMatch(html, /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i) ||
