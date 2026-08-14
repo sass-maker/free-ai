@@ -76,6 +76,7 @@ export const AGENT_SURFACE = {
         "url": "https://ai-gateway.sassmaker.com/dashboard",
         "md": "https://ai-gateway.sassmaker.com/dashboard.md",
         "kind": "docs",
+        "sitemap": false,
         "description": "Public gateway dashboard reference"
       },
       {
@@ -111,6 +112,7 @@ export const AGENT_SURFACE = {
         "url": "https://ai-gateway.sassmaker.com/health",
         "md": "https://ai-gateway.sassmaker.com/health.md",
         "kind": "docs",
+        "sitemap": false,
         "description": "Health endpoint reference"
       },
       {
@@ -125,6 +127,7 @@ export const AGENT_SURFACE = {
         "url": "https://ai-gateway.sassmaker.com/models",
         "md": "https://ai-gateway.sassmaker.com/models.md",
         "kind": "docs",
+        "sitemap": false,
         "description": "Model catalog reference"
       },
       {

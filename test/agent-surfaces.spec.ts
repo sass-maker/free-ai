@@ -34,6 +34,11 @@ describe('agent surface catalog', () => {
       AGENT_SURFACE.catalog.apiResources.some((resource) => resource.url.endsWith('/v1/models'))
     ).toBe(true);
     expect(htmlUrls.has('https://ai-gateway.sassmaker.com/v1/models')).toBe(false);
+    expect(
+      AGENT_SURFACE.catalog.surfaces
+        .filter((surface: { sitemap?: boolean }) => surface.sitemap === false)
+        .map((surface: { id: string }) => surface.id)
+    ).toEqual(['dashboard', 'health', 'models']);
   });
 
   it('lets generated asset Markdown handle page alternates', () => {
