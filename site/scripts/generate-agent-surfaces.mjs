@@ -8,6 +8,7 @@ const DIST_ROOT = join(SITE_ROOT, 'dist');
 const DOCS_ROOT = join(SITE_ROOT, 'src/content/docs');
 
 const surfaces = AGENT_SURFACE.catalog.surfaces;
+const sitemapSurfaces = surfaces.filter((surface) => surface.sitemap !== false);
 
 await Promise.all(surfaces.map(writeMarkdownSurface));
 await writeFile(join(DIST_ROOT, 'sitemap.xml'), renderSitemap(), 'utf8');
@@ -99,8 +100,8 @@ function markdownFromHtml(html) {
 }
 
 function renderSitemap() {
-  const urls = surfaces
-    .map((surface) => `  <url><loc>${escapeXml(surface.url)}</loc></url>`)
+  const urls = sitemapSurfaces
+    .map((surface) => `  <url><loc>${escapeXml(canonicalHtmlUrl(surface.url))}</loc></url>`)
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
@@ -109,6 +110,7 @@ async function validateGeneratedSurfaces() {
   const ids = new Set();
   const urls = new Set();
   for (const surface of surfaces) {
+    const routePath = new URL(surface.url).pathname;
     if (ids.has(surface.id)) throw new Error(`Duplicate surface id: ${surface.id}`);
     if (urls.has(surface.url)) throw new Error(`Duplicate surface URL: ${surface.url}`);
     ids.add(surface.id);
@@ -131,7 +133,30 @@ async function validateGeneratedSurfaces() {
     if (/<!doctype\s+html|<html\b/i.test(markdown)) {
       throw new Error(`Markdown contains an HTML shell: ${surface.md}`);
     }
+
+    if (surface.sitemap !== false) {
+      const htmlPath =
+        routePath === '/'
+          ? join(DIST_ROOT, 'index.html')
+          : join(DIST_ROOT, routePath, 'index.html');
+      const html = await readFile(htmlPath, 'utf8');
+      const canonical =
+        firstMatch(html, /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i) ||
+        firstMatch(html, /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i);
+      const expectedCanonical = canonicalHtmlUrl(surface.url);
+      if (canonical !== expectedCanonical) {
+        throw new Error(
+          `Canonical mismatch for ${surface.id}: expected ${expectedCanonical}, found ${canonical || 'missing'}`
+        );
+      }
+    }
   }
+}
+
+function canonicalHtmlUrl(value) {
+  const url = new URL(value);
+  if (url.pathname !== '/') url.pathname = `${url.pathname.replace(/\/$/, '')}/`;
+  return url.href;
 }
 
 function frontmatterValue(frontmatter, key) {
