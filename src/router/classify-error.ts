@@ -34,42 +34,33 @@ function getMessage(error: unknown): string {
   }
 }
 
+const SAFETY_KEYWORDS = ['safety', 'content filter', 'refus'];
+const RETRIABLE_KEYWORDS = ['rate limit', 'quota', 'timeout', 'overload'];
+const RETRIABLE_STATUSES = new Set([429, 408, 409, 425]);
+const INPUT_ERROR_STATUSES = new Set([400, 404, 422]);
+const AUTH_ERROR_STATUSES = new Set([401, 403]);
+
 export function classifyError(error: unknown): FailureClass {
   const status = getStatus(error);
   const message = getMessage(error).toLowerCase();
 
-  if (
-    message.includes('safety') ||
-    message.includes('content filter') ||
-    message.includes('refus')
-  ) {
+  if (SAFETY_KEYWORDS.some((keyword) => message.includes(keyword))) {
     return 'safety_refusal';
   }
 
-  if (
-    status === 429 ||
-    status === 408 ||
-    status === 409 ||
-    status === 425 ||
-    (status !== undefined && status >= 500)
-  ) {
+  if (RETRIABLE_STATUSES.has(status ?? -1) || (status !== undefined && status >= 500)) {
     return 'usage_retriable';
   }
 
-  if (status === 400 || status === 404 || status === 422) {
+  if (INPUT_ERROR_STATUSES.has(status ?? -1)) {
     return 'input_nonretriable';
   }
 
-  if (status === 401 || status === 403) {
+  if (AUTH_ERROR_STATUSES.has(status ?? -1)) {
     return 'provider_fatal';
   }
 
-  if (
-    message.includes('rate limit') ||
-    message.includes('quota') ||
-    message.includes('timeout') ||
-    message.includes('overload')
-  ) {
+  if (RETRIABLE_KEYWORDS.some((keyword) => message.includes(keyword))) {
     return 'usage_retriable';
   }
 

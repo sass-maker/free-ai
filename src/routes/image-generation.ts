@@ -1,45 +1,19 @@
-import { createRoute, type OpenAPIHono, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 
 import { getImageRegistry, hasImageProviderKey } from '../config';
 import { CostBudget } from '../lib/cost-budget';
 import { imageProviderCallers } from '../providers';
 import { classifyError, isRetriableFailure } from '../router/classify-error';
-import type { Env, Provider } from '../types';
+import type { Provider } from '../types';
 import { createRequestId, getErrorMessage } from '../utils/request';
 import { sortFallbackLast } from './provider-order';
-
-type GatewayApp = OpenAPIHono<{ Bindings: Env }>;
-
-type RecordAnalytics = (params: {
-  db: D1Database;
-  projectId?: string;
-  outcome: 'ok' | 'error';
-  provider?: Provider;
-  model?: string;
-}) => Promise<void>;
-
-const projectIdSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-zA-Z0-9._:-]+$/);
-
-const gatewayMetaSchema = z.object({
-  provider: z.string(),
-  model: z.string(),
-  attempts: z.number().int().min(1),
-  reasoning_effort: z.enum(['auto', 'low', 'medium', 'high']),
-  request_id: z.string(),
-  project_id: z.string().optional(),
-});
-
-const errorSchema = z.object({
-  error: z.object({
-    message: z.string(),
-    type: z.string(),
-    code: z.string().optional(),
-  }),
-});
+import {
+  type GatewayApp,
+  type RecordAnalytics,
+  errorSchema,
+  gatewayMetaSchema,
+  projectIdSchema,
+} from './shared-schemas';
 
 const imageGenRequestSchema = z
   .object({
