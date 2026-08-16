@@ -87,8 +87,9 @@ jobs:
           smoke_exit=$?
           set -e
           node -e "JSON.parse(require('fs').readFileSync('smoke-report.json', 'utf8'))"
+          smoke_status=$(node -p "JSON.parse(require('fs').readFileSync('smoke-report.json','utf8')).status")
           echo "exit=$smoke_exit" >> "$GITHUB_OUTPUT"
-          echo "status=$(node -p \"JSON.parse(require('fs').readFileSync('smoke-report.json', 'utf8')).status\")" >> "$GITHUB_OUTPUT"
+          echo "status=$smoke_status" >> "$GITHUB_OUTPUT"
 
       - name: Summarize provider resync
         shell: bash
