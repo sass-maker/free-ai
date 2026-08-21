@@ -123,12 +123,13 @@ ops/                  gateway key hash manifests (local json gitignored)
 
 ### Adding Tasks
 - Track Free AI work in this repository's GitHub issues or OpenSpec changes.
-- Keep cross-project infrastructure work in Fleet Workspace, not SaaS Maker.
+- Keep reusable cross-project automation in Workflows and Skills and private
+  portfolio metadata in Site Health, not SaaS Maker.
 
 ### Using SaaS Maker
 - Do not use the retired SaaS Maker task queue or API as a system of record.
-- Fleet Workspace owns shared project metadata and infrastructure; Free AI
-  remains independently versioned and deployed.
+- Site Health owns private portfolio metadata; Workflows and Skills owns shared
+  automation. Free AI remains independently versioned and deployed.
 
 ### Free AI First
 - Prefer free/local AI paths for routine development and analysis: the `free-ai`
