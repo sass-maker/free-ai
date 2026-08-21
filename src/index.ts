@@ -1,4 +1,6 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { honoMiddleware } from '@saas-maker/app-health/hono';
 import { capture, configurePostHog, flushPostHog, trace } from './lib/telemetry';
 import { getAppHealthClient } from './lib/app-health';
@@ -20,6 +22,7 @@ import {
   getBenchmarkOptimizerFixture,
 } from './benchmark/cost-optimizer';
 import { providerCallers, sttProviderCallers } from './providers';
+import type { ProviderCallResult } from './providers/types';
 import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './providers/quota';
 import { classifyError, isRetriableFailure } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
@@ -64,6 +67,8 @@ import type {
   Provider,
   ProviderLimitConfig,
   ProviderQuotaStatus,
+  ReasoningEffort,
+  ReasoningTier,
   ResponseFormat,
   TextProvider,
   Tool,
@@ -965,85 +970,613 @@ const chatRoute = createRoute({
   },
 });
 
-app.openapi(chatRoute, async (c) => {
-  const requestStartedAt = Date.now();
-  const body = c.req.valid('json');
-  const requestId = createRequestId();
-  const endpoint =
-    c.req.header('x-gateway-source-endpoint') === 'responses' ? 'responses' : 'chat.completions';
-  const normalizedMessages = normalizeMessages(body.messages, body.prompt);
-  const _messageCount = normalizedMessages.length;
-  const _promptChars = normalizedMessages.reduce((sum, message) => {
-    if (typeof message.content === 'string') {
-      return sum + message.content.length;
-    }
-    return sum + JSON.stringify(message.content).length;
-  }, 0);
+function extractWorkersStreamToken(chunk: unknown): string {
+  if (typeof chunk === 'string') return chunk;
+  if (!chunk || typeof chunk !== 'object') return '';
+  const record = chunk as Record<string, unknown>;
+  if (typeof record.response === 'string') return record.response;
+  const delta = record.delta as { content?: unknown } | undefined;
+  if (typeof delta?.content === 'string') return delta.content;
+  if (typeof record.text === 'string') return record.text;
+  return '';
+}
 
+function createWorkersSseProcessor(requestId: string, model: string) {
+  const chunkDecoder = new TextDecoder();
+  let workersSseBuffer = '';
+
+  const writeWorkersChunk = async (
+    writer: WritableStreamDefaultWriter<Uint8Array>,
+    token: string
+  ) => {
+    await writer.write(
+      toSseData({
+        id: `chatcmpl-${requestId}`,
+        object: 'chat.completion.chunk',
+        created: Math.floor(Date.now() / 1000),
+        model,
+        choices: [
+          {
+            index: 0,
+            delta: { content: token },
+            finish_reason: null,
+          },
+        ],
+      })
+    );
+  };
+
+  const processWorkersSseText = async (
+    writer: WritableStreamDefaultWriter<Uint8Array>,
+    text: string
+  ) => {
+    workersSseBuffer += text;
+
+    while (true) {
+      const frameEnd = workersSseBuffer.indexOf('\n\n');
+      if (frameEnd === -1) {
+        break;
+      }
+
+      const frame = workersSseBuffer.slice(0, frameEnd).trim();
+      workersSseBuffer = workersSseBuffer.slice(frameEnd + 2);
+      if (!frame) {
+        continue;
+      }
+
+      const dataLine = frame.split('\n').find((line) => line.trimStart().startsWith('data:'));
+
+      if (!dataLine) {
+        continue;
+      }
+
+      const payloadText = dataLine.replace(/^data:\s*/, '').trim();
+      if (!payloadText || payloadText === '[DONE]') {
+        continue;
+      }
+
+      try {
+        const payload = JSON.parse(payloadText) as {
+          response?: unknown;
+          delta?: { content?: unknown };
+          text?: unknown;
+        };
+
+        const token = extractWorkersStreamToken(payload);
+        if (token) {
+          await writeWorkersChunk(writer, token);
+        }
+      } catch {
+        // Ignore non-JSON frames from upstream Workers AI stream.
+      }
+    }
+  };
+
+  return { chunkDecoder, processWorkersSseText, writeWorkersChunk };
+}
+
+function createWorkersAiStream(
+  requestId: string,
+  model: string,
+  streamSource: AsyncIterable<unknown>
+): ReadableStream<Uint8Array> {
+  const { chunkDecoder, processWorkersSseText, writeWorkersChunk } = createWorkersSseProcessor(
+    requestId,
+    model
+  );
+
+  return createSseStream(async (writer) => {
+    for await (const chunk of streamSource) {
+      if (chunk instanceof Uint8Array) {
+        const asText = chunkDecoder.decode(chunk, { stream: true });
+        await processWorkersSseText(writer, asText);
+        continue;
+      }
+
+      if (chunk instanceof ArrayBuffer) {
+        const bytes = new Uint8Array(chunk);
+        const asText = chunkDecoder.decode(bytes, { stream: true });
+        await processWorkersSseText(writer, asText);
+        continue;
+      }
+
+      const token = extractWorkersStreamToken(chunk);
+      if (!token) {
+        continue;
+      }
+
+      await writeWorkersChunk(writer, token);
+    }
+  });
+}
+
+function chatErrorStatus(errorClass: string): ContentfulStatusCode {
+  if (errorClass === 'input_nonretriable') return 400;
+  if (errorClass === 'usage_retriable') return 429;
+  return 502;
+}
+
+function buildChatStreamResponse(
+  stream: ReadableStream<Uint8Array>,
+  meta: GatewayMeta,
+  degraded: boolean
+): Response {
+  return new Response(stream, {
+    headers: {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-gateway-provider': meta.provider,
+      'x-gateway-model': meta.model,
+      'x-gateway-attempts': String(meta.attempts),
+      'x-gateway-request-id': meta.request_id,
+      ...(degraded ? { 'x-degraded-mode': 'true' } : {}),
+    },
+  });
+}
+
+function buildChatFinalResponse(
+  completion: Record<string, unknown>,
+  candidate: { model: string },
+  requestId: string,
+  meta: GatewayMeta,
+  degraded: boolean
+): Record<string, unknown> {
+  return {
+    ...(completion.id
+      ? completion
+      : buildCompletionEnvelope({
+          model: candidate.model,
+          content:
+            String(
+              (completion.choices as Array<{ message?: { content?: unknown } }>)?.[0]?.message
+                ?.content ?? ''
+            ) || '',
+          requestId,
+          gatewayMeta: meta,
+        })),
+    degraded,
+    x_gateway: meta,
+  };
+}
+
+interface ChatRetryState {
+  attemptCounter: number;
+  chosenMeta: GatewayMeta | undefined;
+  finalResponse: Record<string, unknown> | null;
+  streamResponse: Response | null;
+  lastErrorClass: string;
+  lastErrorMessage: string;
+  lastAttemptedProvider: TextProvider | undefined;
+  lastAttemptedModel: string | undefined;
+  routingFallbackHops: FallbackHop[];
+}
+
+interface ChatRetryContext {
+  c: Context;
+  normalized: NormalizedChatRequest;
+  requestId: string;
+  projectId: string;
+  state: ChatRetryState;
+}
+
+function handleChatProviderSuccess(
+  ctx: ChatRetryContext,
+  candidate: ModelCandidate,
+  providerResult: ProviderCallResult,
+  startedAt: number
+): void {
+  const { c, normalized, requestId, projectId, state } = ctx;
+  const latencyMs = Date.now() - startedAt;
+  const key = getModelKey(candidate.provider, candidate.model);
+
+  state.routingFallbackHops.push({
+    provider: candidate.provider,
+    model: candidate.model,
+    outcome: 'ok',
+    latency_ms: latencyMs,
+  });
+
+  healthRecord(c.env, {
+    key,
+    success: true,
+    latencyMs,
+    now: Date.now(),
+  });
+
+  state.chosenMeta = buildGatewayMeta({
+    provider: candidate.provider,
+    model: candidate.model,
+    attempts: state.attemptCounter,
+    reasoning: normalized.reasoning_effort,
+    requestId,
+    projectId,
+  });
+
+  if (providerResult.stream && providerResult.streamSource) {
+    const stream =
+      candidate.provider === 'workers_ai'
+        ? createWorkersAiStream(
+            requestId,
+            candidate.model,
+            providerResult.streamSource as AsyncIterable<unknown>
+          )
+        : createSseStream(async (writer) => {
+            for await (const chunk of providerResult.streamSource as AsyncIterable<unknown>) {
+              await writer.write(toSseData(chunk));
+            }
+          });
+
+    state.streamResponse = buildChatStreamResponse(
+      stream,
+      state.chosenMeta,
+      state.attemptCounter > 1
+    );
+    return;
+  }
+
+  const completion = (providerResult.completion as Record<string, unknown> | undefined) ?? {};
+
+  if (isSafetyRefusal(completion)) {
+    // Safety refusal counts as successful final response and should not trigger fallback.
+  }
+
+  state.finalResponse = buildChatFinalResponse(
+    completion,
+    candidate,
+    requestId,
+    state.chosenMeta,
+    state.attemptCounter > 1
+  );
+}
+
+function handleChatProviderError(
+  ctx: ChatRetryContext,
+  candidate: ModelCandidate,
+  error: unknown,
+  startedAt: number
+): void {
+  const { c, state } = ctx;
+  const failureClass = classifyError(error);
+  state.lastErrorClass = failureClass;
+  state.lastErrorMessage = getErrorMessage(error);
+
+  state.routingFallbackHops.push({
+    provider: candidate.provider,
+    model: candidate.model,
+    outcome: 'failed',
+    latency_ms: Date.now() - startedAt,
+  });
+
+  healthRecord(c.env, {
+    key: getModelKey(candidate.provider, candidate.model),
+    success: false,
+    latencyMs: Date.now() - startedAt,
+    failureClass,
+    now: Date.now(),
+  });
+
+  if (!isRetriableFailure(failureClass) || state.attemptCounter >= 2) {
+    throw new AbortError(state.lastErrorMessage);
+  }
+
+  throw error instanceof Error ? error : new Error(state.lastErrorMessage);
+}
+
+function createChatRetryCallback(
+  c: Context,
+  selected: ModelCandidate[],
+  normalized: NormalizedChatRequest,
+  requestId: string,
+  projectId: string,
+  state: ChatRetryState
+) {
+  const ctx: ChatRetryContext = { c, normalized, requestId, projectId, state };
+  return async () => {
+    const candidate = selected[state.attemptCounter];
+    if (!candidate || state.attemptCounter >= 2) {
+      throw new AbortError('No more candidates');
+    }
+
+    state.attemptCounter += 1;
+    state.lastAttemptedProvider = candidate.provider;
+    state.lastAttemptedModel = candidate.model;
+    const startedAt = Date.now();
+
+    try {
+      const caller = providerCallers[candidate.provider];
+      if (!caller) {
+        throw new Error(`No caller for provider ${candidate.provider}`);
+      }
+
+      const providerResult = await caller({
+        env: c.env,
+        provider: candidate.provider,
+        model: candidate.model,
+        messages: normalized.messages,
+        temperature: normalized.temperature,
+        max_tokens: normalized.max_tokens,
+        stream: normalized.stream,
+        tools: normalized.tools,
+        tool_choice: normalized.tool_choice,
+        response_format: normalized.response_format,
+      });
+
+      handleChatProviderSuccess(ctx, candidate, providerResult, startedAt);
+    } catch (error) {
+      handleChatProviderError(ctx, candidate, error, startedAt);
+    }
+  };
+}
+
+function validateChatInput(
+  c: Context,
+  body: {
+    model: string;
+    messages?: unknown;
+    prompt?: string;
+    project_id?: string;
+    stream?: boolean;
+  }
+) {
   const headerProjectId = c.req.header('x-gateway-project-id') ?? undefined;
   const explicitProjectId = resolveProjectId(headerProjectId, body.project_id);
   if (!explicitProjectId) {
-    return c.json(
-      {
-        error: {
-          message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
-          type: 'invalid_request_error',
-          code: 'invalid_project_id',
+    return {
+      error: c.json(
+        {
+          error: {
+            message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
+            type: 'invalid_request_error',
+            code: 'invalid_project_id',
+          },
         },
-      },
-      400
-    );
+        400
+      ) as never,
+    };
   }
-
-  const projectId = explicitProjectId;
-
-  if (normalizedMessages.length === 0) {
-    return c.json(
-      {
-        error: {
-          message: 'Either `messages` or `prompt` is required',
-          type: 'invalid_request_error',
-          code: 'missing_input',
+  const normalized = buildNormalizedChatRequest(body, body.stream ?? false);
+  if (normalized.messages.length === 0) {
+    return {
+      error: c.json(
+        {
+          error: {
+            message: 'Either `messages` or `prompt` is required',
+            type: 'invalid_request_error',
+            code: 'missing_input',
+          },
         },
-      },
-      400
-    );
+        400
+      ) as never,
+    };
   }
+  return { projectId: explicitProjectId, normalized };
+}
 
-  const normalized: NormalizedChatRequest = {
-    model: body.model,
-    messages: normalizedMessages,
-    stream: body.stream,
-    temperature: body.temperature,
-    max_tokens: body.max_tokens,
-    reasoning_effort: body.reasoning_effort,
-    min_reasoning_level:
-      body.min_reasoning_level ??
-      (body.reasoning_effort === 'auto' ? undefined : body.reasoning_effort),
-    tools: body.tools as Tool[] | undefined,
-    tool_choice: body.tool_choice as NormalizedChatRequest['tool_choice'],
-    response_format: body.response_format as ResponseFormat | undefined,
+function recordChatLedger(
+  c: Context,
+  params: {
+    endpoint: string;
+    projectId: string;
+    normalized: NormalizedChatRequest;
+    requestedModel: string;
+    quotaStatuses: Map<TextProvider, ProviderQuotaStatus>;
+    fallbackHops: FallbackHop[];
+    chosenMeta?: GatewayMeta;
+    outcome: RoutingOutcome;
+    requestStartedAt: number;
+    errorClass?: string;
+    fallbackProvider?: Provider;
+    fallbackModel?: string;
+  }
+) {
+  scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, params);
+  c.executionCtx.waitUntil(
+    recordAnalytics({
+      db: c.env.GATEWAY_DB,
+      projectId: params.projectId,
+      outcome: (params.outcome === 'ok' ? 'ok' : 'error') as 'ok' | 'error',
+      provider: params.chosenMeta?.provider ?? params.fallbackProvider,
+      model: params.chosenMeta?.model ?? params.fallbackModel,
+    })
+  );
+}
+
+function handleChatResult(
+  c: Context,
+  state: ChatRetryState,
+  endpoint: string,
+  projectId: string,
+  normalized: NormalizedChatRequest,
+  quotaStatuses: Map<TextProvider, ProviderQuotaStatus>,
+  requestStartedAt: number
+) {
+  const ledgerBase = {
+    endpoint,
+    projectId,
+    normalized,
+    requestedModel: normalized.model,
+    quotaStatuses,
+    requestStartedAt,
   };
 
+  if (state.streamResponse) {
+    recordChatLedger(c, {
+      ...ledgerBase,
+      fallbackHops: state.routingFallbackHops,
+      chosenMeta: state.chosenMeta,
+      outcome: 'ok' as RoutingOutcome,
+    });
+    return state.streamResponse as Response;
+  }
+
+  if (state.finalResponse && state.chosenMeta) {
+    recordChatLedger(c, {
+      ...ledgerBase,
+      fallbackHops: state.routingFallbackHops,
+      chosenMeta: state.chosenMeta,
+      outcome: 'ok' as RoutingOutcome,
+    });
+    return c.json(state.finalResponse as never, 200);
+  }
+
+  const status = chatErrorStatus(state.lastErrorClass);
+  recordChatLedger(c, {
+    ...ledgerBase,
+    fallbackHops: state.routingFallbackHops,
+    chosenMeta: state.chosenMeta,
+    outcome: 'error' as RoutingOutcome,
+    errorClass: state.lastErrorClass,
+    fallbackProvider: state.lastAttemptedProvider,
+    fallbackModel: state.lastAttemptedModel,
+  });
+
+  return c.json(
+    {
+      error: {
+        message: `All providers failed: ${state.lastErrorMessage}`,
+        type: state.lastErrorClass,
+      },
+    },
+    status
+  );
+}
+
+function shouldRoundRobin(
+  selected: ModelCandidate[],
+  forcedProvider: unknown,
+  forcedModel: unknown,
+  requestedModel: string
+) {
+  return (
+    !forcedProvider &&
+    !forcedModel &&
+    selected.length > 1 &&
+    (requestedModel === '' || requestedModel === 'auto')
+  );
+}
+
+async function applyRoundRobin(
+  c: Context,
+  selected: ModelCandidate[],
+  endpoint: 'chat.completions' | 'responses',
+  normalized: NormalizedChatRequest
+) {
+  const roundRobinKey = buildChatRoundRobinKey({
+    endpoint,
+    min_reasoning_level: normalized.min_reasoning_level,
+    stream: normalized.stream,
+    candidates: selected,
+  });
+  const offset = await nextRoundRobinOffset(c.env, {
+    key: roundRobinKey,
+    size: selected.length,
+  }).catch(() => 0);
+  return rotateByOffset(selected, offset);
+}
+
+function buildLookupLimits(
+  registry: ModelCandidate[],
+  limits: Record<string, ProviderLimitConfig>
+): Record<string, ProviderLimitConfig> {
+  const lookupLimits: Record<string, ProviderLimitConfig> = {};
+  for (const candidate of registry) {
+    const key = getModelKey(candidate.provider, candidate.model);
+    lookupLimits[key] = limits[key] ?? { requestsPerDay: 200 };
+  }
+  return lookupLimits;
+}
+
+async function runCandidateSelection(
+  c: Context,
+  registry: ModelCandidate[],
+  normalized: NormalizedChatRequest,
+  projectId: string,
+  forcedModel: string | undefined,
+  now: number
+) {
+  const limits = getProviderLimits(c.env);
+  const modelKeys = registry.map((candidate) => getModelKey(candidate.provider, candidate.model));
+  const lookupLimits = buildLookupLimits(registry, limits);
+  const stateMap = await healthLookup(c.env, modelKeys, lookupLimits, now);
+  const evaluationMap = parseEvaluationWeights(c.env.MODEL_EVALUATIONS_JSON);
+  const requiredCapabilities = deriveRequiredCapabilities({
+    tools: normalized.tools,
+    response_format: normalized.response_format,
+    messages: normalized.messages,
+  });
+  return trace(
+    'ai:route',
+    () =>
+      Promise.resolve(
+        selectCandidates(registry, stateMap, {
+          min_reasoning_level: normalized.min_reasoning_level,
+          stream: normalized.stream,
+          now,
+          modelOverride: forcedModel,
+          requiredCapabilities,
+          evaluationMap,
+        })
+      ),
+    { context: { project: projectId, model: normalized.model } }
+  );
+}
+
+function chatConfigError(c: Context) {
+  return c.json(
+    {
+      error: {
+        message: 'No provider credentials or models configured',
+        type: 'configuration_error',
+      },
+    },
+    503
+  ) as never;
+}
+
+function chatQuotaExhaustedError(c: Context) {
+  return c.json(
+    {
+      error: {
+        message: 'No provider credentials or quota available',
+        type: 'service_unavailable',
+        code: 'provider_quota_exhausted',
+      },
+    },
+    503
+  ) as never;
+}
+
+function chatNoCandidateError(c: Context) {
+  return c.json(
+    {
+      error: {
+        message: 'No healthy free-tier model available',
+        type: 'service_unavailable',
+        code: 'no_candidate',
+      },
+    },
+    503
+  ) as never;
+}
+
+async function selectChatCandidates(
+  c: Context,
+  normalized: NormalizedChatRequest,
+  projectId: string,
+  endpoint: 'chat.completions' | 'responses',
+  requestStartedAt: number
+): Promise<
+  | { error: never }
+  | { selected: ModelCandidate[]; quotaStatuses: Map<TextProvider, ProviderQuotaStatus> }
+> {
   const forcedProvider = getForcedTextProvider(c);
   const forcedModel = c.req.header('x-gateway-force-model') ?? undefined;
 
-  let registry = getModelRegistry(c.env);
-  if (forcedProvider) {
-    registry = registry.filter((model) => model.provider === forcedProvider);
-  }
+  let registry = forcedProvider
+    ? getModelRegistry(c.env).filter((model) => model.provider === forcedProvider)
+    : getModelRegistry(c.env);
 
-  if (registry.length === 0) {
-    return c.json(
-      {
-        error: {
-          message: 'No provider credentials or models configured',
-          type: 'configuration_error',
-        },
-      },
-      503
-    );
-  }
+  if (registry.length === 0) return { error: chatConfigError(c) };
 
   const quotaStatuses = await getRoutingQuotaStatuses(c.env, registry);
   registry = registry.filter((candidate) => providerQuotaAllowsCandidate(candidate, quotaStatuses));
@@ -1059,83 +1592,26 @@ app.openapi(chatRoute, async (c) => {
       outcome: 'quota_exhausted',
       requestStartedAt,
     });
-
-    return c.json(
-      {
-        error: {
-          message: 'No provider credentials or quota available',
-          type: 'service_unavailable',
-          code: 'provider_quota_exhausted',
-        },
-      },
-      503
-    );
+    return { error: chatQuotaExhaustedError(c) };
   }
 
-  const limits = getProviderLimits(c.env);
-  const now = Date.now();
-  const modelKeys = registry.map((candidate) => getModelKey(candidate.provider, candidate.model));
-
-  const lookupLimits: Record<string, ProviderLimitConfig> = {};
-  for (const candidate of registry) {
-    const key = getModelKey(candidate.provider, candidate.model);
-    lookupLimits[key] = limits[key] ?? { requestsPerDay: 200 };
-  }
-
-  const stateMap = await healthLookup(c.env, modelKeys, lookupLimits, now);
-  const evaluationMap = parseEvaluationWeights(c.env.MODEL_EVALUATIONS_JSON);
-  const requiredCapabilities = deriveRequiredCapabilities({
-    tools: normalized.tools,
-    response_format: normalized.response_format,
-    messages: normalized.messages,
-  });
-
-  let selected = await trace(
-    'ai:route',
-    () =>
-      Promise.resolve(
-        selectCandidates(registry, stateMap, {
-          min_reasoning_level: normalized.min_reasoning_level,
-          stream: normalized.stream,
-          now,
-          modelOverride: forcedModel,
-          requiredCapabilities,
-          evaluationMap,
-        })
-      ),
-    { context: { project: projectId, model: normalized.model } }
+  let selected = await runCandidateSelection(
+    c,
+    registry,
+    normalized,
+    projectId,
+    forcedModel,
+    Date.now()
   );
 
   const requestedModel = normalized.model.trim().toLowerCase();
-  const shouldRoundRobin =
-    !forcedProvider &&
-    !forcedModel &&
-    selected.length > 1 &&
-    (requestedModel === '' || requestedModel === 'auto');
-
-  if (shouldRoundRobin) {
-    const roundRobinKey = buildChatRoundRobinKey({
-      endpoint,
-      min_reasoning_level: normalized.min_reasoning_level,
-      stream: normalized.stream,
-      candidates: selected,
-    });
-
-    const offset = await nextRoundRobinOffset(c.env, {
-      key: roundRobinKey,
-      size: selected.length,
-    }).catch(() => 0);
-
-    selected = rotateByOffset(selected, offset);
+  if (shouldRoundRobin(selected, forcedProvider, forcedModel, requestedModel)) {
+    selected = await applyRoundRobin(c, selected, endpoint, normalized);
   }
 
   if (selected.length === 0) {
     c.executionCtx.waitUntil(
-      recordAnalytics({
-        db: c.env.GATEWAY_DB,
-        projectId,
-        outcome: 'error',
-      })
+      recordAnalytics({ db: c.env.GATEWAY_DB, projectId, outcome: 'error' })
     );
     scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, {
       endpoint,
@@ -1147,369 +1623,68 @@ app.openapi(chatRoute, async (c) => {
       outcome: 'no_candidate',
       requestStartedAt,
     });
-
-    return c.json(
-      {
-        error: {
-          message: 'No healthy free-tier model available',
-          type: 'service_unavailable',
-          code: 'no_candidate',
-        },
-      },
-      503
-    );
+    return { error: chatNoCandidateError(c) };
   }
 
-  const routingFallbackHops: FallbackHop[] = [];
-  let attemptCounter = 0;
-  let chosenMeta: GatewayMeta | undefined;
-  let finalResponse: Record<string, unknown> | null = null;
-  let streamResponse: Response | null = null;
-  let lastErrorClass = 'provider_fatal';
-  let lastErrorMessage = 'Unknown error';
-  let lastAttemptedProvider: TextProvider | undefined;
-  let lastAttemptedModel: string | undefined;
+  return { selected, quotaStatuses };
+}
 
-  await pRetry(
-    async () => {
-      const candidate = selected[attemptCounter];
-      if (!candidate || attemptCounter >= 2) {
-        throw new AbortError('No more candidates');
-      }
+app.openapi(chatRoute, async (c) => {
+  const requestStartedAt = Date.now();
+  const body = c.req.valid('json');
+  const requestId = createRequestId();
+  const endpoint =
+    c.req.header('x-gateway-source-endpoint') === 'responses' ? 'responses' : 'chat.completions';
+  const normalizedMessages = normalizeMessages(body.messages, body.prompt);
+  const _messageCount = normalizedMessages.length;
+  const _promptChars = normalizedMessages.reduce((sum, message) => {
+    if (typeof message.content === 'string') return sum + message.content.length;
+    return sum + JSON.stringify(message.content).length;
+  }, 0);
 
-      attemptCounter += 1;
-      lastAttemptedProvider = candidate.provider;
-      lastAttemptedModel = candidate.model;
-      const startedAt = Date.now();
+  const validation = validateChatInput(c, body);
+  if ('error' in validation) return validation.error as never;
+  const { projectId, normalized } = validation;
 
-      try {
-        const caller = providerCallers[candidate.provider];
-        if (!caller) {
-          throw new Error(`No caller for provider ${candidate.provider}`);
-        }
-
-        const providerResult = await caller({
-          env: c.env,
-          provider: candidate.provider,
-          model: candidate.model,
-          messages: normalized.messages,
-          temperature: normalized.temperature,
-          max_tokens: normalized.max_tokens,
-          stream: normalized.stream,
-          tools: normalized.tools,
-          tool_choice: normalized.tool_choice,
-          response_format: normalized.response_format,
-        });
-
-        const latencyMs = Date.now() - startedAt;
-        const key = getModelKey(candidate.provider, candidate.model);
-
-        routingFallbackHops.push({
-          provider: candidate.provider,
-          model: candidate.model,
-          outcome: 'ok',
-          latency_ms: latencyMs,
-        });
-
-        await healthRecord(c.env, {
-          key,
-          success: true,
-          latencyMs,
-          now: Date.now(),
-        });
-
-        chosenMeta = buildGatewayMeta({
-          provider: candidate.provider,
-          model: candidate.model,
-          attempts: attemptCounter,
-          reasoning: normalized.reasoning_effort,
-          requestId,
-          projectId,
-        });
-
-        if (providerResult.stream && providerResult.streamSource) {
-          const chunkDecoder = new TextDecoder();
-          let workersSseBuffer = '';
-
-          const writeWorkersChunk = async (
-            writer: WritableStreamDefaultWriter<Uint8Array>,
-            token: string
-          ) => {
-            await writer.write(
-              toSseData({
-                id: `chatcmpl-${requestId}`,
-                object: 'chat.completion.chunk',
-                created: Math.floor(Date.now() / 1000),
-                model: candidate.model,
-                choices: [
-                  {
-                    index: 0,
-                    delta: { content: token },
-                    finish_reason: null,
-                  },
-                ],
-              })
-            );
-          };
-
-          const processWorkersSseText = async (
-            writer: WritableStreamDefaultWriter<Uint8Array>,
-            text: string
-          ) => {
-            workersSseBuffer += text;
-
-            while (true) {
-              const frameEnd = workersSseBuffer.indexOf('\n\n');
-              if (frameEnd === -1) {
-                break;
-              }
-
-              const frame = workersSseBuffer.slice(0, frameEnd).trim();
-              workersSseBuffer = workersSseBuffer.slice(frameEnd + 2);
-              if (!frame) {
-                continue;
-              }
-
-              const dataLine = frame
-                .split('\n')
-                .find((line) => line.trimStart().startsWith('data:'));
-
-              if (!dataLine) {
-                continue;
-              }
-
-              const payloadText = dataLine.replace(/^data:\s*/, '').trim();
-              if (!payloadText || payloadText === '[DONE]') {
-                continue;
-              }
-
-              try {
-                const payload = JSON.parse(payloadText) as {
-                  response?: unknown;
-                  delta?: { content?: unknown };
-                  text?: unknown;
-                };
-
-                const token =
-                  typeof payload.response === 'string'
-                    ? payload.response
-                    : typeof payload.delta?.content === 'string'
-                      ? payload.delta.content
-                      : typeof payload.text === 'string'
-                        ? payload.text
-                        : '';
-
-                if (token) {
-                  await writeWorkersChunk(writer, token);
-                }
-              } catch {
-                // Ignore non-JSON frames from upstream Workers AI stream.
-              }
-            }
-          };
-
-          const stream = createSseStream(async (writer) => {
-            for await (const chunk of providerResult.streamSource as AsyncIterable<unknown>) {
-              if (candidate.provider === 'workers_ai') {
-                if (chunk instanceof Uint8Array) {
-                  const asText = chunkDecoder.decode(chunk, { stream: true });
-                  await processWorkersSseText(writer, asText);
-                  continue;
-                }
-
-                if (chunk instanceof ArrayBuffer) {
-                  const bytes = new Uint8Array(chunk);
-                  const asText = chunkDecoder.decode(bytes, { stream: true });
-                  await processWorkersSseText(writer, asText);
-                  continue;
-                }
-
-                const token =
-                  typeof chunk === 'string'
-                    ? chunk
-                    : chunk && typeof chunk === 'object' && 'response' in chunk
-                      ? String((chunk as { response?: unknown }).response ?? '')
-                      : chunk &&
-                          typeof chunk === 'object' &&
-                          'delta' in chunk &&
-                          (chunk as { delta?: { content?: unknown } }).delta?.content
-                        ? String((chunk as { delta?: { content?: unknown } }).delta?.content ?? '')
-                        : chunk && typeof chunk === 'object' && 'text' in chunk
-                          ? String((chunk as { text?: unknown }).text ?? '')
-                          : '';
-
-                if (!token) {
-                  continue;
-                }
-
-                await writeWorkersChunk(writer, token);
-              } else {
-                await writer.write(toSseData(chunk));
-              }
-            }
-          });
-
-          streamResponse = new Response(stream, {
-            headers: {
-              'content-type': 'text/event-stream; charset=utf-8',
-              'cache-control': 'no-store',
-              'x-gateway-provider': chosenMeta.provider,
-              'x-gateway-model': chosenMeta.model,
-              'x-gateway-attempts': String(chosenMeta.attempts),
-              'x-gateway-request-id': chosenMeta.request_id,
-              ...(attemptCounter > 1 ? { 'x-degraded-mode': 'true' } : {}),
-            },
-          });
-
-          return;
-        }
-
-        const completion = (providerResult.completion as Record<string, unknown> | undefined) ?? {};
-
-        if (isSafetyRefusal(completion)) {
-          // Safety refusal counts as successful final response and should not trigger fallback.
-        }
-
-        finalResponse = {
-          ...(completion.id
-            ? completion
-            : buildCompletionEnvelope({
-                model: candidate.model,
-                content:
-                  String(
-                    (completion.choices as Array<{ message?: { content?: unknown } }>)?.[0]?.message
-                      ?.content ?? ''
-                  ) || '',
-                requestId,
-                gatewayMeta: chosenMeta,
-              })),
-          degraded: attemptCounter > 1,
-          x_gateway: chosenMeta,
-        };
-      } catch (error) {
-        const failureClass = classifyError(error);
-        lastErrorClass = failureClass;
-        lastErrorMessage = getErrorMessage(error);
-
-        routingFallbackHops.push({
-          provider: candidate.provider,
-          model: candidate.model,
-          outcome: 'failed',
-          latency_ms: Date.now() - startedAt,
-        });
-
-        await healthRecord(c.env, {
-          key: getModelKey(candidate.provider, candidate.model),
-          success: false,
-          latencyMs: Date.now() - startedAt,
-          failureClass,
-          now: Date.now(),
-        });
-
-        if (!isRetriableFailure(failureClass) || attemptCounter >= 2) {
-          throw new AbortError(lastErrorMessage);
-        }
-
-        throw error instanceof Error ? error : new Error(lastErrorMessage);
-      }
-    },
-    {
-      retries: 1,
-      minTimeout: 500,
-      maxTimeout: 5000,
-      factor: 2,
-      randomize: true,
-    }
-  ).catch(() => undefined);
-
-  if (streamResponse) {
-    c.executionCtx.waitUntil(
-      recordAnalytics({
-        db: c.env.GATEWAY_DB,
-        projectId,
-        outcome: 'ok',
-        provider: chosenMeta?.provider,
-        model: chosenMeta?.model,
-      })
-    );
-    scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, {
-      endpoint,
-      projectId,
-      normalized,
-      requestedModel: normalized.model,
-      quotaStatuses,
-      fallbackHops: routingFallbackHops,
-      chosenMeta,
-      outcome: 'ok',
-      requestStartedAt,
-    });
-
-    return streamResponse;
-  }
-
-  if (finalResponse && chosenMeta) {
-    c.executionCtx.waitUntil(
-      recordAnalytics({
-        db: c.env.GATEWAY_DB,
-        projectId,
-        outcome: 'ok',
-        provider: chosenMeta.provider,
-        model: chosenMeta.model,
-      })
-    );
-    scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, {
-      endpoint,
-      projectId,
-      normalized,
-      requestedModel: normalized.model,
-      quotaStatuses,
-      fallbackHops: routingFallbackHops,
-      chosenMeta,
-      outcome: 'ok',
-      requestStartedAt,
-    });
-
-    return c.json(finalResponse as never, 200);
-  }
-
-  const status =
-    lastErrorClass === 'input_nonretriable'
-      ? 400
-      : lastErrorClass === 'usage_retriable'
-        ? 429
-        : 502;
-
-  c.executionCtx.waitUntil(
-    recordAnalytics({
-      db: c.env.GATEWAY_DB,
-      projectId,
-      outcome: 'error',
-      provider: chosenMeta?.provider ?? lastAttemptedProvider,
-      model: chosenMeta?.model ?? lastAttemptedModel,
-    })
+  const candidateResult = await selectChatCandidates(
+    c,
+    normalized,
+    projectId,
+    endpoint,
+    requestStartedAt
   );
-  scheduleChatRoutingLedger(c.executionCtx, c.env.GATEWAY_DB, {
+  if ('error' in candidateResult) return candidateResult.error;
+  const { selected, quotaStatuses } = candidateResult;
+
+  const state: ChatRetryState = {
+    attemptCounter: 0,
+    chosenMeta: undefined,
+    finalResponse: null,
+    streamResponse: null,
+    lastErrorClass: 'provider_fatal',
+    lastErrorMessage: 'Unknown error',
+    lastAttemptedProvider: undefined,
+    lastAttemptedModel: undefined,
+    routingFallbackHops: [],
+  };
+
+  await pRetry(createChatRetryCallback(c, selected, normalized, requestId, projectId, state), {
+    retries: 1,
+    minTimeout: 500,
+    maxTimeout: 5000,
+    factor: 2,
+    randomize: true,
+  }).catch(() => undefined);
+
+  return handleChatResult(
+    c,
+    state,
     endpoint,
     projectId,
     normalized,
-    requestedModel: normalized.model,
     quotaStatuses,
-    fallbackHops: routingFallbackHops,
-    chosenMeta,
-    outcome: 'error',
-    requestStartedAt,
-    errorClass: lastErrorClass,
-  });
-
-  return c.json(
-    {
-      error: {
-        message: `All providers failed: ${lastErrorMessage}`,
-        type: lastErrorClass,
-      },
-    },
-    status
-  );
+    requestStartedAt
+  ) as never;
 });
 
 const replayRoute = createRoute({
@@ -1552,6 +1727,101 @@ const replayRoute = createRoute({
   },
 });
 
+function buildNormalizedChatRequest(
+  body: {
+    model: string;
+    messages?: unknown;
+    prompt?: string;
+    stream?: boolean;
+    temperature?: number;
+    max_tokens?: number;
+    reasoning_effort?: string;
+    min_reasoning_level?: string;
+    tools?: unknown;
+    tool_choice?: unknown;
+    response_format?: unknown;
+  },
+  stream: boolean
+): NormalizedChatRequest {
+  const normalizedMessages = normalizeMessages(
+    body.messages as ChatMessage[] | undefined,
+    body.prompt
+  );
+  return {
+    model: body.model,
+    messages: normalizedMessages,
+    stream,
+    temperature: body.temperature,
+    max_tokens: body.max_tokens,
+    reasoning_effort: (body.reasoning_effort ?? 'auto') as ReasoningEffort,
+    min_reasoning_level: (body.min_reasoning_level ??
+      (body.reasoning_effort === 'auto' ? undefined : body.reasoning_effort)) as
+      | ReasoningTier
+      | undefined,
+    tools: body.tools as Tool[] | undefined,
+    tool_choice: body.tool_choice as NormalizedChatRequest['tool_choice'],
+    response_format: body.response_format as ResponseFormat | undefined,
+  };
+}
+
+async function executeReplayCall(
+  c: Context,
+  candidate: ModelCandidate,
+  normalized: NormalizedChatRequest,
+  requestId: string,
+  includeCompletion: boolean
+) {
+  const startedAt = Date.now();
+  const selectedPayload = {
+    id: candidate.id,
+    provider: candidate.provider,
+    model: candidate.model,
+    reasoning: candidate.reasoning,
+    supports_streaming: candidate.supportsStreaming,
+  };
+  try {
+    const caller = providerCallers[candidate.provider];
+    if (!caller) throw new Error(`No caller for provider ${candidate.provider}`);
+    const providerResult = await caller({
+      env: c.env,
+      provider: candidate.provider,
+      model: candidate.model,
+      messages: normalized.messages,
+      temperature: normalized.temperature,
+      max_tokens: normalized.max_tokens,
+      stream: false,
+      tools: normalized.tools,
+      tool_choice: normalized.tool_choice,
+      response_format: normalized.response_format,
+    });
+    return c.json(
+      {
+        ok: true,
+        request_id: requestId,
+        provider: candidate.provider,
+        model: candidate.model,
+        latency_ms: Date.now() - startedAt,
+        selected: selectedPayload,
+        completion: includeCompletion === false ? undefined : (providerResult.completion ?? {}),
+      },
+      200
+    ) as never;
+  } catch (error) {
+    return c.json(
+      {
+        ok: false,
+        request_id: requestId,
+        provider: candidate.provider,
+        model: candidate.model,
+        latency_ms: Date.now() - startedAt,
+        selected: selectedPayload,
+        error: { message: getErrorMessage(error), type: classifyError(error) },
+      },
+      502
+    ) as never;
+  }
+}
+
 app.openapi(replayRoute, async (c) => {
   const body = c.req.valid('json');
   const requestId = createRequestId();
@@ -1570,8 +1840,8 @@ app.openapi(replayRoute, async (c) => {
     );
   }
 
-  const normalizedMessages = normalizeMessages(body.messages, body.prompt);
-  if (normalizedMessages.length === 0) {
+  const normalized = buildNormalizedChatRequest(body, false);
+  if (normalized.messages.length === 0) {
     return c.json(
       {
         error: {
@@ -1583,21 +1853,6 @@ app.openapi(replayRoute, async (c) => {
       400
     );
   }
-
-  const normalized: NormalizedChatRequest = {
-    model: body.model,
-    messages: normalizedMessages,
-    stream: false,
-    temperature: body.temperature,
-    max_tokens: body.max_tokens,
-    reasoning_effort: body.reasoning_effort,
-    min_reasoning_level:
-      body.min_reasoning_level ??
-      (body.reasoning_effort === 'auto' ? undefined : body.reasoning_effort),
-    tools: body.tools as Tool[] | undefined,
-    tool_choice: body.tool_choice as NormalizedChatRequest['tool_choice'],
-    response_format: body.response_format as ResponseFormat | undefined,
-  };
 
   const forcedModel =
     c.req.header('x-gateway-force-model') ??
@@ -1632,66 +1887,8 @@ app.openapi(replayRoute, async (c) => {
     );
   }
 
-  const startedAt = Date.now();
-  const selectedPayload = {
-    id: candidate.id,
-    provider: candidate.provider,
-    model: candidate.model,
-    reasoning: candidate.reasoning,
-    supports_streaming: candidate.supportsStreaming,
-  };
-
-  try {
-    const caller = providerCallers[candidate.provider];
-    if (!caller) {
-      throw new Error(`No caller for provider ${candidate.provider}`);
-    }
-
-    const providerResult = await caller({
-      env: c.env,
-      provider: candidate.provider,
-      model: candidate.model,
-      messages: normalized.messages,
-      temperature: normalized.temperature,
-      max_tokens: normalized.max_tokens,
-      stream: false,
-      tools: normalized.tools,
-      tool_choice: normalized.tool_choice,
-      response_format: normalized.response_format,
-    });
-
-    return c.json(
-      {
-        ok: true,
-        request_id: requestId,
-        provider: candidate.provider,
-        model: candidate.model,
-        latency_ms: Date.now() - startedAt,
-        selected: selectedPayload,
-        completion:
-          body.include_completion === false ? undefined : (providerResult.completion ?? {}),
-      },
-      200
-    );
-  } catch (error) {
-    return c.json(
-      {
-        ok: false,
-        request_id: requestId,
-        provider: candidate.provider,
-        model: candidate.model,
-        latency_ms: Date.now() - startedAt,
-        selected: selectedPayload,
-        error: {
-          message: getErrorMessage(error),
-          type: classifyError(error),
-        },
-      },
-      502
-    );
-  }
+  return executeReplayCall(c, candidate, normalized, requestId, body.include_completion) as never;
 });
-
 const responsesRoute = createRoute({
   method: 'post',
   path: '/v1/responses',
@@ -1734,26 +1931,71 @@ const responsesRoute = createRoute({
   },
 });
 
-app.openapi(responsesRoute, async (c) => {
-  const body = c.req.valid('json');
-  const headerProjectId = c.req.header('x-gateway-project-id') ?? undefined;
-  const projectId = resolveProjectId(headerProjectId, body.project_id);
+function buildResponsesProxyHeaders(c: Context, projectId: string): Headers {
+  const headers = new Headers();
+  headers.set('content-type', 'application/json');
+  headers.set('x-gateway-source-endpoint', 'responses');
+
+  const forwardHeaders: Array<[string, string]> = [
+    ['authorization', c.req.header('authorization') ?? ''],
+    ['x-api-key', c.req.header('x-api-key') ?? ''],
+    ['cf-connecting-ip', c.req.header('cf-connecting-ip') ?? ''],
+    ['x-gateway-force-provider', c.req.header('x-gateway-force-provider') ?? ''],
+    ['x-gateway-force-model', c.req.header('x-gateway-force-model') ?? ''],
+    ['x-gateway-project-id', projectId],
+  ];
+
+  for (const [name, value] of forwardHeaders) {
+    if (value) headers.set(name, value);
+  }
+
+  return headers;
+}
+
+function parseProxiedJson(text: string): unknown | undefined {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function parseProxiedResponse(proxiedText: string, proxiedStatus: number) {
+  const parsed = parseProxiedJson(proxiedText);
+  if (parsed === undefined) {
+    return { error: proxiedText || 'Upstream error', status: proxiedStatus };
+  }
+  if (parsed && typeof parsed === 'object' && 'error' in (parsed as Record<string, unknown>)) {
+    return { body: parsed, status: proxiedStatus };
+  }
+  return { error: proxiedText || 'Upstream error', status: proxiedStatus };
+}
+
+type ResponsesValidationResult = { ok: true } | { ok: false; status: number; body: unknown };
+
+function validateResponsesRequest(
+  body: { stream?: boolean; input?: unknown },
+  projectId: string | undefined
+): ResponsesValidationResult {
   if (!projectId) {
-    return c.json(
-      {
+    return {
+      ok: false,
+      status: 400,
+      body: {
         error: {
           message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
           type: 'invalid_request_error',
           code: 'invalid_project_id',
         },
       },
-      400
-    );
+    };
   }
 
   if (body.stream) {
-    return c.json(
-      {
+    return {
+      ok: false,
+      status: 400,
+      body: {
         error: {
           message:
             'Streaming for /v1/responses is not implemented yet. Use /v1/chat/completions for streaming.',
@@ -1761,8 +2003,20 @@ app.openapi(responsesRoute, async (c) => {
           code: 'stream_not_supported',
         },
       },
-      400
-    );
+    };
+  }
+
+  return { ok: true };
+}
+
+app.openapi(responsesRoute, async (c) => {
+  const body = c.req.valid('json');
+  const headerProjectId = c.req.header('x-gateway-project-id') ?? undefined;
+  const projectId = resolveProjectId(headerProjectId, body.project_id);
+
+  const validation = validateResponsesRequest(body, projectId);
+  if (!validation.ok) {
+    return c.json(validation.body as never, validation.status as 400);
   }
 
   const prompt = responsesInputToPrompt(body.input);
@@ -1783,40 +2037,7 @@ app.openapi(responsesRoute, async (c) => {
   const min_reasoning_level =
     body.min_reasoning_level ?? (reasoningEffort === 'auto' ? undefined : reasoningEffort);
 
-  const headers = new Headers();
-  headers.set('content-type', 'application/json');
-  headers.set('x-gateway-source-endpoint', 'responses');
-
-  const authorization = c.req.header('authorization');
-  if (authorization) {
-    headers.set('authorization', authorization);
-  }
-
-  const apiKey = c.req.header('x-api-key');
-  if (apiKey) {
-    headers.set('x-api-key', apiKey);
-  }
-
-  // Forward the caller IP so the proxied chat request is rate-limited per
-  // client instead of collapsing all callers into one shared "unknown" bucket.
-  const clientIp = c.req.header('cf-connecting-ip');
-  if (clientIp) {
-    headers.set('cf-connecting-ip', clientIp);
-  }
-
-  const forceProvider = c.req.header('x-gateway-force-provider');
-  if (forceProvider) {
-    headers.set('x-gateway-force-provider', forceProvider);
-  }
-
-  const forceModel = c.req.header('x-gateway-force-model');
-  if (forceModel) {
-    headers.set('x-gateway-force-model', forceModel);
-  }
-
-  if (projectId) {
-    headers.set('x-gateway-project-id', projectId);
-  }
+  const headers = buildResponsesProxyHeaders(c, projectId!);
 
   const proxiedRequest = new Request(new URL('/v1/chat/completions', c.req.url), {
     method: 'POST',
@@ -1837,32 +2058,23 @@ app.openapi(responsesRoute, async (c) => {
   const proxiedText = await proxiedResponse.text();
 
   if (!proxiedResponse.ok) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(proxiedText);
-    } catch {
-      parsed = undefined;
+    const result = parseProxiedResponse(proxiedText, proxiedResponse.status);
+    if ('body' in result) {
+      return c.json(result.body as never, result.status as 400 | 429 | 503);
     }
-
-    if (parsed && typeof parsed === 'object' && 'error' in (parsed as Record<string, unknown>)) {
-      return c.json(parsed as never, proxiedResponse.status as 400 | 429 | 503);
-    }
-
     return c.json(
       {
         error: {
-          message: proxiedText || 'Upstream error',
+          message: result.error,
           type: 'provider_fatal',
         },
       },
-      proxiedResponse.status as 400 | 429 | 503
+      result.status as 400 | 429 | 503
     );
   }
 
-  let parsedCompletion: Record<string, unknown>;
-  try {
-    parsedCompletion = JSON.parse(proxiedText) as Record<string, unknown>;
-  } catch {
+  const parsedCompletion = parseProxiedJson(proxiedText) as Record<string, unknown> | undefined;
+  if (!parsedCompletion) {
     return c.json(
       {
         error: {
@@ -2821,23 +3033,43 @@ const analyticsRoute = createRoute({
   },
 });
 
-app.openapi(analyticsRoute, async (c) => {
-  const query = c.req.valid('query');
-  const projectId = query.project_id;
-  const days = query.days;
-  const groupBy = query.group_by;
-
+function buildAnalyticsWhereClause(query: { project_id?: string; days?: number }): {
+  where: string;
+  params: unknown[];
+} {
   const filters: string[] = [];
   const params: unknown[] = [];
-  if (projectId) {
+  if (query.project_id) {
     filters.push('project_id = ?');
-    params.push(projectId);
+    params.push(query.project_id);
   }
-  if (days) {
+  if (query.days) {
     filters.push(`date >= date('now', ?)`);
-    params.push(`-${days} days`);
+    params.push(`-${query.days} days`);
   }
   const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+  return { where, params };
+}
+
+function rowsToRecord<T extends Record<string, unknown>>(
+  rows: T[],
+  keyField: keyof T
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const row of rows) {
+    result[String(row[keyField])] = {
+      requests: row.requests,
+      successful: row.successful,
+      failed: row.failed,
+    };
+  }
+  return result;
+}
+
+app.openapi(analyticsRoute, async (c) => {
+  const query = c.req.valid('query');
+  const groupBy = query.group_by;
+  const { where, params } = buildAnalyticsWhereClause(query);
 
   const stats = await c.env.GATEWAY_DB.prepare(
     `SELECT SUM(total_requests) as total, SUM(successful_requests) as successful, SUM(failed_requests) as failed FROM project_analytics ${where}`
@@ -2886,19 +3118,6 @@ app.openapi(analyticsRoute, async (c) => {
         }>()
     : { results: [] };
 
-  const providers: Record<string, unknown> = {};
-  providerStats.results.forEach((p) => {
-    providers[p.provider] = { requests: p.requests, successful: p.successful, failed: p.failed };
-  });
-  const models: Record<string, unknown> = {};
-  modelStats.results.forEach((m) => {
-    models[m.model] = { requests: m.requests, successful: m.successful, failed: m.failed };
-  });
-  const projects: Record<string, unknown> = {};
-  projectStats.results.forEach((p) => {
-    projects[p.project_id] = { requests: p.requests, successful: p.successful, failed: p.failed };
-  });
-
   const total = stats?.total ?? 0;
   const withFailureRate = <T extends { requests: number; failed: number }>(row: T) => ({
     ...row,
@@ -2909,9 +3128,9 @@ app.openapi(analyticsRoute, async (c) => {
     successful_requests: stats?.successful ?? 0,
     failed_requests: stats?.failed ?? 0,
     success_rate: total > 0 ? (stats?.successful ?? 0) / total : 0,
-    providers,
-    models,
-    projects,
+    providers: rowsToRecord(providerStats.results, 'provider'),
+    models: rowsToRecord(modelStats.results, 'model'),
+    projects: rowsToRecord(projectStats.results, 'project_id'),
     daily: dailyStats.results.map(withFailureRate),
     group_by: groupBy ?? null,
     daily_breakdown: dailyBreakdown.results.map(withFailureRate),

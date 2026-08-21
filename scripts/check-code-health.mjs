@@ -70,7 +70,7 @@ function checkComplexity() {
     maxParams: Math.max(...rows.map((row) => row[3])),
   };
   // Ratcheted ADR-approved debt: https://github.com/sass-maker/free-ai/issues/53
-  const baseline = { violations: 26, maxCcn: 28, maxLength: 448, maxParams: 4 };
+  const baseline = { violations: 0, maxCcn: 15, maxLength: 91, maxParams: 7 };
   console.log(
     `Complexity: ${observed.functions} functions, ${observed.nloc} NLOC, ` +
       `${observed.violations} violations; max CCN ${observed.maxCcn}, ` +

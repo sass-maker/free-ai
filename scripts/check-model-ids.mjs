@@ -39,7 +39,7 @@ function asModelItems(body) {
 function modelId(item) {
   if (typeof item === 'string') return item;
   if (typeof item?.id === 'string') return item.id;
-  if (typeof item?.name === 'string') return item.name.replace(/^models\//, '');
+  if (typeof item?.name === 'string') return item.name.split('models/').join('');
   return null;
 }
 

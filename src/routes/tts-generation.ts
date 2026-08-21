@@ -1,8 +1,9 @@
 import { createRoute, z } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 
 import { getTtsRegistry, hasTtsProviderKey } from '../config';
 import { ttsProviderCallers } from '../providers';
-import type { Provider } from '../types';
+import type { Env, Provider } from '../types';
 import { getErrorMessage } from '../utils/request';
 import { sortFallbackLast } from './provider-order';
 import {
@@ -11,6 +12,8 @@ import {
   errorSchema,
   projectIdSchema,
 } from './shared-schemas';
+
+type TtsRouteContext = Context<{ Bindings: Env }>;
 
 const ttsRequestSchema = z
   .object({
@@ -62,6 +65,72 @@ function resolveProjectId(
   return projectIdSchema.safeParse(candidate).success ? candidate : undefined;
 }
 
+function invalidProjectIdResponse() {
+  return {
+    error: {
+      message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
+      type: 'invalid_request_error',
+      code: 'invalid_project_id',
+    },
+  };
+}
+
+function noTtsProviderResponse() {
+  return {
+    error: {
+      message: 'TTS unavailable: no GROQ_API_KEY and Workers AI binding missing',
+      type: 'configuration_error',
+      code: 'no_tts_provider',
+    },
+  };
+}
+
+function filterTtsRegistry(
+  env: Env,
+  forcedProvider: string | undefined,
+  requestedModel: string,
+  requestedLower: string
+) {
+  return getTtsRegistry(env).filter((candidate) => {
+    if (forcedProvider && candidate.provider !== forcedProvider) return false;
+    if (
+      requestedModel &&
+      requestedLower !== 'auto' &&
+      candidate.model !== requestedModel &&
+      candidate.id !== requestedModel
+    ) {
+      return false;
+    }
+    return hasTtsProviderKey(env, candidate.provider);
+  });
+}
+
+async function tryTtsCandidate(
+  context: TtsRouteContext,
+  candidate: { provider: string; model: string },
+  body: {
+    input: string;
+    voice?: string;
+    response_format?: 'mp3' | 'wav' | 'opus' | 'flac';
+    speed?: number;
+  }
+): Promise<{ audio: BodyInit; contentType: string } | { error: string }> {
+  try {
+    const caller = ttsProviderCallers[candidate.provider as 'groq' | 'workers_ai'];
+    const result = await caller({
+      env: context.env,
+      model: candidate.model,
+      input: body.input,
+      voice: body.voice,
+      response_format: body.response_format,
+      speed: body.speed,
+    });
+    return result;
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
+}
+
 export function registerTtsGenerationRoute(
   app: GatewayApp,
   recordAnalytics: RecordAnalytics
@@ -71,45 +140,16 @@ export function registerTtsGenerationRoute(
     const headerProjectId = context.req.header('x-gateway-project-id') ?? undefined;
     const projectId = resolveProjectId(headerProjectId, body.project_id);
     if (!projectId) {
-      return context.json(
-        {
-          error: {
-            message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
-            type: 'invalid_request_error',
-            code: 'invalid_project_id',
-          },
-        },
-        400
-      );
+      return context.json(invalidProjectIdResponse(), 400);
     }
 
     const forcedProvider = context.req.header('x-gateway-force-provider') ?? undefined;
     const requestedModel = body.model.trim();
     const requestedLower = requestedModel.toLowerCase();
-    const registry = getTtsRegistry(context.env).filter((candidate) => {
-      if (forcedProvider && candidate.provider !== forcedProvider) return false;
-      if (
-        requestedModel &&
-        requestedLower !== 'auto' &&
-        candidate.model !== requestedModel &&
-        candidate.id !== requestedModel
-      ) {
-        return false;
-      }
-      return hasTtsProviderKey(context.env, candidate.provider);
-    });
+    const registry = filterTtsRegistry(context.env, forcedProvider, requestedModel, requestedLower);
 
     if (registry.length === 0) {
-      return context.json(
-        {
-          error: {
-            message: 'TTS unavailable: no GROQ_API_KEY and Workers AI binding missing',
-            type: 'configuration_error',
-            code: 'no_tts_provider',
-          },
-        },
-        503
-      );
+      return context.json(noTtsProviderResponse(), 503);
     }
 
     const sorted = sortFallbackLast(registry, !forcedProvider && requestedLower === 'auto');
@@ -123,17 +163,8 @@ export function registerTtsGenerationRoute(
       chosenModel = candidate.model;
       ttsAttempts += 1;
 
-      try {
-        const caller = ttsProviderCallers[candidate.provider];
-        const result = await caller({
-          env: context.env,
-          model: candidate.model,
-          input: body.input,
-          voice: body.voice,
-          response_format: body.response_format,
-          speed: body.speed,
-        });
-
+      const outcome = await tryTtsCandidate(context, candidate, body);
+      if (!('error' in outcome)) {
         context.executionCtx.waitUntil(
           recordAnalytics({
             db: context.env.GATEWAY_DB,
@@ -145,18 +176,17 @@ export function registerTtsGenerationRoute(
         );
 
         const degraded = ttsAttempts > 1;
-        return new Response(result.audio, {
+        return new Response(outcome.audio, {
           headers: {
-            'content-type': result.contentType,
+            'content-type': outcome.contentType,
             'x-gateway-provider': candidate.provider,
             'x-gateway-model': candidate.model,
             'x-gateway-project-id': projectId,
             ...(degraded ? { 'x-degraded-mode': 'true' } : {}),
           },
         });
-      } catch (error) {
-        lastError = getErrorMessage(error);
       }
+      lastError = outcome.error;
     }
 
     context.executionCtx.waitUntil(

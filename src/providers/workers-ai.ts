@@ -155,6 +155,35 @@ function extractWorkersAiEmbeddingRows(result: unknown): number[][] {
   return [];
 }
 
+function buildWorkersAiCompletion(model: string, content: string, usage?: Record<string, unknown>) {
+  return {
+    id: `cf-${crypto.randomUUID()}`,
+    object: 'chat.completion',
+    created: Math.floor(Date.now() / 1000),
+    model,
+    choices: [
+      {
+        index: 0,
+        message: { role: 'assistant', content },
+        finish_reason: 'stop',
+      },
+    ],
+    ...(usage ? { usage } : {}),
+  };
+}
+
+function streamRestResult(model: string, restResult: { response: string }) {
+  async function* singleChunk() {
+    yield { response: restResult.response };
+  }
+  return {
+    provider: 'workers_ai' as const,
+    model,
+    stream: true as const,
+    streamSource: singleChunk(),
+  };
+}
+
 export const callWorkersAi: ProviderCaller = async (input) => {
   if (!isWorkersAiEnabled(input.env)) {
     throw new Error('Workers AI is disabled');
@@ -199,43 +228,14 @@ export const callWorkersAi: ProviderCaller = async (input) => {
     });
 
     if (input.stream) {
-      async function* singleChunk() {
-        yield { response: restResult.response };
-      }
-
-      return {
-        provider: 'workers_ai',
-        model: input.model,
-        stream: true,
-        streamSource: singleChunk(),
-      };
+      return streamRestResult(input.model, restResult);
     }
 
     return {
       provider: 'workers_ai',
       model: input.model,
       stream: false,
-      completion: {
-        id: `cf-${crypto.randomUUID()}`,
-        object: 'chat.completion',
-        created: Math.floor(Date.now() / 1000),
-        model: input.model,
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant',
-              content: restResult.response,
-            },
-            finish_reason: 'stop',
-          },
-        ],
-        usage: restResult.usage as {
-          prompt_tokens?: number;
-          completion_tokens?: number;
-          total_tokens?: number;
-        },
-      },
+      completion: buildWorkersAiCompletion(input.model, restResult.response, restResult.usage),
     };
   }
 
@@ -260,22 +260,7 @@ export const callWorkersAi: ProviderCaller = async (input) => {
     provider: 'workers_ai',
     model: input.model,
     stream: false,
-    completion: {
-      id: `cf-${crypto.randomUUID()}`,
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: input.model,
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: 'assistant',
-            content,
-          },
-          finish_reason: 'stop',
-        },
-      ],
-    },
+    completion: buildWorkersAiCompletion(input.model, content),
   };
 };
 

@@ -52,6 +52,28 @@ function embeddingRows(payload) {
   return rows.filter((item) => item && item.type === 'embedding');
 }
 
+function describeEmbeddingError(ok, selected, embeddings, requireEnabled) {
+  if (ok) return null;
+  if (selected && selected.enabled === false && requireEnabled) {
+    return 'embedding model is disabled';
+  }
+  if (embeddings.length === 0) return 'no embedding models returned';
+  return selected ? null : 'required embedding model not found';
+}
+
+function summarizeSelected(selected) {
+  if (!selected) return null;
+  return {
+    id: selected.id,
+    provider: selected.provider ?? null,
+    dimensions: typeof selected.dimensions === 'number' ? selected.dimensions : null,
+    supports_dimensions: selected.supports_dimensions === true,
+    aliases: Array.isArray(selected.aliases) ? selected.aliases : [],
+    priority: typeof selected.priority === 'number' ? selected.priority : null,
+    enabled: selected.enabled !== false,
+  };
+}
+
 export async function runEmbeddingModelCatalogSmoke(options = {}) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
@@ -78,26 +100,8 @@ export async function runEmbeddingModelCatalogSmoke(options = {}) {
       model,
       status: res.status,
       embedding_model_count: embeddings.length,
-      selected: selected
-        ? {
-            id: selected.id,
-            provider: selected.provider ?? null,
-            dimensions: typeof selected.dimensions === 'number' ? selected.dimensions : null,
-            supports_dimensions: selected.supports_dimensions === true,
-            aliases: Array.isArray(selected.aliases) ? selected.aliases : [],
-            priority: typeof selected.priority === 'number' ? selected.priority : null,
-            enabled: selected.enabled !== false,
-          }
-        : null,
-      error: ok
-        ? null
-        : selected && selected.enabled === false && requireEnabled
-          ? 'embedding model is disabled'
-          : embeddings.length === 0
-            ? 'no embedding models returned'
-            : selected
-              ? null
-              : 'required embedding model not found',
+      selected: summarizeSelected(selected),
+      error: describeEmbeddingError(ok, selected, embeddings, requireEnabled),
     };
   } catch (error) {
     return {

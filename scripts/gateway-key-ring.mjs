@@ -121,6 +121,60 @@ function uploadSecret(secretValue) {
   }
 }
 
+function cmdGenerate(args, manifestPath, manifest) {
+  const label = normalizeLabel(args.label ?? '');
+  const key = generateKey();
+  const entry = {
+    label,
+    sha256: sha256Hex(key),
+    created_at: new Date().toISOString(),
+  };
+  upsertEntry(manifest, entry);
+  saveManifest(manifestPath, manifest);
+  console.log(`key=${key}`);
+  console.log(`sha256=${entry.sha256}`);
+  console.log(`manifest=${manifestPath}`);
+  console.log('Upload with: pnpm keys:upload');
+}
+
+function cmdAddHash(args, manifestPath, manifest) {
+  const label = normalizeLabel(args.label ?? '');
+  const sha256 = String(args.sha256 ?? '').toLowerCase();
+  if (!isSha256(sha256)) {
+    throw new Error('--sha256 must be a 64-character SHA-256 hex digest');
+  }
+  upsertEntry(manifest, { label, sha256, created_at: new Date().toISOString() });
+  saveManifest(manifestPath, manifest);
+  console.log(`added=${label}`);
+  console.log(`manifest=${manifestPath}`);
+}
+
+function cmdList(manifest) {
+  for (const line of entryLines(manifest)) {
+    console.log(line);
+  }
+}
+
+function cmdPrintSecret(manifest) {
+  console.log(entryLines(manifest).join('\n'));
+}
+
+function cmdUpload(manifest, manifestPath) {
+  const secretValue = entryLines(manifest).join('\n');
+  if (!secretValue) {
+    throw new Error(`No entries in ${manifestPath}`);
+  }
+  uploadSecret(secretValue);
+}
+
+const COMMANDS = {
+  generate: cmdGenerate,
+  'add-hash': cmdAddHash,
+  list: (_args, _manifestPath, manifest) => cmdList(manifest),
+  'print-secret': (_args, _manifestPath, manifest) => cmdPrintSecret(manifest),
+  upload: (_args, manifestPath, manifest) => cmdUpload(manifest, manifestPath),
+};
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const manifestPath = resolve(process.cwd(), args.manifest);
@@ -131,54 +185,9 @@ function main() {
     return;
   }
 
-  if (args.command === 'generate') {
-    const label = normalizeLabel(args.label ?? '');
-    const key = generateKey();
-    const entry = {
-      label,
-      sha256: sha256Hex(key),
-      created_at: new Date().toISOString(),
-    };
-    upsertEntry(manifest, entry);
-    saveManifest(manifestPath, manifest);
-    console.log(`key=${key}`);
-    console.log(`sha256=${entry.sha256}`);
-    console.log(`manifest=${manifestPath}`);
-    console.log('Upload with: pnpm keys:upload');
-    return;
-  }
-
-  if (args.command === 'add-hash') {
-    const label = normalizeLabel(args.label ?? '');
-    const sha256 = String(args.sha256 ?? '').toLowerCase();
-    if (!isSha256(sha256)) {
-      throw new Error('--sha256 must be a 64-character SHA-256 hex digest');
-    }
-    upsertEntry(manifest, { label, sha256, created_at: new Date().toISOString() });
-    saveManifest(manifestPath, manifest);
-    console.log(`added=${label}`);
-    console.log(`manifest=${manifestPath}`);
-    return;
-  }
-
-  if (args.command === 'list') {
-    for (const line of entryLines(manifest)) {
-      console.log(line);
-    }
-    return;
-  }
-
-  if (args.command === 'print-secret') {
-    console.log(entryLines(manifest).join('\n'));
-    return;
-  }
-
-  if (args.command === 'upload') {
-    const secretValue = entryLines(manifest).join('\n');
-    if (!secretValue) {
-      throw new Error(`No entries in ${manifestPath}`);
-    }
-    uploadSecret(secretValue);
+  const handler = COMMANDS[args.command];
+  if (handler) {
+    handler(args, manifestPath, manifest);
     return;
   }
 

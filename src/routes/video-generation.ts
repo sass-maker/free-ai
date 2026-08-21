@@ -4,7 +4,7 @@ import { getVideoRegistry, hasVideoProviderKey } from '../config';
 import { CostBudget } from '../lib/cost-budget';
 import { videoProviderCallers } from '../providers';
 import { classifyError } from '../router/classify-error';
-import type { VideoProvider } from '../types';
+import type { Env, VideoModelCandidate, VideoProvider } from '../types';
 import { createRequestId, getErrorMessage } from '../utils/request';
 import {
   type GatewayApp,
@@ -104,6 +104,157 @@ const videosPollRoute = createRoute({
   },
 });
 
+function filterVideoRegistry(env: Env, model: string): VideoModelCandidate[] {
+  const requestedLower = model.toLowerCase();
+  return getVideoRegistry(env).filter((candidate) => {
+    if (model && requestedLower !== 'auto' && candidate.model !== model && candidate.id !== model) {
+      return false;
+    }
+    return hasVideoProviderKey(env, candidate.provider);
+  });
+}
+
+function invalidProjectIdError() {
+  return {
+    error: {
+      message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
+      type: 'invalid_request_error',
+      code: 'invalid_project_id',
+    },
+  };
+}
+
+function noVideoProviderError() {
+  return {
+    error: {
+      message: 'Video generation unavailable: TOGETHER_API_KEY not configured or model not found',
+      type: 'configuration_error',
+      code: 'no_video_provider',
+    },
+  };
+}
+
+async function persistVideoJobMeta(
+  env: Env,
+  job: { id: string },
+  chosen: { provider: VideoProvider; model: string },
+  projectId: string
+): Promise<void> {
+  try {
+    await env.HEALTH_KV.put(
+      `video_job:${job.id}`,
+      JSON.stringify({
+        provider: chosen.provider,
+        model: chosen.model,
+        project_id: projectId,
+      }),
+      { expirationTtl: 60 * 60 * 24 }
+    );
+  } catch {
+    // Job metadata is best-effort; polling falls back to the default provider.
+  }
+}
+
+function buildVideoGenSuccessBody(
+  job: {
+    id: string;
+    status: 'processing' | 'completed' | 'failed';
+    video_url?: string;
+    error?: string;
+  },
+  chosen: { provider: VideoProvider; model: string },
+  requestId: string,
+  projectId: string
+) {
+  return {
+    id: job.id,
+    status: job.status,
+    video_url: job.video_url,
+    poll_url: `/v1/videos/generations/${job.id}`,
+    error: job.error,
+    x_gateway: {
+      provider: chosen.provider,
+      model: chosen.model,
+      attempts: 1,
+      reasoning_effort: 'auto' as const,
+      request_id: requestId,
+      project_id: projectId,
+    },
+  };
+}
+
+function buildVideoGenErrorBody(error: unknown, failureClass: string, costBudget: CostBudget) {
+  return {
+    error: {
+      message: `Video submit failed: ${getErrorMessage(error)}`,
+      type: failureClass,
+      cost_budget: costBudget.state(),
+    },
+  } as never;
+}
+
+async function loadVideoJobMeta(
+  env: Env,
+  id: string
+): Promise<{ provider: VideoProvider; model: string; projectId?: string }> {
+  let provider: VideoProvider = 'together';
+  let model = '';
+  let projectId: string | undefined;
+
+  try {
+    const meta = (await env.HEALTH_KV.get(`video_job:${id}`, 'json')) as {
+      provider?: VideoProvider;
+      model?: string;
+      project_id?: string;
+    } | null;
+    if (meta?.provider) provider = meta.provider;
+    if (meta?.model) model = meta.model;
+    if (meta?.project_id) projectId = meta.project_id;
+  } catch {
+    // A missing mapping falls back to Together, matching the submit path.
+  }
+
+  return { provider, model, projectId };
+}
+
+function buildVideoPollSuccessBody(
+  job: {
+    id: string;
+    status: 'processing' | 'completed' | 'failed';
+    video_url?: string;
+    error?: string;
+  },
+  provider: VideoProvider,
+  model: string,
+  requestId: string,
+  projectId?: string
+) {
+  return {
+    id: job.id,
+    status: job.status,
+    video_url: job.video_url,
+    error: job.error,
+    x_gateway: {
+      provider,
+      model,
+      attempts: 1,
+      reasoning_effort: 'auto' as const,
+      request_id: requestId,
+      project_id: projectId,
+    },
+  };
+}
+
+function buildVideoPollErrorBody(error: unknown) {
+  return {
+    error: {
+      message: `Video poll not yet supported by Together upstream (undocumented GET endpoint). Submit works; retrieval pending. Underlying error: ${getErrorMessage(error)}`,
+      type: 'not_implemented',
+      code: 'video_poll_pending_upstream',
+    },
+  };
+}
+
 export function registerVideoGenerationRoutes(
   app: GatewayApp,
   recordAnalytics: RecordAnalytics
@@ -114,44 +265,12 @@ export function registerVideoGenerationRoutes(
     const headerProjectId = context.req.header('x-gateway-project-id') ?? undefined;
     const projectId = resolveProjectId(headerProjectId, body.project_id);
     if (!projectId) {
-      return context.json(
-        {
-          error: {
-            message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
-            type: 'invalid_request_error',
-            code: 'invalid_project_id',
-          },
-        },
-        400
-      );
+      return context.json(invalidProjectIdError(), 400);
     }
 
-    const requestedModel = body.model.trim();
-    const requestedLower = requestedModel.toLowerCase();
-    const registry = getVideoRegistry(context.env).filter((candidate) => {
-      if (
-        requestedModel &&
-        requestedLower !== 'auto' &&
-        candidate.model !== requestedModel &&
-        candidate.id !== requestedModel
-      ) {
-        return false;
-      }
-      return hasVideoProviderKey(context.env, candidate.provider);
-    });
-
+    const registry = filterVideoRegistry(context.env, body.model);
     if (registry.length === 0) {
-      return context.json(
-        {
-          error: {
-            message:
-              'Video generation unavailable: TOGETHER_API_KEY not configured or model not found',
-            type: 'configuration_error',
-            code: 'no_video_provider',
-          },
-        },
-        503
-      );
+      return context.json(noVideoProviderError(), 503);
     }
 
     const chosen = registry.sort((a, b) => b.priority - a.priority)[0];
@@ -180,38 +299,9 @@ export function registerVideoGenerationRoutes(
         })
       );
 
-      try {
-        await context.env.HEALTH_KV.put(
-          `video_job:${job.id}`,
-          JSON.stringify({
-            provider: chosen.provider,
-            model: chosen.model,
-            project_id: projectId,
-          }),
-          { expirationTtl: 60 * 60 * 24 }
-        );
-      } catch {
-        // Job metadata is best-effort; polling falls back to the default provider.
-      }
+      await persistVideoJobMeta(context.env, job, chosen, projectId);
 
-      return context.json(
-        {
-          id: job.id,
-          status: job.status,
-          video_url: job.video_url,
-          poll_url: `/v1/videos/generations/${job.id}`,
-          error: job.error,
-          x_gateway: {
-            provider: chosen.provider,
-            model: chosen.model,
-            attempts: 1,
-            reasoning_effort: 'auto' as const,
-            request_id: requestId,
-            project_id: projectId,
-          },
-        },
-        statusCode
-      );
+      return context.json(buildVideoGenSuccessBody(job, chosen, requestId, projectId), statusCode);
     } catch (error) {
       const failureClass = classifyError(error);
       context.executionCtx.waitUntil(
@@ -229,83 +319,28 @@ export function registerVideoGenerationRoutes(
           : failureClass === 'usage_retriable'
             ? 429
             : 502;
-      return context.json(
-        {
-          error: {
-            message: `Video submit failed: ${getErrorMessage(error)}`,
-            type: failureClass,
-            cost_budget: costBudget.state(),
-          },
-        } as never,
-        errorStatus
-      );
+      return context.json(buildVideoGenErrorBody(error, failureClass, costBudget), errorStatus);
     }
   });
 
   app.openapi(videosPollRoute, async (context) => {
     const { id } = context.req.valid('param');
-
-    let provider: VideoProvider = 'together';
-    let model = '';
-    let projectId: string | undefined;
-
-    try {
-      const meta = (await context.env.HEALTH_KV.get(`video_job:${id}`, 'json')) as {
-        provider?: VideoProvider;
-        model?: string;
-        project_id?: string;
-      } | null;
-      if (meta?.provider) provider = meta.provider;
-      if (meta?.model) model = meta.model;
-      if (meta?.project_id) projectId = meta.project_id;
-    } catch {
-      // A missing mapping falls back to Together, matching the submit path.
-    }
+    const meta = await loadVideoJobMeta(context.env, id);
+    const { provider, model, projectId } = meta;
 
     if (!hasVideoProviderKey(context.env, provider)) {
-      return context.json(
-        {
-          error: {
-            message: 'Video provider not configured',
-            type: 'configuration_error',
-            code: 'no_video_provider',
-          },
-        },
-        503
-      );
+      return context.json(noVideoProviderError(), 503);
     }
 
     try {
       const poller = videoProviderCallers.together.poll;
       const job = await poller(context.env, id);
       return context.json(
-        {
-          id: job.id,
-          status: job.status,
-          video_url: job.video_url,
-          error: job.error,
-          x_gateway: {
-            provider,
-            model,
-            attempts: 1,
-            reasoning_effort: 'auto' as const,
-            request_id: createRequestId(),
-            project_id: projectId,
-          },
-        },
+        buildVideoPollSuccessBody(job, provider, model, createRequestId(), projectId),
         200
       );
     } catch (error) {
-      return context.json(
-        {
-          error: {
-            message: `Video poll not yet supported by Together upstream (undocumented GET endpoint). Submit works; retrieval pending. Underlying error: ${getErrorMessage(error)}`,
-            type: 'not_implemented',
-            code: 'video_poll_pending_upstream',
-          },
-        },
-        501
-      );
+      return context.json(buildVideoPollErrorBody(error), 501);
     }
   });
 }

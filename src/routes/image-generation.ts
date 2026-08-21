@@ -4,7 +4,7 @@ import { getImageRegistry, hasImageProviderKey } from '../config';
 import { CostBudget } from '../lib/cost-budget';
 import { imageProviderCallers } from '../providers';
 import { classifyError, isRetriableFailure } from '../router/classify-error';
-import type { Provider } from '../types';
+import type { Env, ImageModelCandidate, Provider } from '../types';
 import { createRequestId, getErrorMessage } from '../utils/request';
 import { sortFallbackLast } from './provider-order';
 import {
@@ -81,6 +81,81 @@ function resolveProjectId(
   return projectIdSchema.safeParse(candidate).success ? candidate : undefined;
 }
 
+function filterImageRegistry(
+  env: Env,
+  model: string,
+  forcedProvider?: string
+): ImageModelCandidate[] {
+  const requestedLower = model.toLowerCase();
+  return getImageRegistry(env).filter((candidate) => {
+    if (forcedProvider && candidate.provider !== forcedProvider) return false;
+    if (model && requestedLower !== 'auto' && candidate.model !== model && candidate.id !== model) {
+      return false;
+    }
+    return hasImageProviderKey(env, candidate.provider);
+  });
+}
+
+function invalidProjectIdError() {
+  return {
+    error: {
+      message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
+      type: 'invalid_request_error',
+      code: 'invalid_project_id',
+    },
+  };
+}
+
+function noImageProviderError() {
+  return {
+    error: {
+      message:
+        'Image generation unavailable: no Together/Gemini/NVIDIA key and Workers AI binding missing',
+      type: 'configuration_error',
+      code: 'no_image_provider',
+    },
+  };
+}
+
+function buildImageSuccessBody(
+  result: { created: number; data: unknown[] },
+  candidate: { provider: string; model: string },
+  attempts: number,
+  requestId: string,
+  projectId: string,
+  degraded: boolean
+) {
+  return {
+    created: result.created,
+    data: result.data,
+    degraded,
+    x_gateway: {
+      provider: candidate.provider,
+      model: candidate.model,
+      attempts,
+      reasoning_effort: 'auto' as const,
+      request_id: requestId,
+      project_id: projectId,
+    },
+  } as never;
+}
+
+function imageErrorStatus(errorClass: string): 400 | 429 | 502 {
+  if (errorClass === 'input_nonretriable') return 400;
+  if (errorClass === 'usage_retriable') return 429;
+  return 502;
+}
+
+function buildImageErrorBody(lastError: string, lastErrorClass: string, costBudget: CostBudget) {
+  return {
+    error: {
+      message: `All image providers failed: ${lastError}`,
+      type: lastErrorClass,
+      cost_budget: costBudget.state(),
+    },
+  } as never;
+}
+
 export function registerImageGenerationRoute(
   app: GatewayApp,
   recordAnalytics: RecordAnalytics
@@ -91,49 +166,19 @@ export function registerImageGenerationRoute(
     const headerProjectId = context.req.header('x-gateway-project-id') ?? undefined;
     const projectId = resolveProjectId(headerProjectId, body.project_id);
     if (!projectId) {
-      return context.json(
-        {
-          error: {
-            message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
-            type: 'invalid_request_error',
-            code: 'invalid_project_id',
-          },
-        },
-        400
-      );
+      return context.json(invalidProjectIdError(), 400);
     }
 
     const forcedProvider = context.req.header('x-gateway-force-provider') ?? undefined;
-    const requestedModel = body.model.trim();
-    const requestedLower = requestedModel.toLowerCase();
-    const registry = getImageRegistry(context.env).filter((candidate) => {
-      if (forcedProvider && candidate.provider !== forcedProvider) return false;
-      if (
-        requestedModel &&
-        requestedLower !== 'auto' &&
-        candidate.model !== requestedModel &&
-        candidate.id !== requestedModel
-      ) {
-        return false;
-      }
-      return hasImageProviderKey(context.env, candidate.provider);
-    });
-
+    const registry = filterImageRegistry(context.env, body.model, forcedProvider);
     if (registry.length === 0) {
-      return context.json(
-        {
-          error: {
-            message:
-              'Image generation unavailable: no Together/Gemini/NVIDIA key and Workers AI binding missing',
-            type: 'configuration_error',
-            code: 'no_image_provider',
-          },
-        },
-        503
-      );
+      return context.json(noImageProviderError(), 503);
     }
 
-    const sorted = sortFallbackLast(registry, !forcedProvider && requestedLower === 'auto');
+    const sorted = sortFallbackLast(
+      registry,
+      !forcedProvider && body.model.toLowerCase() === 'auto'
+    );
     let lastError = 'Unknown error';
     let attempts = 0;
     let chosenProvider: string | undefined;
@@ -172,19 +217,7 @@ export function registerImageGenerationRoute(
 
         const degraded = attempts > 1;
         return context.json(
-          {
-            created: result.created,
-            data: result.data,
-            degraded,
-            x_gateway: {
-              provider: candidate.provider,
-              model: candidate.model,
-              attempts,
-              reasoning_effort: 'auto' as const,
-              request_id: requestId,
-              project_id: projectId,
-            },
-          } as never,
+          buildImageSuccessBody(result, candidate, attempts, requestId, projectId, degraded),
           200,
           degraded ? { 'x-degraded-mode': 'true' } : undefined
         );
@@ -208,22 +241,9 @@ export function registerImageGenerationRoute(
       })
     );
 
-    const errorStatus =
-      lastErrorClass === 'input_nonretriable'
-        ? 400
-        : lastErrorClass === 'usage_retriable'
-          ? 429
-          : 502;
-
     return context.json(
-      {
-        error: {
-          message: `All image providers failed: ${lastError}`,
-          type: lastErrorClass,
-          cost_budget: costBudget.state(),
-        },
-      } as never,
-      errorStatus
+      buildImageErrorBody(lastError, lastErrorClass, costBudget),
+      imageErrorStatus(lastErrorClass)
     );
   });
 }

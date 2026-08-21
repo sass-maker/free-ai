@@ -262,6 +262,26 @@ function rowFromAggregate(
   };
 }
 
+async function fetchAggregateQuery<T extends RollupRow>(
+  db: D1Database,
+  selectClause: string,
+  where: string,
+  params: unknown[],
+  groupBy: string,
+  orderBy = 'request_count DESC',
+  limit?: number
+): Promise<T[]> {
+  const sql = `SELECT ${selectClause}
+    FROM routing_ledger_rollup ${where}
+    GROUP BY ${groupBy}
+    ORDER BY ${orderBy}${limit ? ` LIMIT ${limit}` : ''}`;
+  const result = await db
+    .prepare(sql)
+    .bind(...params)
+    .all<T>();
+  return result.results ?? [];
+}
+
 export async function queryRoutingLedger(
   db: D1Database,
   options: { days: number; project_id?: string }
@@ -298,83 +318,77 @@ export async function queryRoutingLedger(
       with_fallback: number | null;
     }>();
 
-  const byPromptClass = await db
-    .prepare(
-      `SELECT prompt_class,
-        SUM(request_count) as request_count,
-        SUM(sum_latency_ms) as sum_latency_ms,
-        SUM(sum_attempts) as sum_attempts,
-        SUM(with_fallback) as with_fallback,
-        SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests
-      FROM routing_ledger_rollup ${where}
-      GROUP BY prompt_class
-      ORDER BY request_count DESC`
-    )
-    .bind(...params)
-    .all<RollupRow & { prompt_class: string; successful_requests: number }>();
+  const aggregateSelect = `prompt_class,
+    SUM(request_count) as request_count,
+    SUM(sum_latency_ms) as sum_latency_ms,
+    SUM(sum_attempts) as sum_attempts,
+    SUM(with_fallback) as with_fallback,
+    SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests`;
 
-  const byOutcome = await db
-    .prepare(
-      `SELECT outcome,
-        SUM(request_count) as request_count,
-        SUM(sum_latency_ms) as sum_latency_ms,
-        SUM(sum_attempts) as sum_attempts,
-        SUM(with_fallback) as with_fallback
-      FROM routing_ledger_rollup ${where}
-      GROUP BY outcome
-      ORDER BY request_count DESC`
-    )
-    .bind(...params)
-    .all<RollupRow & { outcome: string }>();
+  const byPromptClass = await fetchAggregateQuery<
+    RollupRow & { prompt_class: string; successful_requests: number }
+  >(db, aggregateSelect, where, params, 'prompt_class');
 
-  const byModel = await db
-    .prepare(
-      `SELECT chosen_provider, chosen_model,
-        SUM(request_count) as request_count,
-        SUM(sum_latency_ms) as sum_latency_ms,
-        SUM(sum_attempts) as sum_attempts,
-        SUM(with_fallback) as with_fallback,
-        SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests
-      FROM routing_ledger_rollup ${where}
-      GROUP BY chosen_provider, chosen_model
-      ORDER BY request_count DESC
-      LIMIT 40`
-    )
-    .bind(...params)
-    .all<
-      RollupRow & { chosen_provider: string; chosen_model: string; successful_requests: number }
-    >();
+  const byOutcome = await fetchAggregateQuery<RollupRow & { outcome: string }>(
+    db,
+    `outcome,
+    SUM(request_count) as request_count,
+    SUM(sum_latency_ms) as sum_latency_ms,
+    SUM(sum_attempts) as sum_attempts,
+    SUM(with_fallback) as with_fallback`,
+    where,
+    params,
+    'outcome'
+  );
 
-  const byQuota = await db
-    .prepare(
-      `SELECT quota_signature,
-        SUM(request_count) as request_count,
-        SUM(sum_latency_ms) as sum_latency_ms,
-        SUM(sum_attempts) as sum_attempts,
-        SUM(with_fallback) as with_fallback,
-        SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests
-      FROM routing_ledger_rollup ${where}
-      GROUP BY quota_signature
-      ORDER BY request_count DESC`
-    )
-    .bind(...params)
-    .all<RollupRow & { quota_signature: string; successful_requests: number }>();
+  const byModel = await fetchAggregateQuery<
+    RollupRow & { chosen_provider: string; chosen_model: string; successful_requests: number }
+  >(
+    db,
+    `chosen_provider, chosen_model,
+    SUM(request_count) as request_count,
+    SUM(sum_latency_ms) as sum_latency_ms,
+    SUM(sum_attempts) as sum_attempts,
+    SUM(with_fallback) as with_fallback,
+    SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests`,
+    where,
+    params,
+    'chosen_provider, chosen_model',
+    'request_count DESC',
+    40
+  );
 
-  const fallbackSignatures = await db
-    .prepare(
-      `SELECT fallback_signature,
-        SUM(request_count) as request_count,
-        SUM(sum_latency_ms) as sum_latency_ms,
-        SUM(sum_attempts) as sum_attempts,
-        SUM(with_fallback) as with_fallback,
-        SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests
-      FROM routing_ledger_rollup ${where}
-      GROUP BY fallback_signature
-      ORDER BY request_count DESC
-      LIMIT 20`
-    )
-    .bind(...params)
-    .all<RollupRow & { fallback_signature: string; successful_requests: number }>();
+  const byQuota = await fetchAggregateQuery<
+    RollupRow & { quota_signature: string; successful_requests: number }
+  >(
+    db,
+    `quota_signature,
+    SUM(request_count) as request_count,
+    SUM(sum_latency_ms) as sum_latency_ms,
+    SUM(sum_attempts) as sum_attempts,
+    SUM(with_fallback) as with_fallback,
+    SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests`,
+    where,
+    params,
+    'quota_signature'
+  );
+
+  const fallbackSignatures = await fetchAggregateQuery<
+    RollupRow & { fallback_signature: string; successful_requests: number }
+  >(
+    db,
+    `fallback_signature,
+    SUM(request_count) as request_count,
+    SUM(sum_latency_ms) as sum_latency_ms,
+    SUM(sum_attempts) as sum_attempts,
+    SUM(with_fallback) as with_fallback,
+    SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) as successful_requests`,
+    where,
+    params,
+    'fallback_signature',
+    'request_count DESC',
+    20
+  );
 
   const totalRequests = totals?.total_requests ?? 0;
   const successfulRequests = totals?.successful_requests ?? 0;
@@ -401,14 +415,14 @@ export async function queryRoutingLedger(
       avg_attempts: totalRequests > 0 ? sumAttempts / totalRequests : 0,
       fallback_rate: totalRequests > 0 ? withFallback / totalRequests : 0,
     },
-    by_prompt_class: (byPromptClass.results ?? []).map((row) =>
+    by_prompt_class: byPromptClass.map((row) =>
       rowFromAggregate(row, row.prompt_class, row.successful_requests)
     ),
-    by_outcome: (byOutcome.results ?? []).map((row) => {
+    by_outcome: byOutcome.map((row) => {
       const successful = row.outcome === 'ok' ? row.request_count : 0;
       return rowFromAggregate(row, row.outcome, successful);
     }),
-    by_model: (byModel.results ?? []).map((row) =>
+    by_model: byModel.map((row) =>
       rowFromAggregate(
         row,
         row.chosen_provider && row.chosen_model
@@ -417,10 +431,10 @@ export async function queryRoutingLedger(
         row.successful_requests
       )
     ),
-    by_quota_signature: (byQuota.results ?? []).map((row) =>
+    by_quota_signature: byQuota.map((row) =>
       rowFromAggregate(row, row.quota_signature, row.successful_requests)
     ),
-    top_fallback_signatures: (fallbackSignatures.results ?? []).map((row) => ({
+    top_fallback_signatures: fallbackSignatures.map((row) => ({
       signature: row.fallback_signature,
       requests: row.request_count,
       success_rate: row.request_count > 0 ? row.successful_requests / row.request_count : 0,

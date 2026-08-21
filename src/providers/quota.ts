@@ -57,6 +57,19 @@ async function writeCachedQuota(env: Env, status: ProviderQuotaStatus): Promise<
   }
 }
 
+function openRouterQuotaReason(
+  limitRemaining: number | null,
+  isFreeTier: boolean | undefined
+): string {
+  if (limitRemaining !== null && limitRemaining <= 0) {
+    return 'OpenRouter key reports no remaining credit limit';
+  }
+  if (isFreeTier) {
+    return 'OpenRouter free-model daily request limit is account-level and not exposed per model';
+  }
+  return 'OpenRouter key status is usable';
+}
+
 async function fetchOpenRouterQuota(env: Env): Promise<ProviderQuotaStatus> {
   if (!env.OPENROUTER_API_KEY) {
     return fallbackStatus('openrouter', 'unconfigured', 'OPENROUTER_API_KEY is not configured');
@@ -93,12 +106,7 @@ async function fetchOpenRouterQuota(env: Env): Promise<ProviderQuotaStatus> {
       status: limitRemaining !== null && limitRemaining <= 0 ? 'exhausted' : 'ok',
       source: 'openrouter_key',
       checkedAt: new Date().toISOString(),
-      reason:
-        limitRemaining !== null && limitRemaining <= 0
-          ? 'OpenRouter key reports no remaining credit limit'
-          : data.is_free_tier
-            ? 'OpenRouter free-model daily request limit is account-level and not exposed per model'
-            : 'OpenRouter key status is usable',
+      reason: openRouterQuotaReason(limitRemaining, data.is_free_tier),
       limitRemaining,
       limit: typeof data.limit === 'number' ? data.limit : null,
       usage: typeof data.usage === 'number' ? data.usage : undefined,

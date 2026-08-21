@@ -275,6 +275,188 @@ function buildGatewayMeta(params: {
   };
 }
 
+type EmbeddingValidationResult =
+  | {
+      ok: true;
+      projectId: string;
+      requestedModel: string;
+      normalizedInput: string[];
+    }
+  | {
+      ok: false;
+      status: 400;
+      body: { error: { message: string; type: string; code: string } };
+    };
+
+function validateEmbeddingRequest(params: {
+  model: string;
+  input: string | string[];
+  project_id?: string;
+  headerProjectId: string | undefined;
+}): EmbeddingValidationResult {
+  const projectId = resolveProjectId(params.headerProjectId, params.project_id);
+  if (!projectId) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: {
+          message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
+          type: 'invalid_request_error',
+          code: 'invalid_project_id',
+        },
+      },
+    };
+  }
+
+  const requestedModel = params.model.trim();
+  if (!requestedModel || requestedModel.toLowerCase() === 'auto') {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: {
+          message: '`model` is required for embeddings and cannot be "auto"',
+          type: 'invalid_request_error',
+          code: 'invalid_embedding_model',
+        },
+      },
+    };
+  }
+
+  const normalizedInput = normalizeEmbeddingInput(params.input);
+  if (normalizedInput.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: {
+          message: '`input` is required',
+          type: 'invalid_request_error',
+          code: 'missing_input',
+        },
+      },
+    };
+  }
+
+  return { ok: true, projectId, requestedModel, normalizedInput };
+}
+
+function noEmbeddingProviderError() {
+  return {
+    error: {
+      message: 'No embedding provider is configured',
+      type: 'configuration_error',
+      code: 'no_embedding_provider',
+    },
+  };
+}
+
+interface EmbeddingAttemptResult {
+  finalResponse: Record<string, unknown> | null;
+  chosenMeta: GatewayMeta | undefined;
+  lastErrorClass: string;
+  lastErrorMessage: string;
+  lastAttemptedProvider: EmbeddingProvider | undefined;
+  lastAttemptedModel: string | undefined;
+}
+
+async function runEmbeddingAttempts(params: {
+  env: Env;
+  candidates: EmbeddingCandidate[];
+  normalizedInput: string[];
+  encodingFormat?: 'float';
+  dimensions?: number;
+  requestId: string;
+  projectId: string;
+}): Promise<EmbeddingAttemptResult> {
+  let attemptCounter = 0;
+  let chosenMeta: GatewayMeta | undefined;
+  let finalResponse: Record<string, unknown> | null = null;
+  let lastErrorClass = 'provider_fatal';
+  let lastErrorMessage = 'Unknown error';
+  let lastAttemptedProvider: EmbeddingProvider | undefined;
+  let lastAttemptedModel: string | undefined;
+  const maxEmbeddingAttempts = Math.max(1, params.candidates.length);
+
+  await pRetry(
+    async () => {
+      const candidate = params.candidates[attemptCounter];
+      if (!candidate || attemptCounter >= maxEmbeddingAttempts) {
+        throw new AbortError('No more embedding candidates');
+      }
+
+      attemptCounter += 1;
+      lastAttemptedProvider = candidate.provider;
+      lastAttemptedModel = candidate.model;
+
+      try {
+        const caller = providerEmbeddingCallers[candidate.provider];
+        const result = await caller({
+          env: params.env,
+          provider: candidate.provider,
+          model: candidate.model,
+          input: params.normalizedInput,
+          encoding_format: params.encodingFormat,
+          dimensions: params.dimensions,
+        });
+
+        chosenMeta = buildGatewayMeta({
+          provider: candidate.provider,
+          model: candidate.model,
+          attempts: attemptCounter,
+          requestId: params.requestId,
+          projectId: params.projectId,
+        });
+        finalResponse = {
+          ...result.response,
+          x_gateway: chosenMeta,
+        };
+      } catch (error) {
+        const failureClass = classifyError(error);
+        lastErrorClass = failureClass;
+        lastErrorMessage = getErrorMessage(error);
+
+        if (!isRetriableFailure(failureClass) || attemptCounter >= maxEmbeddingAttempts) {
+          throw new AbortError(lastErrorMessage);
+        }
+        throw error instanceof Error ? error : new Error(lastErrorMessage);
+      }
+    },
+    {
+      retries: maxEmbeddingAttempts - 1,
+      minTimeout: 500,
+      maxTimeout: 5000,
+      factor: 2,
+      randomize: true,
+    }
+  ).catch(() => undefined);
+
+  return {
+    finalResponse,
+    chosenMeta,
+    lastErrorClass,
+    lastErrorMessage,
+    lastAttemptedProvider,
+    lastAttemptedModel,
+  };
+}
+
+function embeddingErrorStatus(errorClass: string): 400 | 429 | 502 {
+  if (errorClass === 'input_nonretriable') return 400;
+  if (errorClass === 'usage_retriable') return 429;
+  return 502;
+}
+
+function buildEmbeddingErrorBody(lastErrorMessage: string, lastErrorClass: string) {
+  return {
+    error: {
+      message: `All embedding providers failed: ${lastErrorMessage}`,
+      type: lastErrorClass,
+    },
+  };
+}
+
 export function registerEmbeddingGenerationRoute(
   app: GatewayApp,
   recordAnalytics: RecordAnalytics
@@ -282,170 +464,67 @@ export function registerEmbeddingGenerationRoute(
   app.openapi(embeddingsRoute, async (context) => {
     const body = context.req.valid('json');
     const requestId = createRequestId();
-    const normalizedInput = normalizeEmbeddingInput(body.input);
-    const requestedEmbeddingModel = body.model.trim();
     const forcedProvider = getForcedEmbeddingProvider(context);
     const forcedModel = context.req.header('x-gateway-force-model') ?? undefined;
     const headerProjectId = context.req.header('x-gateway-project-id') ?? undefined;
-    const projectId = resolveProjectId(headerProjectId, body.project_id);
 
-    if (!projectId) {
-      return context.json(
-        {
-          error: {
-            message: 'Missing or invalid project_id. Use 1-64 chars [a-zA-Z0-9._:-]',
-            type: 'invalid_request_error',
-            code: 'invalid_project_id',
-          },
-        },
-        400
-      );
+    const validation = validateEmbeddingRequest({
+      model: body.model,
+      input: body.input,
+      project_id: body.project_id,
+      headerProjectId,
+    });
+    if (!validation.ok) {
+      return context.json(validation.body, validation.status);
     }
 
-    if (!requestedEmbeddingModel || requestedEmbeddingModel.toLowerCase() === 'auto') {
-      return context.json(
-        {
-          error: {
-            message: '`model` is required for embeddings and cannot be "auto"',
-            type: 'invalid_request_error',
-            code: 'invalid_embedding_model',
-          },
-        },
-        400
-      );
-    }
-
-    if (normalizedInput.length === 0) {
-      return context.json(
-        {
-          error: {
-            message: '`input` is required',
-            type: 'invalid_request_error',
-            code: 'missing_input',
-          },
-        },
-        400
-      );
-    }
+    const { projectId, requestedModel, normalizedInput } = validation;
 
     const candidates = resolveEmbeddingCandidates(context.env, {
-      requestedModel: requestedEmbeddingModel,
+      requestedModel,
       forcedProvider,
       forcedModel,
     });
     if (candidates.length === 0) {
-      return context.json(
-        {
-          error: {
-            message: 'No embedding provider is configured',
-            type: 'configuration_error',
-            code: 'no_embedding_provider',
-          },
-        },
-        503
-      );
+      return context.json(noEmbeddingProviderError(), 503);
     }
 
-    let attemptCounter = 0;
-    let chosenMeta: GatewayMeta | undefined;
-    let finalResponse: Record<string, unknown> | null = null;
-    let lastErrorClass = 'provider_fatal';
-    let lastErrorMessage = 'Unknown error';
-    let lastAttemptedProvider: EmbeddingProvider | undefined;
-    let lastAttemptedModel: string | undefined;
-    const maxEmbeddingAttempts = Math.max(1, candidates.length);
+    const result = await runEmbeddingAttempts({
+      env: context.env,
+      candidates,
+      normalizedInput,
+      encodingFormat: body.encoding_format,
+      dimensions: body.dimensions,
+      requestId,
+      projectId,
+    });
 
-    await pRetry(
-      async () => {
-        const candidate = candidates[attemptCounter];
-        if (!candidate || attemptCounter >= maxEmbeddingAttempts) {
-          throw new AbortError('No more embedding candidates');
-        }
-
-        attemptCounter += 1;
-        lastAttemptedProvider = candidate.provider;
-        lastAttemptedModel = candidate.model;
-
-        try {
-          const caller = providerEmbeddingCallers[candidate.provider];
-          const result = await caller({
-            env: context.env,
-            provider: candidate.provider,
-            model: candidate.model,
-            input: normalizedInput,
-            encoding_format: body.encoding_format,
-            dimensions: body.dimensions,
-          });
-
-          chosenMeta = buildGatewayMeta({
-            provider: candidate.provider,
-            model: candidate.model,
-            attempts: attemptCounter,
-            requestId,
-            projectId,
-          });
-          finalResponse = {
-            ...result.response,
-            x_gateway: chosenMeta,
-          };
-        } catch (error) {
-          const failureClass = classifyError(error);
-          lastErrorClass = failureClass;
-          lastErrorMessage = getErrorMessage(error);
-
-          if (!isRetriableFailure(failureClass) || attemptCounter >= maxEmbeddingAttempts) {
-            throw new AbortError(lastErrorMessage);
-          }
-          throw error instanceof Error ? error : new Error(lastErrorMessage);
-        }
-      },
-      {
-        retries: maxEmbeddingAttempts - 1,
-        minTimeout: 500,
-        maxTimeout: 5000,
-        factor: 2,
-        randomize: true,
-      }
-    ).catch(() => undefined);
-
-    if (finalResponse && chosenMeta) {
+    if (result.finalResponse && result.chosenMeta) {
       context.executionCtx.waitUntil(
         recordAnalytics({
           db: context.env.GATEWAY_DB,
           projectId,
           outcome: 'ok',
-          provider: chosenMeta.provider,
-          model: chosenMeta.model,
+          provider: result.chosenMeta.provider,
+          model: result.chosenMeta.model,
         })
       );
-      return context.json(finalResponse as never, 200);
+      return context.json(result.finalResponse as never, 200);
     }
-
-    const status =
-      lastErrorClass === 'input_nonretriable'
-        ? 400
-        : lastErrorClass === 'usage_retriable'
-          ? 429
-          : 502;
 
     context.executionCtx.waitUntil(
       recordAnalytics({
         db: context.env.GATEWAY_DB,
         projectId,
         outcome: 'error',
-        provider: chosenMeta?.provider ?? lastAttemptedProvider,
-        model: chosenMeta?.model ?? lastAttemptedModel,
+        provider: result.chosenMeta?.provider ?? result.lastAttemptedProvider,
+        model: result.chosenMeta?.model ?? result.lastAttemptedModel,
       })
     );
 
     return context.json(
-      {
-        error: {
-          message: `All embedding providers failed: ${lastErrorMessage}`,
-          type: lastErrorClass,
-        },
-      },
-      status
+      buildEmbeddingErrorBody(result.lastErrorMessage, result.lastErrorClass),
+      embeddingErrorStatus(result.lastErrorClass)
     );
   });
 }

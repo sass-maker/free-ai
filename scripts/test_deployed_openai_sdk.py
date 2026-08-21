@@ -80,6 +80,25 @@ def build_extra_headers(force_provider: str) -> dict[str, str]:
     return headers
 
 
+def _run_stream_test(client, args, extra_headers) -> str:
+    if args.skip_stream:
+        return ""
+    chunks: list[str] = []
+    stream = client.chat.completions.create(
+        model="auto",
+        messages=[{"role": "user", "content": args.stream_prompt}],
+        stream=True,
+        extra_headers=extra_headers,
+    )
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        if delta and delta.content:
+            chunks.append(delta.content)
+    return "".join(chunks).strip()
+
+
 def run_smoke(args: argparse.Namespace) -> SmokeResult:
     try:
         from openai import OpenAI
@@ -112,22 +131,7 @@ def run_smoke(args: argparse.Namespace) -> SmokeResult:
     )
     responses_text = (responses.output_text or "").strip()
 
-    stream_text = ""
-    if not args.skip_stream:
-        chunks: list[str] = []
-        stream = client.chat.completions.create(
-            model="auto",
-            messages=[{"role": "user", "content": args.stream_prompt}],
-            stream=True,
-            extra_headers=extra_headers,
-        )
-        for chunk in stream:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
-            if delta and delta.content:
-                chunks.append(delta.content)
-        stream_text = "".join(chunks).strip()
+    stream_text = _run_stream_test(client, args, extra_headers)
 
     ok = bool(chat_text and responses_text and (stream_text or args.skip_stream))
     token_preview = f"{api_key[:12]}..." if len(api_key) >= 12 else "***"

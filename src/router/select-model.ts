@@ -168,6 +168,75 @@ function reliabilityRank(state: ModelStateSnapshot | undefined): number {
   return degraded ? 2 : 0;
 }
 
+function candidateMatchesCapabilities(
+  candidate: ModelCandidate,
+  caps: RequiredCapabilities
+): boolean {
+  if (caps.toolCalling && !candidate.capabilities.toolCalling) return false;
+  if (caps.jsonMode && !candidate.capabilities.jsonMode) return false;
+  if (caps.vision && !supportsVisionInput(candidate)) return false;
+  if (caps.minContextWindow && candidate.capabilities.contextWindow < caps.minContextWindow) {
+    return false;
+  }
+  return true;
+}
+
+function isCandidateInCooldown(state: ModelStateSnapshot | undefined, now: number): boolean {
+  if (!state) return false;
+  if (state.cooldownUntil > now) return true;
+  if (state.headroom <= 0) return true;
+  return false;
+}
+
+function isCandidateAvailable(
+  candidate: ModelCandidate,
+  stateMap: Map<string, ModelStateSnapshot>,
+  options: SelectOptions
+): boolean {
+  if (!options.modelOverride && !isAutomaticRoutingEligible(candidate)) return false;
+  if (options.stream && !candidate.supportsStreaming) return false;
+  if (
+    options.modelOverride &&
+    candidate.model !== options.modelOverride &&
+    candidate.id !== options.modelOverride
+  )
+    return false;
+  if (
+    options.min_reasoning_level &&
+    reasoningRank[candidate.reasoning] < reasoningRank[options.min_reasoning_level]
+  )
+    return false;
+  if (
+    options.requiredCapabilities &&
+    !candidateMatchesCapabilities(candidate, options.requiredCapabilities)
+  )
+    return false;
+
+  const key = `${candidate.provider}:${candidate.model}`;
+  if (options.excludedKeys?.has(key)) return false;
+
+  return !isCandidateInCooldown(stateMap.get(key), options.now);
+}
+
+function rankCandidates(
+  ranked: Array<{
+    candidate: ModelCandidate;
+    score: number;
+    tierIndex: number;
+    reliabilityRank: number;
+  }>,
+  options: SelectOptions
+): ModelCandidate[] {
+  ranked.sort((a, b) => {
+    const fallbackDiff = fallbackRank(a.candidate, options) - fallbackRank(b.candidate, options);
+    if (fallbackDiff !== 0) return fallbackDiff;
+    if (a.reliabilityRank !== b.reliabilityRank) return a.reliabilityRank - b.reliabilityRank;
+    if (a.tierIndex !== b.tierIndex) return a.tierIndex - b.tierIndex;
+    return b.score - a.score;
+  });
+  return ranked.map((item) => item.candidate);
+}
+
 export function selectCandidates(
   registry: ModelCandidate[],
   stateMap: Map<string, ModelStateSnapshot>,
@@ -175,65 +244,10 @@ export function selectCandidates(
 ): ModelCandidate[] {
   const scoringReasoning: ReasoningEffort = options.min_reasoning_level ?? 'auto';
   const order = getTierOrder(scoringReasoning);
-  const excluded = options.excludedKeys ?? new Set<string>();
 
-  const caps = options.requiredCapabilities;
-
-  const available = registry.filter((candidate) => {
-    if (!options.modelOverride && !isAutomaticRoutingEligible(candidate)) {
-      return false;
-    }
-
-    if (options.stream && !candidate.supportsStreaming) {
-      return false;
-    }
-
-    if (
-      options.modelOverride &&
-      candidate.model !== options.modelOverride &&
-      candidate.id !== options.modelOverride
-    ) {
-      return false;
-    }
-
-    if (
-      options.min_reasoning_level &&
-      reasoningRank[candidate.reasoning] < reasoningRank[options.min_reasoning_level]
-    ) {
-      return false;
-    }
-
-    if (caps) {
-      if (caps.toolCalling && !candidate.capabilities.toolCalling) {
-        return false;
-      }
-      if (caps.jsonMode && !candidate.capabilities.jsonMode) {
-        return false;
-      }
-      if (caps.vision && !supportsVisionInput(candidate)) {
-        return false;
-      }
-      if (caps.minContextWindow && candidate.capabilities.contextWindow < caps.minContextWindow) {
-        return false;
-      }
-    }
-
-    const key = `${candidate.provider}:${candidate.model}`;
-    if (excluded.has(key)) {
-      return false;
-    }
-
-    const state = stateMap.get(key);
-    if (state && state.cooldownUntil > options.now) {
-      return false;
-    }
-
-    if (state && state.headroom <= 0) {
-      return false;
-    }
-
-    return true;
-  });
+  const available = registry.filter((candidate) =>
+    isCandidateAvailable(candidate, stateMap, options)
+  );
 
   const ranked: Array<{
     candidate: ModelCandidate;
@@ -259,22 +273,5 @@ export function selectCandidates(
     });
   }
 
-  ranked.sort((a, b) => {
-    const fallbackDiff = fallbackRank(a.candidate, options) - fallbackRank(b.candidate, options);
-    if (fallbackDiff !== 0) {
-      return fallbackDiff;
-    }
-
-    if (a.reliabilityRank !== b.reliabilityRank) {
-      return a.reliabilityRank - b.reliabilityRank;
-    }
-
-    if (a.tierIndex !== b.tierIndex) {
-      return a.tierIndex - b.tierIndex;
-    }
-
-    return b.score - a.score;
-  });
-
-  return ranked.map((item) => item.candidate);
+  return rankCandidates(ranked, options);
 }

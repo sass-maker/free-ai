@@ -98,7 +98,8 @@ function readEnvFile() {
 }
 
 function parseWorkerName(toml) {
-  const match = toml.match(/^name\s*=\s*"([^"]+)"/m);
+  const pattern = /^name\s*=\s*"([^"]+)"/m;
+  const match = toml.match(pattern);
   if (!match) {
     throw new Error('Could not parse Worker name from wrangler.toml');
   }
@@ -106,9 +107,9 @@ function parseWorkerName(toml) {
 }
 
 function parseHealthKvIds(toml) {
-  const inline = toml.match(
-    /binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*"([^"]+)"\s*,\s*preview_id\s*=\s*"([^"]+)"/m
-  );
+  const inlinePattern =
+    /binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*"([^"]+)"\s*,\s*preview_id\s*=\s*"([^"]+)"/m;
+  const inline = toml.match(inlinePattern);
 
   if (inline) {
     return {
@@ -117,9 +118,9 @@ function parseHealthKvIds(toml) {
     };
   }
 
-  const table = toml.match(
-    /\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"[\s\S]*?id\s*=\s*"([^"]+)"[\s\S]*?preview_id\s*=\s*"([^"]+)"/m
-  );
+  const tablePattern =
+    /\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"[\s\S]*?id\s*=\s*"([^"]+)"[\s\S]*?preview_id\s*=\s*"([^"]+)"/m;
+  const table = toml.match(tablePattern);
 
   if (!table) {
     throw new Error('Could not find HEALTH_KV binding in wrangler.toml');
@@ -132,7 +133,8 @@ function parseHealthKvIds(toml) {
 }
 
 function parseIdFromCreateOutput(output) {
-  const match = output.match(/id\s*=\s*"([^"]+)"/m);
+  const pattern = /id\s*=\s*"([^"]+)"/m;
+  const match = output.match(pattern);
   if (!match) {
     throw new Error(`Could not parse namespace id from output:\n${output}`);
   }
@@ -140,53 +142,37 @@ function parseIdFromCreateOutput(output) {
 }
 
 function escapeTomlString(value) {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return value.split('\\').join('\\\\').split('"').join('\\"');
 }
 
 function withKvIds(toml, id, previewId) {
-  if (
-    /binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*"[^"]+"\s*,\s*preview_id\s*=\s*"[^"]+"/m.test(toml)
-  ) {
-    return toml.replace(
-      /(binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*")([^"]+)("\s*,\s*preview_id\s*=\s*")([^"]+)(")/m,
-      `$1${id}$3${previewId}$5`
-    );
+  const inlineTest =
+    /binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*"[^"]+"\s*,\s*preview_id\s*=\s*"[^"]+"/m;
+  if (inlineTest.test(toml)) {
+    const inlineReplace =
+      /(binding\s*=\s*"HEALTH_KV"\s*,\s*id\s*=\s*")([^"]+)("\s*,\s*preview_id\s*=\s*")([^"]+)(")/m;
+    return toml.replace(inlineReplace, `$1${id}$3${previewId}$5`);
   }
 
-  if (/\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"/m.test(toml)) {
-    return toml.replace(
-      /(\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"[\s\S]*?id\s*=\s*")([^"]+)("[\s\S]*?preview_id\s*=\s*")([^"]+)(")/m,
-      `$1${id}$3${previewId}$5`
-    );
+  const tableTest = /\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"/m;
+  if (tableTest.test(toml)) {
+    const tableReplace =
+      /(\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"HEALTH_KV"[\s\S]*?id\s*=\s*")([^"]+)("[\s\S]*?preview_id\s*=\s*")([^"]+)(")/m;
+    return toml.replace(tableReplace, `$1${id}$3${previewId}$5`);
   }
 
   throw new Error('Could not replace HEALTH_KV ids in wrangler config');
 }
 
 function withVarsFromEnv(toml, env) {
+  const vars = ['PLAYGROUND_ENABLED', 'ENABLE_PHASE2', 'AUTO_ISSUE_KEYS'];
   let next = toml;
-
-  if (env.PLAYGROUND_ENABLED !== undefined) {
-    next = next.replace(
-      /^PLAYGROUND_ENABLED\s*=\s*"[^"]*"/m,
-      `PLAYGROUND_ENABLED = "${escapeTomlString(env.PLAYGROUND_ENABLED)}"`
-    );
+  for (const varName of vars) {
+    if (env[varName] !== undefined) {
+      const pattern = new RegExp(`^${varName}\\s*=\\s*"[^"]*"`, 'm');
+      next = next.replace(pattern, `${varName} = "${escapeTomlString(env[varName])}"`);
+    }
   }
-
-  if (env.ENABLE_PHASE2 !== undefined) {
-    next = next.replace(
-      /^ENABLE_PHASE2\s*=\s*"[^"]*"/m,
-      `ENABLE_PHASE2 = "${escapeTomlString(env.ENABLE_PHASE2)}"`
-    );
-  }
-
-  if (env.AUTO_ISSUE_KEYS !== undefined) {
-    next = next.replace(
-      /^AUTO_ISSUE_KEYS\s*=\s*"[^"]*"/m,
-      `AUTO_ISSUE_KEYS = "${escapeTomlString(env.AUTO_ISSUE_KEYS)}"`
-    );
-  }
-
   return next;
 }
 
@@ -225,14 +211,15 @@ function _listDatabases() {
 }
 
 function _parseD1IdFromCreateOutput(output) {
-  const explicit = output.match(/database_id\s*=\s*"([^"]+)"/m);
+  const explicitPattern = /database_id\s*=\s*"([^"]+)"/m;
+  const explicit = output.match(explicitPattern);
   if (explicit) {
     return explicit[1];
   }
 
-  const uuid = output.match(
-    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
-  );
+  const uuidPattern =
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
+  const uuid = output.match(uuidPattern);
   if (uuid) {
     return uuid[0];
   }
@@ -335,14 +322,16 @@ function uploadSecrets(configPath, payload) {
 }
 
 function extractWorkersDevUrl(output) {
-  const match = output.match(/https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/i);
+  const pattern = /https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/i;
+  const match = output.match(pattern);
   return match ? match[0] : null;
 }
 
 function resolveDeploySha() {
   const sha = process.env.GITHUB_SHA || run('git', ['rev-parse', 'HEAD'], { capture: true }).trim();
 
-  if (!/^[0-9a-f]{40}$/i.test(sha)) {
+  const shaPattern = /^[0-9a-f]{40}$/i;
+  if (!shaPattern.test(sha)) {
     throw new Error(`Cannot deploy without a full Git SHA tag; received: ${sha || '<empty>'}`);
   }
 
