@@ -236,6 +236,123 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── OpenRouter (needs OPENROUTER_API_KEY) ────────────────────────────
   {
+    id: 'openrouter-stealth-ox-alpha',
+    provider: 'openrouter',
+    model: 'stealth/ox-alpha',
+    reasoning: 'high',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.82,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      nativeReasoning: true,
+      contextWindow: 1_048_576,
+      maxOutputTokens: 131_072,
+    },
+  },
+  {
+    id: 'openrouter-zai-glm-5-2-free',
+    provider: 'openrouter',
+    model: 'z-ai/glm-5.2:free',
+    reasoning: 'high',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.68,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      nativeReasoning: true,
+      contextWindow: 256_000,
+      maxOutputTokens: 65_536,
+    },
+  },
+  {
+    id: 'openrouter-nvidia-nemotron-3-5-lightning-free',
+    provider: 'openrouter',
+    model: 'nvidia/nemotron-3.5-lightning:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.6,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: false,
+      vision: false,
+      contextWindow: 1_000_000,
+      maxOutputTokens: 65_536,
+    },
+  },
+  {
+    id: 'openrouter-thinkingmachines-inkling-free',
+    provider: 'openrouter',
+    model: 'thinkingmachines/inkling:free',
+    reasoning: 'high',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.55,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: false,
+      vision: true,
+      nativeReasoning: true,
+      contextWindow: 262_144,
+      maxOutputTokens: 65_536,
+    },
+  },
+  {
+    id: 'openrouter-thinkingmachines-inkling-small-free',
+    provider: 'openrouter',
+    model: 'thinkingmachines/inkling-small:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.45,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: false,
+      vision: true,
+      nativeReasoning: true,
+      contextWindow: 262_144,
+      maxOutputTokens: 65_536,
+    },
+  },
+  {
+    id: 'openrouter-dots-studio-dots-3-note-preview-free',
+    provider: 'openrouter',
+    model: 'dots-studio/dots-3-note-preview:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true, // preview model — expires 2026-09-30
+    priority: 0.5,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 512_000,
+      maxOutputTokens: 65_536,
+    },
+  },
+  {
+    id: 'openrouter-liquid-lfm-2-5-2-6b-free',
+    provider: 'openrouter',
+    model: 'liquid/lfm-2.5-2.6b:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.35,
+    capabilities: {
+      toolCalling: true,
+      jsonMode: true,
+      vision: false,
+      nativeReasoning: true,
+      contextWindow: 65_536,
+      maxOutputTokens: 8_192,
+    },
+  },
+  {
     id: 'openrouter-nvidia-nemotron-12b-free',
     provider: 'openrouter',
     model: 'nvidia/nemotron-nano-12b-v2-vl:free',
@@ -1131,22 +1248,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       maxOutputTokens: 4096,
     },
   },
-  {
-    id: 'openrouter-openai-gpt-oss-20b-free',
-    provider: 'openrouter',
-    model: 'openai/gpt-oss-20b:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
   {
@@ -1324,23 +1425,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
   {
-    id: 'openrouter-inclusionai-ling-3-0-tiny-free',
-    provider: 'openrouter',
-    model: 'inclusionai/ling-3.0-tiny:free',
-    reasoning: 'low',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: true,
-      jsonMode: false,
-      vision: false,
-      nativeReasoning: true,
-      contextWindow: 262_144,
-      maxOutputTokens: 32_768,
-    },
-  },
-  {
     id: 'openrouter-poolside-laguna-s-2-1-free',
     provider: 'openrouter',
     model: 'poolside/laguna-s-2.1:free',
@@ -1396,6 +1480,13 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'gemini:gemini-2.5-flash': { requestsPerDay: 500 },
   'gemini:gemini-2.5-flash-lite': { requestsPerDay: 1500 },
   // OpenRouter (free models, rate-limited upstream)
+  'openrouter:stealth/ox-alpha': { requestsPerDay: 100 },
+  'openrouter:z-ai/glm-5.2:free': { requestsPerDay: 100 },
+  'openrouter:nvidia/nemotron-3.5-lightning:free': { requestsPerDay: 100 },
+  'openrouter:thinkingmachines/inkling:free': { requestsPerDay: 100 },
+  'openrouter:thinkingmachines/inkling-small:free': { requestsPerDay: 100 },
+  'openrouter:dots-studio/dots-3-note-preview:free': { requestsPerDay: 100 },
+  'openrouter:liquid/lfm-2.5-2.6b:free': { requestsPerDay: 100 },
 
   'openrouter:nvidia/nemotron-nano-12b-v2-vl:free': { requestsPerDay: 100 },
 
@@ -1461,7 +1552,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:openrouter/free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-3-nano-30b-a3b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-nano-9b-v2:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:openai/gpt-oss-20b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 
   'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 
@@ -1478,7 +1568,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'zai:glm-4.5-flash': { requestsPerDay: 200 }, // AUTO-ADDED — tune
   'zai:glm-4.6v-flash': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   // AUTO-ADDED limits
-  'openrouter:inclusionai/ling-3.0-tiny:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:poolside/laguna-s-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'modelscope:Qwen/Qwen3-32B': { requestsPerDay: 50 },
 };

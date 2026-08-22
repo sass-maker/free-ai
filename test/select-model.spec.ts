@@ -555,10 +555,11 @@ describe('default registry vision coverage', () => {
 
     expect(selected.every((candidate) => candidate.reasoning === 'high')).toBe(true);
     // GitHub Models is manual-only after its 100% observed failure window, so
-    // automatic high-tier vision currently relies on Gemini and Mistral.
+    // automatic high-tier vision currently relies on Gemini, Mistral, and the
+    // free OpenRouter reasoning+vision model (stealth/ox-alpha).
     expect(selected.length).toBeGreaterThanOrEqual(2);
     expect(highTier.length).toBeGreaterThanOrEqual(2);
-    expect(providers).toEqual(new Set(['gemini', 'mistral']));
+    expect(providers).toEqual(new Set(['gemini', 'mistral', 'openrouter']));
     expect(selected.every((candidate) => candidate.provider !== 'github_models')).toBe(true);
     expect(models).not.toContain('openai/gpt-5-mini');
     expect(models).not.toContain('openai/o4-mini');
