@@ -1,0 +1,7 @@
+---
+import Tab from "blume/components/content/Tab.astro";
+
+const { label, title, ...props } = Astro.props;
+---
+
+<Tab title={title ?? label ?? "Tab"} {...props}><slot /></Tab>

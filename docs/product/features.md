@@ -2,7 +2,7 @@
 
 What the gateway does today. For the user-facing API reference see
 [`../../site/src/content/docs/`](../../site/src/content/docs/) (rendered by
-Starlight). For the public product overview see [`../../README.md`](../../README.md).
+Blume at `/docs/`). For the public product overview see [`../../README.md`](../../README.md).
 
 ## Gateway core — authenticated `/v1/*` routes
 
@@ -46,7 +46,7 @@ Starlight). For the public product overview see [`../../README.md`](../../README
 
 - **Gateway Worker:** `https://ai-gateway.sassmaker.com` — worker
   `free-ai-gateway`; D1 `free-ai-gateway-db`.
-- **Docs/landing (bundled):** Astro/Starlight site in `site/dist`, served via
+- **Docs/landing (bundled):** Astro site plus Blume API docs in `site/dist`, served via
   Worker `ASSETS` binding (`run_worker_first=true`) — no separate deploy.
 - **Examples:** `examples/node-openai-sdk/`, `examples/python-openai-sdk/`.
 - **Playground:** Vite build via `pnpm build:playground` (behind

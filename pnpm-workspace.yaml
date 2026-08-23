@@ -1,7 +1,6 @@
 packages:
   - "."
   - "site"
-  - "docs-blume"
 
 onlyBuiltDependencies:
   - workerd

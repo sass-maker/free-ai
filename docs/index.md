@@ -1,8 +1,10 @@
 # free-ai — Repository Knowledge
 
-Local-first documentation for the AI Gateway. Markdown here is the source of truth;
-Blume (in `docs-blume/`) is only the presentation/search layer. Code and executable
-configuration remain authoritative for implementation details and schedules.
+Local-first maintainer documentation for the AI Gateway. Markdown here is the
+source of truth for internal architecture, operations, and decisions. The public
+API reference lives in `site/src/content/docs/` and Blume publishes it at `/docs/`.
+Code and executable configuration remain authoritative for implementation details
+and schedules.
 
 ## Navigation
 
@@ -16,14 +18,17 @@ configuration remain authoritative for implementation details and schedules.
 | Operations | [`operations/`](operations/) | Deploy, cost guardrails, key ops, CI jobs, runbooks, automation inventory |
 | Knowledge | [`knowledge/`](knowledge/) | Durable learnings, concept stubs, failed approaches |
 | Marketing | [`marketing/`](marketing/) | Event map, UTM plan, one-liners, weekly report template |
-| Public API reference | [`../site/src/content/docs/`](../site/src/content/docs/) | User-facing API docs rendered by the Starlight site |
+| Public API reference | [`../site/src/content/docs/`](../site/src/content/docs/) | User-facing API docs rendered by Blume at `/docs/` |
 
 ## Documentation maintenance rules
 
 1. **One canonical home per fact.** If a fact appears in two places, pick one and link
    from the other. Do not duplicate.
-2. **Markdown is the source of truth.** Blume, the Starlight site, and any other
-   renderer are presentation layers — never edit generated copies.
+2. **Each documentation surface has one source of truth.** This maintainer tree
+   is canonical for internal architecture and operations; the public API source
+   in `site/src/content/docs/` is canonical for user-facing reference. Blume,
+   Starlight, and other renderers are presentation layers — never edit generated
+   copies.
 3. **Code is authoritative for implementation.** Don't restate what is easily
    discoverable from code (function signatures, config values, model tables that
    already live in `src/config.ts`). Document *why*, not *what*.
@@ -42,6 +47,6 @@ configuration remain authoritative for implementation details and schedules.
 - `STATUS.md` — short current-state snapshot (objective, active work, blockers)
 - `README.md` — public-facing product overview + quickstart (user-facing)
 - `docs/` — this knowledge tree (maintainer/agent-facing)
-- `site/src/content/docs/` — public API reference rendered by Starlight
-- `docs-blume/` — Blume presentation layer for this `docs/` tree
+- `site/src/content/docs/` — public API reference rendered by Blume at `/docs/`
+- `docs-blume/` — Blume build package for the public API reference
 - `src/` — gateway implementation (authoritative for code behavior)

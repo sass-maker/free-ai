@@ -118,8 +118,8 @@ modules under `src/routes/`. Core chat/responses and uncovered groups stay in
 
 | Surface | Audience | Rendered by |
 | --- | --- | --- |
-| `site/src/content/docs/` (Starlight MDX) | End users | Starlight site at `ai-gateway.sassmaker.com` |
-| `docs/` (this tree) | Maintainers + agents | Blume (presentation) + raw markdown |
+| `site/src/content/docs/` (Markdown/MDX) | End users | Blume API docs at `ai-gateway.sassmaker.com/docs/` |
+| `docs/` (this tree) | Maintainers + agents | Raw markdown |
 | `README.md` | End users + operators | GitHub render |
 | `AGENTS.md` | Agents | Agent tooling |
 | `STATUS.md` | Maintainers | Raw markdown |

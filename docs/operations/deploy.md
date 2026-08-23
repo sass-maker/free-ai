@@ -8,8 +8,8 @@ on every push to `main`.
 ## Pre-deploy checks
 
 `pnpm deploy` chains: `audit:cloudflare-costs` → `pnpm install --frozen-lockfile`
-→ `pnpm --filter @sass-maker/ai-gateway-docs build` (Starlight site) →
-`wrangler deploy`.
+→ the public Astro site build → the Blume API docs build → merge into
+`site/dist/docs` → `wrangler deploy`.
 
 Run locally first:
 
@@ -62,8 +62,9 @@ curl -s https://ai-gateway.sassmaker.com/v1/budget | jq
 ## What gets deployed
 
 - The Worker (`src/index.ts` + all `src/` modules) → `free-ai-gateway`.
-- The Starlight site build (`site/dist`) → served via the `ASSETS` binding with
-  `run_worker_first = true`. No separate site deploy.
+- The Astro homepage plus Starlight agent surfaces and Blume API docs
+  (`site/dist`) → served via the `ASSETS` binding with `run_worker_first = true`.
+  No separate site deploy.
 - D1 migrations are **not** auto-applied by `wrangler deploy`. Apply manually with
   `wrangler d1 migrations apply free-ai-gateway-db` when a new migration exists.
 

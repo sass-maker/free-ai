@@ -18,7 +18,8 @@ Biome's TS rules (Astro frontmatter consts get mangled); format-only applies.
 
 1. `pnpm check` — runs cost audit + typecheck + unit tests.
 2. `pnpm lint` — Biome check.
-3. `pnpm docs:check` — validate docs links + Blume build (if docs changed).
+3. `pnpm docs:check` — validate maintainer docs; run `pnpm docs:build` to smoke
+   build the public API docs.
 4. The pre-push hook runs lint + secret scan automatically.
 
 ## Commit style

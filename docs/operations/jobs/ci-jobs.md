@@ -17,7 +17,8 @@ files (cron) — those are authoritative, not this page.
 - **Concurrency:** `cloudflare-deploy-${{ github.ref }}`, cancels in-progress.
 - **Steps:** checkout → install → typecheck → test → validate
   `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets → `pnpm run deploy`
-  (cost audit + Starlight build + `wrangler deploy`) → smoke `curl /health`.
+  (cost audit + Astro build + Blume `/docs` build + `wrangler deploy`) → smoke
+  `curl /health`.
 - **Permissions:** `contents: read`.
 
 ## `check-models.yml` — Weekly provider resync
@@ -44,8 +45,8 @@ files (cron) — those are authoritative, not this page.
 ## `docs-check.yml` — Documentation validation
 
 - **Trigger:** push to `main`, PR to `main`.
-- **Steps:** `pnpm docs:check` (broken-link scan + orphan detection) +
-  `pnpm docs:build` (Blume build smoke).
+- **Steps:** `pnpm docs:check` (broken-link scan + orphan detection) + public
+  Astro build + `pnpm docs:build` (Blume `/docs` build smoke).
 - See [`../development/workflow.md`](../../development/workflow.md) for local
   equivalents.
 

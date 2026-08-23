@@ -1,25 +1,24 @@
 import { defineConfig } from 'blume';
 
-// Blume is the PRESENTATION + SEARCH layer for the repository knowledge tree.
-// The source of truth is the committed Markdown in ../docs — never edit
-// generated Blume output. See ../docs/index.md for documentation maintenance
-// rules.
+// Blume is the presentation + search layer for the public API reference.
+// The source of truth is the committed Markdown in ../site/src/content/docs.
 export default defineConfig({
-  title: 'AI Gateway — Knowledge',
+  title: 'AI Gateway — API Docs',
   description:
-    'Maintainer and agent documentation for the free-ai OpenAI-compatible LLM gateway: architecture, operations, learnings, and decisions.',
-  content: { root: '../docs' },
+    'Public API documentation for the free-ai OpenAI-compatible LLM gateway.',
+  content: { root: '../site/src/content/docs' },
   github: {
     owner: 'sass-maker',
     repo: 'free-ai',
     branch: 'main',
-    dir: 'docs',
+    dir: 'site/src/content/docs',
   },
   search: { provider: 'orama' },
   ai: { llmsTxt: true },
   seo: { agentReadability: true, sitemap: true, robots: true },
   deployment: {
-    site: 'https://docs.ai-gateway.sassmaker.com',
+    site: 'https://ai-gateway.sassmaker.com',
+    base: '/docs',
     output: 'static',
   },
 });

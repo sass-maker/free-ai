@@ -27,13 +27,11 @@ site/package-lock.json
 cache.bin
 ops/gateway-key-hashes.local.json
 
-# Blume generated artifacts (presentation layer — source of truth is docs/)
+# Blume generated artifacts (presentation layer — source of truth is site/src/content/docs/)
 docs-blume/dist/
 docs-blume/.blume/
 docs-blume/.astro/
 docs-blume/node_modules/
-docs-blume/docs/
-docs-blume/package-lock.json
 
 # local agent logs / scratch
 .agent-logs/

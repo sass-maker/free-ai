@@ -24,7 +24,7 @@ pnpm test:e2e:live            # playwright (live gateway, local only)
 pnpm typecheck                # tsc --noEmit
 pnpm lint                     # biome check .
 pnpm docs:check               # validate docs links + orphans
-pnpm docs:build               # blume build (presentation smoke)
+pnpm docs:build               # build the public Blume docs for /docs
 pnpm audit:cloudflare-costs   # pre-deploy cost guardrail
 pnpm smoke:embedding-models -- --model gemini-embedding-001
 pnpm keys:generate|list|print-secret|upload   # operator key ring
@@ -84,8 +84,10 @@ pnpm keys:generate|list|print-secret|upload   # operator key ring
 
 1. **One canonical home per fact.** If a fact appears in two places, pick one and
    link from the other. See [`docs/index.md`](docs/index.md) for the full rules.
-2. **Markdown in `docs/` is the source of truth.** Blume, Starlight, and any
-   renderer are presentation layers — never edit generated copies.
+2. **Each documentation surface has one source of truth.** Maintainer Markdown
+   in `docs/` is rendered for agents and operators; the public API reference in
+   `site/src/content/docs/` is rendered by both Starlight and Blume. Never edit
+   generated copies.
 3. **Code is authoritative for implementation.** Document *why*, not *what*. Don't
    restate what is discoverable from `src/`.
 4. **Mark unknowns** with `TBD` or an "Unresolved" section. Do not invent rationale.
@@ -105,10 +107,10 @@ src/                  gateway implementation (authoritative for code behavior)
   router/             select-model.ts (scoring), classify-error.ts
   state/              HealthStateDO, IpRateLimitDO, NeuronBudgetDO, client
   auth/               gateway.ts (key + hash validation)
-site/                 Astro + Starlight public site (separate package.json)
+site/                 Astro + Starlight public site and API source (separate package.json)
 site/src/content/docs/   public API reference (user-facing MDX)
 docs/                 repository knowledge tree (maintainer/agent-facing)
-docs-blume/           Blume presentation layer for docs/
+docs-blume/           Blume presentation layer for site/src/content/docs/
 migrations/           D1 SQL migrations (0001–0006)
 scripts/              deploy, cost audit, model-id check, key ring, smoke tests
 test/                 Vitest unit tests
