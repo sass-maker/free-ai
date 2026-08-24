@@ -4,8 +4,7 @@ import { defineConfig } from 'blume';
 // The source of truth is the committed Markdown in ../site/src/content/docs.
 export default defineConfig({
   title: 'AI Gateway — API Docs',
-  description:
-    'Public API documentation for the free-ai OpenAI-compatible LLM gateway.',
+  description: 'Public API documentation for the free-ai OpenAI-compatible LLM gateway.',
   content: { root: '../site/src/content/docs' },
   github: {
     owner: 'sass-maker',
