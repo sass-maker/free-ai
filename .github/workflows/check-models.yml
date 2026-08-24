@@ -53,6 +53,8 @@ jobs:
           console.log(`new=${report.new.length}`);
           console.log(`drift=${report.stale.length + report.new.length}`);
           console.log(`incomplete=${report.summary.incompleteCatalogs}`);
+          console.log(`credential_gaps=${report.summary.credentialGaps}`);
+          console.log(`catalog_errors=${report.summary.catalogErrors}`);
           NODE
           echo "checker_exit=$checker_exit" >> "$GITHUB_OUTPUT"
 
@@ -91,6 +93,20 @@ jobs:
           echo "exit=$smoke_exit" >> "$GITHUB_OUTPUT"
           echo "status=$smoke_status" >> "$GITHUB_OUTPUT"
 
+      - name: Check live provider health
+        id: live-health
+        env:
+          FREE_AI_BASE_URL: https://ai-gateway.sassmaker.com
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-live-provider-health.mjs > live-health-report.json
+          health_exit=$?
+          set -e
+          node -e "JSON.parse(require('fs').readFileSync('live-health-report.json', 'utf8'))"
+          echo "exit=$health_exit" >> "$GITHUB_OUTPUT"
+          echo "status=$(node -p \"JSON.parse(require('fs').readFileSync('live-health-report.json','utf8')).ok ? 'healthy' : 'failed'\")" >> "$GITHUB_OUTPUT"
+
       - name: Summarize provider resync
         shell: bash
         run: |
@@ -98,11 +114,14 @@ jobs:
           const fs = require('fs');
           const report = JSON.parse(fs.readFileSync('catalog-report.json', 'utf8'));
           const smoke = JSON.parse(fs.readFileSync('smoke-report.json', 'utf8'));
+          const health = JSON.parse(fs.readFileSync('live-health-report.json', 'utf8'));
           const incomplete = report.catalogs.filter((catalog) => catalog.status !== 'ok');
           console.log('## Provider resync');
           console.log(`- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
           console.log(`- Registry drift: ${report.stale.length} stale, ${report.new.length} new`);
           console.log(`- Replay smoke: ${smoke.status}`);
+          console.log(`- Live gateway health: ${health.ok ? 'healthy' : 'failed'}`);
+          console.log(`- Live 7-day failure rate: ${(health.analytics_7d.failure_rate * 100).toFixed(2)}%`);
           if (incomplete.length) {
             console.log('\n### Incomplete catalogs');
             for (const item of incomplete) console.log(`- ${item.provider}: ${item.status} - ${item.reason}`);
@@ -117,6 +136,7 @@ jobs:
           path: |
             catalog-report.json
             smoke-report.json
+            live-health-report.json
             model-sync.patch
           if-no-files-found: warn
 
@@ -125,18 +145,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TITLE: '[provider-registry] Catalog drift or coverage gap'
-          HAS_PROBLEM: ${{ steps.catalog.outputs.drift != '0' || steps.catalog.outputs.incomplete != '0' || steps.catalog.outputs.checker_exit == '2' || steps.smoke.outputs.exit != '0' }}
+          HAS_PROBLEM: ${{ steps.catalog.outputs.drift != '0' || steps.catalog.outputs.incomplete != '0' || steps.catalog.outputs.checker_exit == '2' || steps.smoke.outputs.exit != '0' || steps.live-health.outputs.exit != '0' }}
         shell: bash
         run: |
           node - <<'NODE' > issue-body.md
           const fs = require('fs');
           const report = JSON.parse(fs.readFileSync('catalog-report.json', 'utf8'));
           const smoke = JSON.parse(fs.readFileSync('smoke-report.json', 'utf8'));
+          const health = JSON.parse(fs.readFileSync('live-health-report.json', 'utf8'));
           console.log(`Automated provider resync found a condition requiring review in run ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}.`);
           console.log(`\n- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
           console.log(`- Stale models: ${report.stale.length}`);
           console.log(`- New models: ${report.new.length}`);
           console.log(`- Replay smoke: ${smoke.status}`);
+          console.log(`- Live gateway health: ${health.ok ? 'healthy' : 'failed'}`);
           console.log('\nIncomplete catalogs:');
           const incomplete = report.catalogs.filter((catalog) => catalog.status !== 'ok');
           if (!incomplete.length) console.log('- None');
@@ -157,6 +179,6 @@ jobs:
             gh issue close "$number" --comment "Recovered in workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
           fi
 
-      - name: Fail on drift, incomplete coverage, or smoke failure
-        if: steps.catalog.outputs.drift != '0' || steps.catalog.outputs.incomplete != '0' || steps.catalog.outputs.checker_exit == '2' || steps.smoke.outputs.exit != '0'
+      - name: Fail on stale models or product-health failure
+        if: steps.catalog.outputs.stale != '0' || steps.catalog.outputs.catalog_errors != '0' || steps.catalog.outputs.checker_exit == '2' || steps.live-health.outputs.exit != '0' || (steps.smoke.outputs.status != 'skipped' && steps.smoke.outputs.exit != '0')
         run: exit 1
