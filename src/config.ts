@@ -136,22 +136,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── Groq (free tier, rate-limited) ──────────────────────────────────
   {
-    id: 'groq-llama-70b',
-    provider: 'groq',
-    model: 'llama-3.3-70b-versatile',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.91,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 32768,
-    },
-  },
-  {
     id: 'groq-gpt-oss-120b',
     provider: 'groq',
     model: 'openai/gpt-oss-120b',
@@ -180,22 +164,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       jsonMode: true,
       vision: false,
       contextWindow: 32768,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'groq-llama-8b',
-    provider: 'groq',
-    model: 'llama-3.1-8b-instant',
-    reasoning: 'low',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.91,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
       maxOutputTokens: 8192,
     },
   },
@@ -1284,22 +1252,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       maxOutputTokens: 4096,
     },
   },
-  {
-    id: 'cerebras-zai-glm-4-7',
-    provider: 'cerebras',
-    model: 'zai-glm-4.7',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
   {
@@ -1472,10 +1424,8 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'workers_ai:@cf/meta/llama-3.2-1b-instruct': { requestsPerDay: 1000 },
   'workers_ai:@cf/microsoft/phi-2': { requestsPerDay: 800 },
   // Groq
-  'groq:llama-3.3-70b-versatile': { requestsPerDay: 300 },
   'groq:openai/gpt-oss-120b': { requestsPerDay: 200 },
   'groq:openai/gpt-oss-20b': { requestsPerDay: 500 },
-  'groq:llama-3.1-8b-instant': { requestsPerDay: 1500 },
   // Gemini
   'gemini:gemini-2.5-flash': { requestsPerDay: 500 },
   'gemini:gemini-2.5-flash-lite': { requestsPerDay: 1500 },
@@ -1556,7 +1506,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 
   'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'cerebras:zai-glm-4.7': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'groq:qwen/qwen3.6-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:cohere/north-mini-code:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:poolside/laguna-xs-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune

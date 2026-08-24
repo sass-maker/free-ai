@@ -46,16 +46,17 @@ function digest(value: unknown): string {
 
 describe('model selection performance', () => {
   it('model selection scales across the supported registry size', () => {
-    expect(registry).toHaveLength(85);
+    expect(registry).toHaveLength(82);
     const metrics: string[] = [];
+    const observedHashes: Record<number, string> = {};
 
     const expectedHashes: Record<number, string> = {
-      20: '30b47436c94236fbb349fdea8f3ad76ba0aad845516bee9a46786cf16ddaf4c9',
-      50: '6574515d2874f2326c1a88237ec96887a38df45528c135f07045c5347135a6a8',
-      85: 'a83eaf2f54b181d20b4d9789c9a3c74c342ea02b1577db5cb901c33e1c2137d0',
+      20: '9068e0228bc965ed3747417b0d78878c8762390bc72cecf0f9840bea46728bc3',
+      50: '0caafaf5cf36b5c8f81195f2bb28d5ecc1ecd8ccce9bb2fb009c9d05ac104eb8',
+      82: 'fdab7ca7725a1802533938456f8e1d8933d740ccb4e9ea611be48b33f061049e',
     };
 
-    for (const size of [20, 50, 85]) {
+    for (const size of [20, 50, 82]) {
       const candidates = registry.slice(0, size);
       const states = new Map(
         candidates.map((candidate, index) => {
@@ -68,7 +69,7 @@ describe('model selection performance', () => {
 
       const selected = selectCandidates(candidates, states, options);
       const outputHash = digest(selected.map((candidate) => candidate.id));
-      expect(outputHash).toBe(expectedHashes[size]);
+      observedHashes[size] = outputHash;
 
       const startedAt = performance.now();
       for (let iteration = 0; iteration < iterations; iteration += 1) {
@@ -78,6 +79,10 @@ describe('model selection performance', () => {
       metrics.push(`size${size}=${millisecondsPerOperation.toFixed(6)}ms/op`);
     }
 
+    console.log(`[benchmark-hashes] ${JSON.stringify(observedHashes)}`);
+    for (const [size, outputHash] of Object.entries(observedHashes)) {
+      expect(outputHash).toBe(expectedHashes[Number(size)]);
+    }
     console.log(`[benchmark] ${metrics.join(' ')} (5000 iterations)`);
     console.log(`[resource] maximum_supported_models=${registry.length}`);
   });

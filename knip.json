@@ -23,7 +23,14 @@
       "project": ["src/**/*.{ts,astro}", "scripts/**/*.mjs"]
     },
     "docs-blume": {
-      "entry": ["blume.config.ts"],
+      "entry": [
+        "blume.config.ts",
+        "components.ts",
+        "pages/index.astro",
+        "starlight-components.ts",
+        "starlight-tab-item.astro"
+      ],
+      "ignoreBinaries": ["blume"],
       "ignoreDependencies": ["astro"]
     }
   }

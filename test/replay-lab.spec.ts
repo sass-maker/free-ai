@@ -28,7 +28,7 @@ function replayRequest(body: Record<string, unknown>, headers: HeadersInit = {})
     },
     body: JSON.stringify({
       provider: 'groq',
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       project_id: 'debug-lab',
       messages: [{ role: 'user', content: 'hello' }],
       ...body,
@@ -44,7 +44,7 @@ describe('POST /v1/debug/replay', () => {
   it('replays a request directly against a configured provider', async () => {
     mocks.groqMock.mockResolvedValueOnce({
       provider: 'groq',
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       stream: false,
       completion: {
         id: 'chatcmpl-replay',
@@ -68,14 +68,14 @@ describe('POST /v1/debug/replay', () => {
     expect(body).toMatchObject({
       ok: true,
       provider: 'groq',
-      model: 'llama-3.1-8b-instant',
-      selected: { provider: 'groq', model: 'llama-3.1-8b-instant' },
+      model: 'openai/gpt-oss-20b',
+      selected: { provider: 'groq', model: 'openai/gpt-oss-20b' },
       completion: { id: 'chatcmpl-replay' },
     });
     expect(mocks.groqMock).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: 'groq',
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         stream: false,
       })
     );
