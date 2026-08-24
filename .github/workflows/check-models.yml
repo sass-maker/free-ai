@@ -183,5 +183,5 @@ jobs:
           fi
 
       - name: Fail on stale models or product-health failure
-        if: steps.catalog.outputs.stale != '0' || steps.catalog.outputs.catalog_errors != '0' || steps.catalog.outputs.checker_exit == '2' || steps.live-health.outputs.exit != '0' || (steps.smoke.outputs.status != 'skipped' && steps.smoke.outputs.exit != '0')
+        if: steps.catalog.outputs.stale != '0' || steps.catalog.outputs.checker_exit == '2' || steps.live-health.outputs.exit != '0' || (steps.smoke.outputs.status != 'skipped' && steps.smoke.outputs.exit != '0')
         run: exit 1

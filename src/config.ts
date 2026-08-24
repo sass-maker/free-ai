@@ -320,23 +320,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       maxOutputTokens: 8_192,
     },
   },
-  {
-    id: 'openrouter-nvidia-nemotron-12b-free',
-    provider: 'openrouter',
-    model: 'nvidia/nemotron-nano-12b-v2-vl:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.7,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: true,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-
   // ── Cerebras (needs CEREBRAS_API_KEY) ───────────────────────────────
   {
     id: 'cerebras-gpt-oss-120b',
@@ -1184,39 +1167,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       maxOutputTokens: 4096,
     },
   },
-  {
-    id: 'openrouter-nvidia-nemotron-3-nano-30b-a3b-free',
-    provider: 'openrouter',
-    model: 'nvidia/nemotron-3-nano-30b-a3b:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-nvidia-nemotron-nano-9b-v2-free',
-    provider: 'openrouter',
-    model: 'nvidia/nemotron-nano-9b-v2:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-
   // ── Auto-added by weekly model check (review priority + capabilities) ──
   {
     id: 'openrouter-nvidia-nemotron-3-nano-omni-30b-a3b-reasoning-fre',
@@ -1438,8 +1388,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:dots-studio/dots-3-note-preview:free': { requestsPerDay: 100 },
   'openrouter:liquid/lfm-2.5-2.6b:free': { requestsPerDay: 100 },
 
-  'openrouter:nvidia/nemotron-nano-12b-v2-vl:free': { requestsPerDay: 100 },
-
   // Cerebras
   'cerebras:gpt-oss-120b': { requestsPerDay: 300 },
   // SambaNova (free tier, 10-20 RPM)
@@ -1500,9 +1448,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:google/gemma-4-31b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-3-super-120b-a12b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:openrouter/free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:nvidia/nemotron-3-nano-30b-a3b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:nvidia/nemotron-nano-9b-v2:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-
   'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 
   'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
