@@ -105,7 +105,10 @@ jobs:
           set -e
           node -e "JSON.parse(require('fs').readFileSync('live-health-report.json', 'utf8'))"
           echo "exit=$health_exit" >> "$GITHUB_OUTPUT"
-          echo "status=$(node -p \"JSON.parse(require('fs').readFileSync('live-health-report.json','utf8')).ok ? 'healthy' : 'failed'\")" >> "$GITHUB_OUTPUT"
+          node - <<'NODE' >> "$GITHUB_OUTPUT"
+          const report = JSON.parse(require('fs').readFileSync('live-health-report.json', 'utf8'));
+          console.log(`status=${report.ok ? 'healthy' : 'failed'}`);
+          NODE
 
       - name: Summarize provider resync
         shell: bash
