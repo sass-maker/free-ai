@@ -40,6 +40,8 @@ describe('model catalog checker', () => {
     expect(report.stale).toEqual([]);
     expect(report.skipped).toHaveLength(1);
     expect(report.summary.incompleteCatalogs).toBe(1);
+    expect(report.summary.credentialGaps).toBe(1);
+    expect(report.summary.catalogErrors).toBe(0);
   });
 
   it('reports stale and newly discoverable models only from a successful catalog', () => {
@@ -73,5 +75,33 @@ describe('model catalog checker', () => {
       reason: 'catalog response did not contain a model array',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('separates attempted catalog failures from credential coverage gaps', () => {
+    const report = buildRegistryReport(
+      [],
+      [
+        {
+          provider: 'groq',
+          status: 'missing_key',
+          reason: 'GROQ_API_KEY is not configured',
+          all: new Set(),
+          addable: new Set(),
+        },
+        {
+          provider: 'gemini',
+          status: 'error',
+          reason: 'catalog returned HTTP 400',
+          all: new Set(),
+          addable: new Set(),
+        },
+      ]
+    );
+
+    expect(report.summary).toMatchObject({
+      incompleteCatalogs: 2,
+      credentialGaps: 1,
+      catalogErrors: 1,
+    });
   });
 });

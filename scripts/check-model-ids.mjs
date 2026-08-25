@@ -85,9 +85,8 @@ const CATALOG_SPECS = [
   {
     provider: 'gemini',
     secret: 'GEMINI_API_KEY',
-    url: ({ key }) =>
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
-    headers: () => ({}),
+    url: () => 'https://generativelanguage.googleapis.com/v1beta/models',
+    headers: ({ key }) => ({ 'x-goog-api-key': key }),
     discover: (item) => /^gemini-/.test(modelId(item)) && isTextModel(item),
   },
   {
@@ -255,6 +254,8 @@ export function buildRegistryReport(configModels, catalogResults) {
       managedCatalogs: CATALOG_SPECS.length,
       checkedCatalogs: 0,
       incompleteCatalogs: 0,
+      credentialGaps: 0,
+      catalogErrors: 0,
       unsupportedCatalogs: 0,
     },
   };
@@ -269,7 +270,11 @@ export function buildRegistryReport(configModels, catalogResults) {
     });
     if (catalog.status === 'ok') report.summary.checkedCatalogs += 1;
     else if (catalog.status === 'unsupported') report.summary.unsupportedCatalogs += 1;
-    else report.summary.incompleteCatalogs += 1;
+    else {
+      report.summary.incompleteCatalogs += 1;
+      if (catalog.status === 'missing_key') report.summary.credentialGaps += 1;
+      else report.summary.catalogErrors += 1;
+    }
   }
 
   for (const entry of configModels) {
@@ -449,7 +454,9 @@ async function main() {
     console.log(`\nPatched config.ts — ${parts.join(', ')}`);
   }
 
-  // Signal CI when drift or catalog coverage needs review.
+  // Signal the caller when maintenance review is needed. The workflow keeps
+  // missing optional catalog credentials visible in its issue, while using
+  // the separate live-health check as the product-availability gate.
   if (
     !PATCH &&
     (report.stale.length > 0 || report.new.length > 0 || report.summary.incompleteCatalogs > 0)
