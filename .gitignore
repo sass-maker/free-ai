@@ -38,3 +38,4 @@ docs-blume/node_modules/
 .agent-scratch/
 *.agent-log
 .codevetter/
+.codegrok/
