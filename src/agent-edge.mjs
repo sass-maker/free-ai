@@ -14,7 +14,7 @@ export const AGENT_SURFACE = {
   "name": "AI Gateway",
   "url": "https://ai-gateway.sassmaker.com",
   "llmsFullTxt": "# AI Gateway — full agent brief\n\nOpenAI-compatible LLM gateway fronting free-tier models across multiple providers.\n\n## Index\n\n# AI Gateway (free-ai)\n\nOpenAI-compatible gateway over free-tier models across providers.\n\n## API\n\n- Base: https://ai-gateway.sassmaker.com\n- `GET /health`\n- `GET /v1/models`\n- Chat completions require API key (`GATEWAY_API_KEY`)\n\n## Agent entrypoints\n\n- https://ai-gateway.sassmaker.com/llms.txt\n- https://ai-gateway.sassmaker.com/api/ai\n- https://ai-gateway.sassmaker.com/index.md\n\n## Product links\n\n- Health: https://ai-gateway.sassmaker.com/health — Health probe\n- Models: https://ai-gateway.sassmaker.com/v1/models — OpenAI-compatible models list\n\n## Machine surfaces\n\n- https://ai-gateway.sassmaker.com/llms.txt\n- https://ai-gateway.sassmaker.com/llms-full.txt\n- https://ai-gateway.sassmaker.com/api/ai\n- https://ai-gateway.sassmaker.com/index.md\n- https://ai-gateway.sassmaker.com/sitemap.xml\n- https://ai-gateway.sassmaker.com/robots.txt\n\n## Contact / fleet\n\n- Fleet: https://sassmaker.com\n- Agent email for directory verification: sarthakagrawal@agentmail.to\n",
-  "llmsTxt": "# AI Gateway\n\n> OpenAI-compatible LLM gateway fronting free-tier models across multiple providers.\n\n## Product\n\n- [Health](https://ai-gateway.sassmaker.com/health): Health probe\n- [Models](https://ai-gateway.sassmaker.com/v1/models): OpenAI-compatible models list\n\n## Machine surfaces\n\n- [Agent catalog](https://ai-gateway.sassmaker.com/api/ai): JSON inventory of public surfaces\n- [Homepage markdown](https://ai-gateway.sassmaker.com/index.md): Product brief without JS\n- [This index](https://ai-gateway.sassmaker.com/llms.txt)\n\n## Optional\n\n- [Foundry](https://sassmaker.com): Parent fleet showcase\n",
+  "llmsTxt": "# AI Gateway\n\n> OpenAI-compatible LLM gateway fronting free-tier models across multiple providers.\n\n## Product\n\n- [Health](https://ai-gateway.sassmaker.com/health): Health probe\n- [Models](https://ai-gateway.sassmaker.com/v1/models): OpenAI-compatible models list\n- [FAQ](https://ai-gateway.sassmaker.com/faq): Frequently asked questions about the gateway\n\n## Machine surfaces\n\n- [Agent catalog](https://ai-gateway.sassmaker.com/api/ai): JSON inventory of public surfaces\n- [OpenAPI spec](https://ai-gateway.sassmaker.com/openapi.json): Machine-readable API description\n- [Homepage markdown](https://ai-gateway.sassmaker.com/index.md): Product brief without JS\n- [This index](https://ai-gateway.sassmaker.com/llms.txt)\n\n## When to use this\n\n- Routing LLM requests across free-tier providers with an OpenAI-compatible API\n- Discovering available free-tier chat, embedding, image, and audio models\n- Checking gateway health, model availability, and provider quota status\n- Building agent workflows that need a zero-cost LLM gateway with fallback routing\n\n## Optional\n\n- [Foundry](https://sassmaker.com): Parent fleet showcase\n",
   "indexMd": "# AI Gateway (free-ai)\n\nOpenAI-compatible gateway over free-tier models across providers.\n\n## API\n\n- Base: https://ai-gateway.sassmaker.com\n- `GET /health`\n- `GET /v1/models`\n- Chat completions require API key (`GATEWAY_API_KEY`)\n\n## Agent entrypoints\n\n- https://ai-gateway.sassmaker.com/llms.txt\n- https://ai-gateway.sassmaker.com/api/ai\n- https://ai-gateway.sassmaker.com/index.md\n",
   "catalog": {
     "name": "AI Gateway",
@@ -26,7 +26,7 @@ export const AGENT_SURFACE = {
     "robots": "https://ai-gateway.sassmaker.com/robots.txt",
     "markdown": {
       "suffix": ".md",
-      "negotiation": false
+      "negotiation": true
     },
     "surfaces": [
       {
@@ -226,6 +226,186 @@ export const AGENT_SURFACE = {
   }
 };
 
+const OPENAPI_SPEC = {
+  openapi: '3.1.0',
+  info: {
+    title: 'AI Gateway public API',
+    version: '1.0.0',
+    description:
+      'OpenAI-compatible LLM gateway fronting free-tier models across multiple providers. The public web API exposes read-only agent surfaces: the agent catalog, llms.txt, sitemap, and markdown alternates.',
+    contact: { name: 'AI Gateway', url: 'https://ai-gateway.sassmaker.com' },
+  },
+  servers: [{ url: 'https://ai-gateway.sassmaker.com' }],
+  tags: [{ name: 'agent-surfaces', description: 'Machine-readable public surfaces' }],
+  paths: {
+    '/api/ai': {
+      get: {
+        operationId: 'getAgentCatalog',
+        tags: ['agent-surfaces'],
+        summary: 'Agent catalog',
+        description: 'JSON inventory of public agent surfaces.',
+        responses: {
+          200: {
+            description: 'Agent catalog',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/AgentCatalog' } },
+            },
+          },
+        },
+      },
+    },
+    '/llms.txt': {
+      get: {
+        operationId: 'getLlmsTxt',
+        tags: ['agent-surfaces'],
+        summary: 'llms.txt index',
+        responses: { 200: { description: 'Markdown index', content: { 'text/plain': {} } } },
+      },
+    },
+    '/llms-full.txt': {
+      get: {
+        operationId: 'getLlmsFullTxt',
+        tags: ['agent-surfaces'],
+        summary: 'Full agent brief',
+        responses: { 200: { description: 'Markdown brief', content: { 'text/plain': {} } } },
+      },
+    },
+    '/sitemap.xml': {
+      get: {
+        operationId: 'getSitemap',
+        tags: ['agent-surfaces'],
+        summary: 'Sitemap',
+        responses: { 200: { description: 'XML sitemap', content: { 'application/xml': {} } } },
+      },
+    },
+    '/openapi.json': {
+      get: {
+        operationId: 'getOpenApiSpec',
+        tags: ['agent-surfaces'],
+        summary: 'OpenAPI specification',
+        description: 'This document.',
+        responses: {
+          200: { description: 'OpenAPI 3.1 spec', content: { 'application/json': {} } },
+        },
+      },
+    },
+  },
+  components: {
+    schemas: {
+      AgentCatalog: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          version: { type: 'string' },
+          url: { type: 'string', format: 'uri' },
+          llms: { type: 'string', format: 'uri' },
+          llmsFull: { type: 'string', format: 'uri' },
+          sitemap: { type: 'string', format: 'uri' },
+          robots: { type: 'string', format: 'uri' },
+          openapi: { type: 'string', format: 'uri' },
+          markdown: {
+            type: 'object',
+            properties: { suffix: { type: 'string' }, negotiation: { type: 'boolean' } },
+          },
+        },
+      },
+    },
+  },
+};
+
+function jsonError(status, code, message, path) {
+  return new Response(JSON.stringify({ error: { code, message, path } }), {
+    status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'access-control-allow-origin': '*',
+    },
+  });
+}
+
+function markdown404(pathname, origin) {
+  const body = `# 404 — Not Found
+
+\`${pathname}\` does not exist on ${origin}.
+
+## Where to look next
+
+- [Home](${origin}/)
+- [Sitemap](${origin}/sitemap.xml)
+- [Agent index](${origin}/llms.txt)
+- [Full agent brief](${origin}/llms-full.txt)
+- [Agent catalog (JSON)](${origin}/api/ai)
+`;
+  return new Response(body, {
+    status: 404,
+    headers: {
+      'content-type': 'text/markdown; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+    },
+  });
+}
+
+function wantsMarkdown(request) {
+  const accept = (request.headers.get('accept') || '').toLowerCase();
+  if (!accept.includes('text/markdown')) return false;
+  if (!accept.includes('text/html')) return true;
+  return accept.indexOf('text/markdown') < accept.indexOf('text/html');
+}
+
+function staticAgentResponse(path) {
+  if (path === '/openapi.json' || path === '/openapi.yaml') {
+    return new Response(JSON.stringify(OPENAPI_SPEC, null, 2), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'access-control-allow-origin': '*',
+        'cache-control': 'public, max-age=3600',
+      },
+    });
+  }
+  if (path === '/llms.txt') return text(AGENT_SURFACE.llmsTxt, 'text/plain; charset=utf-8');
+  if (path === '/llms-full.txt' && AGENT_SURFACE.llmsFullTxt) {
+    return text(AGENT_SURFACE.llmsFullTxt, 'text/plain; charset=utf-8');
+  }
+  if (path === '/index.md') return text(AGENT_SURFACE.indexMd, 'text/markdown; charset=utf-8');
+  return null;
+}
+
+function agentCatalog(origin) {
+  return {
+    ...AGENT_SURFACE.catalog,
+    url: origin,
+    llms: `${origin}/llms.txt`,
+    llmsFull: `${origin}/llms-full.txt`,
+    sitemap: rebindOrigin(AGENT_SURFACE.catalog.sitemap, origin),
+    robots: rebindOrigin(AGENT_SURFACE.catalog.robots, origin),
+    openapi: `${origin}/openapi.json`,
+    surfaces: (AGENT_SURFACE.catalog.surfaces || []).map((surface) => ({
+      ...surface,
+      url: rebindOrigin(surface.url, origin),
+      md: rebindOrigin(surface.md, origin),
+    })),
+    apiResources: (AGENT_SURFACE.catalog.apiResources || []).map((resource) => ({
+      ...resource,
+      url: rebindOrigin(resource.url, origin),
+    })),
+  };
+}
+
+function negotiatedMarkdown(request, path, origin) {
+  if (!wantsMarkdown(request)) return null;
+  if (path === '/') {
+    return text(AGENT_SURFACE.indexMd, 'text/markdown; charset=utf-8', {
+      Link: '</index.md>; rel="alternate"; type="text/markdown"',
+      Vary: 'Accept, Accept-Encoding',
+    });
+  }
+  if (!path.includes('.') && !path.startsWith('/api/')) return markdown404(path, origin);
+  return null;
+}
+
 /**
  * @param {Request} request
  * @returns {Response | null}
@@ -235,35 +415,14 @@ export function handleAgentEdge(request) {
   const url = new URL(request.url);
   const path = url.pathname === '' ? '/' : url.pathname;
 
-  if (path === '/llms.txt') {
-    return text(AGENT_SURFACE.llmsTxt, 'text/plain; charset=utf-8');
-  }
-  if (path === '/llms-full.txt' && AGENT_SURFACE.llmsFullTxt) {
-    return text(AGENT_SURFACE.llmsFullTxt, 'text/plain; charset=utf-8');
-  }
-  if (path === '/api/ai') {
-    // Re-bind origin so preview/custom domains stay correct
-    const catalog = {
-      ...AGENT_SURFACE.catalog,
-      url: url.origin,
-      llms: `${url.origin}/llms.txt`,
-      llmsFull: `${url.origin}/llms-full.txt`,
-      sitemap: rebindOrigin(AGENT_SURFACE.catalog.sitemap, url.origin),
-      robots: rebindOrigin(AGENT_SURFACE.catalog.robots, url.origin),
-      surfaces: (AGENT_SURFACE.catalog.surfaces || []).map((s) => ({
-        ...s,
-        url: rebindOrigin(s.url, url.origin),
-        md: rebindOrigin(s.md, url.origin),
-      })),
-      apiResources: (AGENT_SURFACE.catalog.apiResources || []).map((resource) => ({
-        ...resource,
-        url: rebindOrigin(resource.url, url.origin),
-      })),
-    };
-    return json(catalog);
-  }
+  const staticResponse = staticAgentResponse(path);
+  if (staticResponse) return staticResponse;
+  if (path === '/api/ai') return json(agentCatalog(url.origin));
 
-  return null;
+  if (path.startsWith('/api/') && path !== '/api/ai') {
+    return jsonError(404, 'not_found', `Unknown API path: ${path}`, path);
+  }
+  return negotiatedMarkdown(request, path, url.origin);
 }
 
 function rebindOrigin(value, origin) {

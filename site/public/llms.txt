@@ -11,8 +11,16 @@
 ## Machine surfaces
 
 - [Agent catalog](https://ai-gateway.sassmaker.com/api/ai): JSON inventory of public surfaces
+- [OpenAPI spec](https://ai-gateway.sassmaker.com/openapi.json): Machine-readable API description
 - [Homepage markdown](https://ai-gateway.sassmaker.com/index.md): Product brief without JS
 - [This index](https://ai-gateway.sassmaker.com/llms.txt)
+
+## When to use this
+
+- Routing LLM requests across free-tier providers with an OpenAI-compatible API
+- Discovering available free-tier chat, embedding, image, and audio models
+- Checking gateway health, model availability, and provider quota status
+- Building agent workflows that need a zero-cost LLM gateway with fallback routing
 
 ## Optional
 

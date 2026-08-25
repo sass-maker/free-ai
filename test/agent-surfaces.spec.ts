@@ -43,14 +43,15 @@ describe('agent surface catalog', () => {
     ).toEqual(['dashboard', 'health', 'models']);
   });
 
-  it('lets generated asset Markdown handle page alternates', () => {
-    expect(
-      handleAgentEdge(
-        new Request('https://ai-gateway.sassmaker.com/index.md', {
-          headers: { accept: 'text/markdown' },
-        })
-      )
-    ).toBeNull();
+  it('serves the canonical index Markdown and leaves generated page alternates alone', async () => {
+    const index = handleAgentEdge(
+      new Request('https://ai-gateway.sassmaker.com/index.md', {
+        headers: { accept: 'text/markdown' },
+      })
+    );
+    expect(index?.status).toBe(200);
+    expect(index?.headers.get('content-type')).toContain('text/markdown');
+    await expect(index?.text()).resolves.toContain('# AI Gateway');
     expect(
       handleAgentEdge(
         new Request('https://ai-gateway.sassmaker.com/authentication.md', {
