@@ -1,0 +1,40 @@
+{
+  "$schema": "fleet.landing-audit.v1",
+  "project": "free-ai",
+  "priority": "P4",
+  "decision": "Infrastructure",
+  "auditedAt": "2026-08-29",
+  "candidateUrl": "https://regularly-pools-liberty-fully.trycloudflare.com/",
+  "productionUrl": "https://ai-gateway.sassmaker.com/",
+  "releaseState": "Local candidate qualified; current provider/model truth, responsive navigation, motion accessibility, agent-catalog integrity, direct documentation links, and footer composition changes are not deployed by this audit.",
+  "implementationAction": "preserve",
+  "migrationCandidate": false,
+  "gates": {
+    "contentPurpose": {
+      "score": 99,
+      "status": "pass",
+      "evidence": "The candidate now states the current product plainly: one OpenAI-compatible gateway key routes across 80+ chat models and 12 free-tier providers with health-aware failover. Current production evidence exposes 85 chat models across 12 providers."
+    },
+    "designQuality": {
+      "score": 93,
+      "status": "pass",
+      "evidence": "The existing dark technical presentation is coherent at 390 and 1440 pixels. The cramped mobile navigation was removed, the hero remains centered and legible, reduced-motion behavior is explicit, and the project strip plus Ask AI both render with zero horizontal overflow."
+    },
+    "seo": {
+      "score": 96,
+      "status": "pass",
+      "evidence": "The candidate homepage passes all 15 title, description, canonical, social, JSON-LD, heading, content, leak, and href checks with zero warnings. Direct homepage documentation links now use canonical trailing-slash routes. The combined production Worker still has inherited documentation redirects and route collisions outside this landing repair."
+    },
+    "geo": {
+      "score": 100,
+      "status": "pass",
+      "evidence": "The candidate catalog now contains 19 truthful public surfaces and all 19 are represented in the generated sitemap. Three documentation entries whose HTML routes collide with live Worker endpoints were removed from the advertised catalog instead of preserving a false 22-surface claim. Production remains A-tier 90 until these source changes are released."
+    },
+    "performance": {
+      "score": 99,
+      "status": "pass",
+      "evidence": "A four-profile PSI Swarm qualification after the font and LCP repair produced weighted LCP 0.677 s, mobile-mid 0.868 s, mobile-fast 0.473 s, desktop 0.287 s, harsh mobile-slow 1.878 s, CLS 0, and TBT 0. The pre-fix candidate had mobile-mid LCP 3.091 s."
+    }
+  },
+  "minimumObserved": 93
+}
