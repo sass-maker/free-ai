@@ -11,8 +11,8 @@ describe('agent surface catalog', () => {
     expect(response).not.toBeNull();
 
     const catalog = (await response?.json()) as typeof AGENT_SURFACE.catalog;
-    expect(catalog.surfaces).toHaveLength(22);
-    expect(new Set(catalog.surfaces.map((surface: { id: string }) => surface.id)).size).toBe(22);
+    expect(catalog.surfaces).toHaveLength(19);
+    expect(new Set(catalog.surfaces.map((surface: { id: string }) => surface.id)).size).toBe(19);
 
     for (const surface of catalog.surfaces) {
       expect(new URL(surface.url).origin).toBe('https://preview.example.com');
@@ -38,9 +38,7 @@ describe('agent surface catalog', () => {
       id: string;
       sitemap?: boolean;
     }>;
-    expect(
-      sitemapSurfaces.filter((surface) => surface.sitemap === false).map((surface) => surface.id)
-    ).toEqual(['dashboard', 'health', 'models']);
+    expect(sitemapSurfaces.filter((surface) => surface.sitemap === false)).toEqual([]);
   });
 
   it('serves the canonical index Markdown and leaves generated page alternates alone', async () => {

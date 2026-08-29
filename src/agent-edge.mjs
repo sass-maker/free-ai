@@ -72,14 +72,6 @@ export const AGENT_SURFACE = {
         "description": "Chat completions API reference"
       },
       {
-        "id": "dashboard",
-        "url": "https://ai-gateway.sassmaker.com/dashboard",
-        "md": "https://ai-gateway.sassmaker.com/dashboard.md",
-        "kind": "docs",
-        "sitemap": false,
-        "description": "Public gateway dashboard reference"
-      },
-      {
         "id": "embeddings",
         "url": "https://ai-gateway.sassmaker.com/embeddings",
         "md": "https://ai-gateway.sassmaker.com/embeddings.md",
@@ -108,27 +100,11 @@ export const AGENT_SURFACE = {
         "description": "Gateway setup guide"
       },
       {
-        "id": "health",
-        "url": "https://ai-gateway.sassmaker.com/health",
-        "md": "https://ai-gateway.sassmaker.com/health.md",
-        "kind": "docs",
-        "sitemap": false,
-        "description": "Health endpoint reference"
-      },
-      {
         "id": "images",
         "url": "https://ai-gateway.sassmaker.com/images",
         "md": "https://ai-gateway.sassmaker.com/images.md",
         "kind": "docs",
         "description": "Image generation API reference"
-      },
-      {
-        "id": "models",
-        "url": "https://ai-gateway.sassmaker.com/models",
-        "md": "https://ai-gateway.sassmaker.com/models.md",
-        "kind": "docs",
-        "sitemap": false,
-        "description": "Model catalog reference"
       },
       {
         "id": "provider-stats",
