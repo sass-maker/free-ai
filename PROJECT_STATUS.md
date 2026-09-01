@@ -1,12 +1,13 @@
 # free-ai — PROJECT STATUS
 
-Last updated: 2026-08-09
+Last updated: 2026-08-31
 
 ## Why / What
 
-Gateway core is shipped and stable. Active work is operator key-ring hygiene and
-low-risk route splitting. Best-effort free tier, not SLA. `src/index.ts` remains
-monolithic until split has test coverage.
+The gateway remains live as a retiring compatibility service while Fleet moves
+to project-owned free-provider and local endpoints. The caller migration is
+complete in the current Fleet audit, but no gateway deploy, DNS change, secret
+mutation, provider-resource deletion, or data deletion is authorized.
 
 See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrails.
 
@@ -22,6 +23,11 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
 
 ## Timeline
 
+- **2026-08-31** — Prepared a staged gateway decommission runbook with separate
+  approval gates for traffic and domain removal, secret and provider credential
+  revocation, compute deletion, and retained-data deletion. The gateway remains
+  live until every prerequisite and explicit approval is recorded; no production
+  action ran.
 - **2026-08-09** — Adopted the verified Ultracite-backed Biome baseline through
   the existing read-only lint gate, with explicit compatibility exceptions and
   no source rewrite, production dependency, routing, cost-cap, or deployment

@@ -15,7 +15,7 @@ and schedules.
 | Architecture | [`architecture/`](architecture/) | System design, request flow, ADRs |
 | How it works (learning) | [`architecture/how-it-works.md`](architecture/how-it-works.md) | End-to-end request walkthrough for first-time readers |
 | Development | [`development/`](development/) | Local dev, testing, contribution workflow |
-| Operations | [`operations/`](operations/) | Deploy, cost guardrails, key ops, CI jobs, runbooks, automation inventory |
+| Operations | [`operations/`](operations/) | Deploy, staged decommission, cost guardrails, key ops, CI jobs, runbooks, automation inventory |
 | Knowledge | [`knowledge/`](knowledge/) | Durable learnings, concept stubs, failed approaches |
 | Marketing | [`marketing/`](marketing/) | Event map, UTM plan, one-liners, weekly report template |
 | Public API reference | [`../site/src/content/docs/`](../site/src/content/docs/) | User-facing API docs rendered by Blume at `/docs/` |

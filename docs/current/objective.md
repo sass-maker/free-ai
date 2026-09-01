@@ -1,14 +1,17 @@
 # Current Objective
 
-The gateway core is shipped and stable. Active work is operator key-ring hygiene
-and low-risk route splitting — not stricter rate limits or public self-serve keys
-without an abuse policy.
+The gateway remains live only as a retiring compatibility service. The current
+Fleet audit found no remaining gateway callers; active work is staged retirement
+with explicit approval before traffic, credential, compute, or retained-data
+changes. No production action is authorized by this document.
 
 **Scope guardrails:**
-- **IN scope:** gateway core, operator dashboards, docs site, cost guardrails,
-  benchmark optimizer UI, repository knowledge system.
-- **OUT of scope:** public self-serve key issuance, stricter rate limiter changes
-  without endpoint evidence, broad multi-route refactors at once.
+- **IN scope:** keep the compatibility service safe while retirement gates are
+  reviewed; preserve cost guardrails and document the decommission sequence.
+- **OUT of scope:** new gateway features, public self-serve key issuance,
+  unapproved DNS or traffic changes, credential revocation, resource deletion,
+  and retained-data deletion.
 
-See [`../../STATUS.md`](../../STATUS.md) for the live objective, blockers, and next
-steps.
+See [`../operations/decommission.md`](../operations/decommission.md) for the
+staged retirement gates and [`../../STATUS.md`](../../STATUS.md) for repository
+status.
