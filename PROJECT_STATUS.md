@@ -27,6 +27,14 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
 
 ## Timeline
 
+- **2026-09-12** — Chat attempts now disable the SDK's hidden retries so the
+  gateway owns fallback and its existing two-attempt budget. The installed SDK's
+  `Request timed out.` error is recognized as retriable; user cancellation still
+  stops. Real-SDK regression tests cover streaming/nonstreaming request counts
+  and timeout recovery through the gateway to a different model. All 277 tests,
+  the full quality gate and documentation checks pass locally. Live sustained
+  reliability and consuming-product qualification remain tracked in issue 65.
+
 - **2026-09-12** — The public home, FAQ and changelog use one accessible
   repository-icon component with a 44px target. Source links no longer display
   a text label. Gateway authentication, routing and provider behavior are unchanged.

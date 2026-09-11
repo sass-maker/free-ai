@@ -35,7 +35,7 @@ function getMessage(error: unknown): string {
 }
 
 const SAFETY_KEYWORDS = ['safety', 'content filter', 'refus'];
-const RETRIABLE_KEYWORDS = ['rate limit', 'quota', 'timeout', 'overload'];
+const RETRIABLE_KEYWORDS = ['rate limit', 'quota', 'timeout', 'timed out', 'overload'];
 const RETRIABLE_STATUSES = new Set([429, 408, 409, 425]);
 const INPUT_ERROR_STATUSES = new Set([400, 422]);
 const AUTH_ERROR_STATUSES = new Set([401, 403]);

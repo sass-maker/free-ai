@@ -1,8 +1,13 @@
+import OpenAI from 'openai';
 import { describe, expect, it } from 'vitest';
 
 import { classifyError, isRetriableFailure } from '../src/router/classify-error';
 
 describe('classifyError', () => {
+  it('recognizes the installed SDK timeout without retrying user cancellation', () => {
+    expect(classifyError(new OpenAI.APIConnectionTimeoutError())).toBe('usage_retriable');
+    expect(classifyError(new OpenAI.APIUserAbortError())).toBe('provider_fatal');
+  });
   it('marks 429 as usage_retriable', () => {
     const failure = classifyError({ status: 429, message: 'Rate limit hit' });
     expect(failure).toBe('usage_retriable');

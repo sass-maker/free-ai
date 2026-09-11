@@ -44,9 +44,9 @@ export async function runOpenAICompatibleRequest(
       ...(input.response_format && { response_format: input.response_format }),
     };
 
-    const stream = (await client.chat.completions.create(
-      streamBody as never
-    )) as unknown as AsyncIterable<unknown>;
+    const stream = (await client.chat.completions.create(streamBody as never, {
+      maxRetries: 0,
+    })) as unknown as AsyncIterable<unknown>;
     return {
       provider: config.provider,
       model: input.model,
@@ -67,7 +67,10 @@ export async function runOpenAICompatibleRequest(
   };
 
   const completion = (await client.chat.completions.create(
-    completionBody as never
+    completionBody as never,
+    // The gateway owns the two-attempt budget and selects the next candidate.
+    // SDK retries would repeat the same failed model outside that accounting.
+    { maxRetries: 0 }
   )) as ProviderCallResult['completion'];
   return {
     provider: config.provider,
