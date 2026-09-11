@@ -27,6 +27,13 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
 
 ## Timeline
 
+- **2026-09-11** — Fixed the health dashboard's mobile grid overflow. With live
+  routing data, its fallback table stretched a 390px document to 1082px; health
+  cards now shrink within the grid and preserve the table's own horizontal
+  scrolling. Local browser verification keeps the populated page at 390px,
+  and the 18 operator-route tests and full 273-test quality gate pass.
+  Physical iPhone acceptance remains separate.
+
 - **2026-09-11** — Released repair for upstream account failures: live replay found
   SambaNova returning 402 and ZAI returning 401. Automatic chat previously stopped
   at those failures even with another eligible provider. It now skips the failed

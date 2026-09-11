@@ -36,7 +36,7 @@ export const OPERATOR_HEALTH_HTML = `<!doctype html>
   .kpi { padding: 14px; }
   .label { color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   .value { font-size: 28px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
-  .card { padding: 14px; margin-top: 12px; }
+  .card { min-width: 0; padding: 14px; margin-top: 12px; }
   .card h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .status { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 8px; font-size: 12px; font-family: var(--mono); background: var(--panel-alt); }
   .status:before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--muted); }
