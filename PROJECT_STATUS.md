@@ -1,6 +1,6 @@
 # free-ai — PROJECT STATUS
 
-Last updated: 2026-09-11
+Last updated: 2026-09-12
 
 ## Why / What
 
@@ -26,6 +26,10 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
   it does not affect runtime routing or provider behavior.
 
 ## Timeline
+
+- **2026-09-12** — The public home, FAQ and changelog use one accessible
+  repository-icon component with a 44px target. Source links no longer display
+  a text label. Gateway authentication, routing and provider behavior are unchanged.
 
 - **2026-09-11** — Fixed the health dashboard's mobile grid overflow. With live
   routing data, its fallback table stretched a 390px document to 1082px; health

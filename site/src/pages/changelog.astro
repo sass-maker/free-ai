@@ -1,4 +1,5 @@
 ---
+import RepositoryLink from '../components/RepositoryLink.astro';
 const title = 'AI Gateway changelog — Verified updates';
 const description =
   'A first-party record of meaningful releases to the sass-maker AI Gateway.';
@@ -112,7 +113,7 @@ const entries = [
         </p>
         <div class="resources" aria-label="Project resources">
           <a href={roadmapUrl}>Roadmap</a>
-          <a href={sourceUrl}>Source</a>
+          <RepositoryLink />
         </div>
       </header>
       <section class="timeline" aria-label="AI Gateway releases">
@@ -133,7 +134,7 @@ const entries = [
       <div>
         <a href="/getting-started">Docs</a>
         <a href={roadmapUrl}>Roadmap</a>
-        <a href={sourceUrl}>Source</a>
+        <RepositoryLink />
       </div>
     </footer>
   </body>
