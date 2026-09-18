@@ -164,6 +164,57 @@ describe('model catalog checker', () => {
     expect(report.new).toEqual([{ provider: 'groq', model: 'new-model' }]);
   });
 
+  it('surfaces a bounded provider excerpt on catalog HTTP failures', async () => {
+    const catalogs = await fetchCatalogs(
+      { GEMINI_API_KEY: 'synthetic-test-key' },
+      async (input) => {
+        if (new URL(input).hostname === 'openrouter.ai') return Response.json({ data: [] });
+        return new Response(
+          '{"error":{"code":400,"message":"API key not valid.   Please pass a valid API key."}}',
+          { status: 400 }
+        );
+      }
+    );
+    const gemini = catalogs.find((catalog) => catalog.provider === 'gemini');
+    expect(gemini.status).toBe('error');
+    expect(gemini.reason).toBe(
+      'catalog returned HTTP 400: {"error":{"code":400,"message":"API key not valid. Please pass a valid API key."}}'
+    );
+  });
+
+  it('scrubs the credential and bounds long error excerpts', async () => {
+    const catalogs = await fetchCatalogs(
+      { GEMINI_API_KEY: 'synthetic-test-key' },
+      async (input) => {
+        if (new URL(input).hostname === 'openrouter.ai') return Response.json({ data: [] });
+        return new Response(`denied synthetic-test-key ${'x'.repeat(500)}`, { status: 403 });
+      }
+    );
+    const gemini = catalogs.find((catalog) => catalog.provider === 'gemini');
+    expect(gemini.reason).not.toContain('synthetic-test-key');
+    expect(gemini.reason).toContain('denied ***');
+    expect(gemini.reason.length).toBeLessThanOrEqual(275);
+  });
+
+  it('treats whitespace-only and padded secrets consistently', async () => {
+    const seen = [];
+    const fetchImpl = async (input, options) => {
+      const url = new URL(input);
+      if (url.hostname === 'openrouter.ai') return Response.json({ data: [] });
+      if (url.hostname === 'generativelanguage.googleapis.com') {
+        seen.push(options.headers['x-goog-api-key']);
+        return Response.json({ models: [{ name: 'models/gemini-1' }] });
+      }
+      return Response.json({ data: [] });
+    };
+    const padded = await fetchCatalogs({ GEMINI_API_KEY: '  padded-key\n' }, fetchImpl);
+    expect(padded.find((catalog) => catalog.provider === 'gemini').status).toBe('ok');
+    expect(seen).toEqual(['padded-key']);
+
+    const blank = await fetchCatalogs({ GEMINI_API_KEY: '   ' }, fetchImpl);
+    expect(blank.find((catalog) => catalog.provider === 'gemini').status).toBe('missing_key');
+  });
+
   it('returns explicit missing-key and malformed-response states', async () => {
     const fetchImpl = vi.fn(async () => Response.json({ unexpected: [] }));
     const catalogs = await fetchCatalogs({}, fetchImpl);

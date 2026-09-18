@@ -158,7 +158,21 @@ async function fetchCatalogItems(spec, key, fetchImpl) {
       headers: spec.headers({ key }),
       signal,
     });
-    if (!response.ok) throw new Error(`catalog returned HTTP ${response.status}`);
+    if (!response.ok) {
+      // A bare status (e.g. HTTP 400) hides whether the provider rejected the
+      // key or the request. Carry a bounded, credential-scrubbed excerpt so a
+      // failed run is diagnosable without downloading artifacts.
+      const detail = await response.text().catch(() => '');
+      const scrubbed = (key ? detail.split(key).join('***') : detail)
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 240);
+      throw new Error(
+        scrubbed
+          ? `catalog returned HTTP ${response.status}: ${scrubbed}`
+          : `catalog returned HTTP ${response.status}`
+      );
+    }
     const body = await response.json();
     const pageItems = asModelItems(body);
     if (!pageItems) throw new Error('catalog response did not contain a model array');
@@ -187,7 +201,10 @@ async function fetchCatalog(spec, env = process.env, fetchImpl = fetch) {
     };
   }
 
-  const key = env[spec.secret];
+  // Surrounding whitespace in a pasted secret is indistinguishable from an
+  // invalid key at the provider; normalize before the presence check so a
+  // blank secret reports missing_key rather than producing a provider 400.
+  const key = env[spec.secret]?.trim();
   if (!key && !spec.optionalSecret) {
     return {
       provider: spec.provider,
