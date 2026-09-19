@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getModelRegistry, getTtsRegistry, isWorkersAiEnabled } from '../src/config';
 import { callWorkersAi } from '../src/providers/workers-ai';
-import { classifyError, isRetriableFailure } from '../src/router/classify-error';
+import {
+  classifyError,
+  isRetriableFailure,
+  MalformedProviderOutputError,
+} from '../src/router/classify-error';
 import {
   buildBudgetExhaustedResponse,
   estimateChatInputChars,
@@ -30,6 +34,50 @@ function budgetNamespace(fetchMock: ReturnType<typeof vi.fn>): DurableObjectName
 }
 
 describe('Workers AI free-tier guard', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([undefined, null, {}, 42, { response: 42 }, { output_text: [42] }])(
+    'rejects malformed binding output %j instead of manufacturing a completion',
+    async (result) => {
+      const env = makeEnv({
+        WORKERS_AI_ENABLED: 'true',
+        AI: { run: vi.fn(async () => result) },
+        NEURON_BUDGET: budgetNamespace(vi.fn(async () => Response.json({ allowed: true }))),
+      });
+      await expect(
+        callWorkersAi({
+          env,
+          provider: 'workers_ai',
+          model: '@cf/meta/llama-3.2-1b-instruct',
+          messages: [{ role: 'user', content: 'hello' }],
+          stream: false,
+        })
+      ).rejects.toBeInstanceOf(MalformedProviderOutputError);
+    }
+  );
+
+  it('rejects a REST success without text instead of manufacturing an empty completion', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ success: true, result: {} }))
+    );
+    const env = makeEnv({
+      WORKERS_AI_ENABLED: 'true',
+      CLOUDFLARE_ACCOUNT_ID: 'synthetic-account',
+      CLOUDFLARE_WORKERS_AI_API_KEY: 'synthetic-key',
+      NEURON_BUDGET: budgetNamespace(vi.fn(async () => Response.json({ allowed: true }))),
+    });
+    await expect(
+      callWorkersAi({
+        env,
+        provider: 'workers_ai',
+        model: '@cf/meta/llama-3.2-1b-instruct',
+        messages: [{ role: 'user', content: 'hello' }],
+        stream: false,
+      })
+    ).rejects.toBeInstanceOf(MalformedProviderOutputError);
+  });
+
   it('keeps Workers AI disabled unless explicitly opted in', () => {
     const ai = { run: vi.fn() };
     const disabledEnv = makeEnv({ AI: ai });

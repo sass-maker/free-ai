@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import app from '../src/index';
+import { MalformedProviderOutputError } from '../src/router/classify-error';
 import { makeCtx, makeTestEnv } from './helpers/env';
 
 const mocks = vi.hoisted(() => ({
@@ -155,5 +156,42 @@ describe('POST /v1/embeddings', () => {
     });
     expect(mocks.gemini).toHaveBeenCalledOnce();
     expect(mocks.voyage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['malformed output', new MalformedProviderOutputError('Provider returned no embeddings')],
+    [
+      'an upstream account rejection',
+      Object.assign(new Error('upstream account unavailable'), { status: 401 }),
+    ],
+  ])('falls back to another embedding provider after %s', async (_label, failure) => {
+    mocks.gemini.mockRejectedValueOnce(failure);
+    mocks.voyage.mockResolvedValueOnce({
+      response: {
+        object: 'list',
+        data: [{ object: 'embedding', index: 0, embedding: [0.3, 0.4] }],
+        model: 'voyage-3.5-lite',
+      },
+    });
+    const { env } = makeTestEnv({
+      GEMINI_API_KEY: 'gemini-key',
+      VOYAGE_API_KEY: 'voyage-key',
+    });
+
+    const response = await app.fetch(
+      embeddingRequest({ model: 'gemini-embedding-001', input: 'hello' }),
+      env,
+      makeCtx()
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      model: string;
+      x_gateway: { provider: string; attempts: number };
+    };
+    expect(body.model).toBe('voyage-3.5-lite');
+    expect(body.x_gateway).toMatchObject({ provider: 'voyage_ai', attempts: 2 });
+    expect(mocks.gemini).toHaveBeenCalledOnce();
+    expect(mocks.voyage).toHaveBeenCalledOnce();
   });
 });

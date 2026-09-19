@@ -15,6 +15,7 @@ export interface ProviderCallInput {
   temperature?: number;
   max_tokens?: number;
   stream: boolean;
+  signal?: AbortSignal;
   tools?: Tool[];
   tool_choice?: 'none' | 'auto' | 'required' | { type: 'function'; function: { name: string } };
   response_format?: ResponseFormat;

@@ -3,7 +3,11 @@ import pRetry, { AbortError } from 'p-retry';
 
 import { isWorkersAiEnabled } from '../config';
 import { providerEmbeddingCallers } from '../providers';
-import { classifyError, isRetriableFailure } from '../router/classify-error';
+import {
+  canFallbackFromProviderFailure,
+  classifyError,
+  isRetriableFailure,
+} from '../router/classify-error';
 import type { EmbeddingProvider, Env, GatewayMeta, Provider } from '../types';
 import { createRequestId, getErrorMessage } from '../utils/request';
 import { type GatewayApp, type RecordAnalytics, projectIdSchema } from './shared-schemas';
@@ -417,7 +421,11 @@ async function runEmbeddingAttempts(params: {
         lastErrorClass = failureClass;
         lastErrorMessage = getErrorMessage(error);
 
-        if (!isRetriableFailure(failureClass) || attemptCounter >= maxEmbeddingAttempts) {
+        if (
+          (!isRetriableFailure(failureClass) &&
+            !canFallbackFromProviderFailure(error, failureClass)) ||
+          attemptCounter >= maxEmbeddingAttempts
+        ) {
           throw new AbortError(lastErrorMessage);
         }
         throw error instanceof Error ? error : new Error(lastErrorMessage);

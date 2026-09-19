@@ -27,6 +27,26 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
 
 ## Timeline
 
+- **2026-09-19** — Chat and embedding fallback now cover malformed upstream
+  output. A non-stream completion without a usable `choices` payload, or an
+  upstream body the SDK cannot parse, consumes one attempt and moves to the
+  next selected candidate instead of returning a synthetic empty 200 or
+  aborting the request. Safety refusals, input errors, forced-provider
+  boundaries and the two-attempt chat budget are unchanged. New deterministic
+  tests cover streaming fallback, caller cancellation before provider work and
+  during retry backoff, capability-constrained
+  fallback, IP rate-limit denial, fail-closed auth on every token-spending
+  route, and consumer correlation metadata. Choice validation also rejects malformed
+  entries while preserving tool calls and refusals in completions without an ID.
+  Embedding calls now disable hidden SDK retries; malformed Workers AI binding
+  and REST text output is rejected. Chat and `/responses` propagate caller
+  signals to SDK requests and retry waits. All 338 tests plus the full quality
+  and documentation gates pass locally. Production disconnect handling still
+  requires the opt-in `enable_request_signal` compatibility flag, absent from
+  the current deployment config, and live qualification. The AI binding has no
+  supported in-flight cancellation option; cancellation is checked around its
+  invocation. Live sampling under issue 65 remains unscheduled.
+
 - **2026-09-12** — Chat attempts now disable the SDK's hidden retries so the
   gateway owns fallback and its existing two-attempt budget. The installed SDK's
   `Request timed out.` error is recognized as retriable; user cancellation still

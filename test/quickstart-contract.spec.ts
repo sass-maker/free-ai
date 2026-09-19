@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import OpenAI from 'openai';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import app from '../src/index';
-import { runOpenAICompatibleRequest } from '../src/providers/openai-compatible';
+import {
+  runOpenAICompatibleEmbeddingsRequest,
+  runOpenAICompatibleRequest,
+} from '../src/providers/openai-compatible';
 import { makeCtx, makeTestEnv } from './helpers/env';
 
 vi.mock('../src/lib/telemetry', async (importOriginal) => ({
@@ -21,6 +24,61 @@ const curlBody = gettingStarted.match(/-d '(\{[\s\S]*?\})'/)?.[1];
 afterEach(() => vi.unstubAllGlobals());
 
 describe('published quickstart contract', () => {
+  it('makes one upstream request per embedding attempt', async () => {
+    const upstream = vi.fn(async () =>
+      Response.json({ error: { message: 'Unavailable' } }, { status: 503 })
+    );
+    vi.stubGlobal('fetch', upstream);
+    const { env } = makeTestEnv();
+    await expect(
+      runOpenAICompatibleEmbeddingsRequest(
+        { env, provider: 'gemini', model: 'synthetic-embedding', input: ['hello'] },
+        { provider: 'gemini', baseURL: 'https://provider.test/v1', apiKey: 'synthetic-key' }
+      )
+    ).rejects.toMatchObject({ status: 503 });
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['chat/completions', false],
+    ['chat/completions', true],
+    ['responses', false],
+  ])('propagates caller cancellation to the SDK for %s (stream=%s)', async (route, stream) => {
+    const controller = new AbortController();
+    let upstreamSignal: AbortSignal | null | undefined;
+    const upstream = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      upstreamSignal = init?.signal;
+      controller.abort();
+      throw new DOMException('The operation was aborted', 'AbortError');
+    });
+    vi.stubGlobal('fetch', upstream);
+    const { env } = makeTestEnv({ GROQ_API_KEY: 'synthetic-provider-key' });
+    const response = await app.fetch(
+      new Request(`https://gateway.test/v1/${route}`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          authorization: 'Bearer test-gateway-key',
+          'content-type': 'application/json',
+          'x-gateway-force-provider': 'groq',
+        },
+        body: JSON.stringify({
+          model: 'auto',
+          project_id: 'sdk-cancel-test',
+          stream,
+          ...(route === 'responses'
+            ? { input: 'hello' }
+            : { messages: [{ role: 'user', content: 'hello' }] }),
+        }),
+      }),
+      env,
+      makeCtx()
+    );
+    expect(response.ok).toBe(false);
+    expect(upstreamSignal?.aborted).toBe(true);
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
   it.each([false, true])(
     'makes one upstream request per chat attempt (stream=%s)',
     async (stream) => {
@@ -84,6 +142,70 @@ describe('published quickstart contract', () => {
     expect(upstream).toHaveBeenCalledTimes(2);
     expect(models[1]).not.toBe(models[0]);
   });
+  it.each([
+    [
+      'an unparseable JSON body',
+      () =>
+        new Response('this is not json', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    ],
+    [
+      'a non-JSON content type',
+      () =>
+        new Response('<html>upstream maintenance page</html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+    ],
+  ])(
+    'moves to the next gateway model when the upstream 200 carries %s',
+    async (_label, malformedResponse) => {
+      const models: string[] = [];
+      const upstream = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const body = (await new Request(input, init).json()) as { model: string };
+        models.push(body.model);
+        if (models.length === 1) return malformedResponse();
+        return Response.json({
+          id: 'chatcmpl-recovered',
+          object: 'chat.completion',
+          created: 1,
+          model: body.model,
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: 'Recovered' },
+              finish_reason: 'stop',
+            },
+          ],
+        });
+      });
+      vi.stubGlobal('fetch', upstream);
+      const { env } = makeTestEnv({ GROQ_API_KEY: 'synthetic-provider-key' });
+      const response = await app.fetch(
+        new Request('https://gateway.test/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer test-gateway-key',
+            'content-type': 'application/json',
+            'x-gateway-force-provider': 'groq',
+          },
+          body: JSON.stringify({
+            model: 'auto',
+            project_id: 'sdk-malformed-test',
+            messages: [{ role: 'user', content: 'Synthetic malformed upstream test' }],
+          }),
+        }),
+        env,
+        makeCtx()
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ degraded: true, x_gateway: { attempts: 2 } });
+      expect(upstream).toHaveBeenCalledTimes(2);
+      expect(models[1]).not.toBe(models[0]);
+    }
+  );
   it('runs the documented JavaScript SDK request through auth, routing and actual provider adapter', async () => {
     const upstream = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input, init);

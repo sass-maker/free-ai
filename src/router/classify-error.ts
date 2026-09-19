@@ -71,19 +71,34 @@ export function isRetriableFailure(failureClass: FailureClass): boolean {
   return failureClass === 'usage_retriable';
 }
 
+/** Provider returned a 200-class response that is not usable output. */
+export class MalformedProviderOutputError extends Error {
+  constructor(message = 'Provider returned malformed output') {
+    super(message);
+    this.name = 'MalformedProviderOutputError';
+  }
+}
+
+export function isMalformedProviderOutput(error: unknown): boolean {
+  // A SyntaxError here is the SDK failing to JSON.parse the upstream body.
+  return error instanceof MalformedProviderOutputError || error instanceof SyntaxError;
+}
+
 /** These statuses concern the gateway's upstream account, not the caller's credentials. */
 export function isProviderAccountFailure(error: unknown): boolean {
   const status = getStatus(error);
   return status === 401 || status === 402;
 }
 
-/** Unavailable upstream accounts/models may fall back; content refusals may not. */
+/** Unavailable upstream accounts/models and malformed output may fall back; content refusals may not. */
 export function canFallbackFromProviderFailure(
   error: unknown,
   failureClass: FailureClass
 ): boolean {
   return (
     failureClass === 'provider_fatal' &&
-    (isProviderAccountFailure(error) || getStatus(error) === 404)
+    (isProviderAccountFailure(error) ||
+      getStatus(error) === 404 ||
+      isMalformedProviderOutput(error))
   );
 }
