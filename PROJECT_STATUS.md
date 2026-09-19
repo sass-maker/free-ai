@@ -42,8 +42,9 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
   and REST text output is rejected. Chat and `/responses` propagate caller
   signals to SDK requests and retry waits. All 338 tests plus the full quality
   and documentation gates pass locally. Production disconnect handling still
-  requires the opt-in `enable_request_signal` compatibility flag, absent from
-  the current deployment config, and live qualification. The AI binding has no
+  requires the opt-in `enable_request_signal` compatibility flag, now included
+  in the checked-in Worker config; deployment and live qualification remain
+  required. The AI binding has no
   supported in-flight cancellation option; cancellation is checked around its
   invocation. Live sampling under issue 65 remains unscheduled.
 
