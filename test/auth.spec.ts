@@ -103,6 +103,101 @@ describe('/v1 authentication', () => {
   });
 });
 
+const TOKEN_SPENDING_ROUTES: Array<{
+  method: string;
+  path: string;
+  body?: Record<string, unknown>;
+}> = [
+  {
+    method: 'POST',
+    path: '/v1/chat/completions',
+    body: { model: 'auto', project_id: 'p', messages: [{ role: 'user', content: 'hi' }] },
+  },
+  {
+    method: 'POST',
+    path: '/v1/responses',
+    body: { model: 'auto', project_id: 'p', input: 'hi' },
+  },
+  {
+    method: 'POST',
+    path: '/v1/embeddings',
+    body: { model: 'gemini-embedding-001', input: 'hi', project_id: 'p' },
+  },
+  {
+    method: 'POST',
+    path: '/v1/images/generations',
+    body: { model: 'auto', prompt: 'hi', project_id: 'p' },
+  },
+  {
+    method: 'POST',
+    path: '/v1/videos/generations',
+    body: { model: 'auto', prompt: 'hi', project_id: 'p' },
+  },
+  { method: 'GET', path: '/v1/videos/generations/job-1' },
+  {
+    method: 'POST',
+    path: '/v1/audio/speech',
+    body: { model: 'auto', input: 'hi', project_id: 'p' },
+  },
+  { method: 'POST', path: '/v1/audio/transcriptions' },
+  { method: 'POST', path: '/v1/audio/speech-to-speech' },
+  {
+    method: 'POST',
+    path: '/v1/debug/replay',
+    body: { model: 'auto', project_id: 'p', messages: [{ role: 'user', content: 'hi' }] },
+  },
+];
+
+function routeRequest(
+  route: { method: string; path: string; body?: Record<string, unknown> },
+  headers: HeadersInit = {}
+) {
+  return new Request(`https://gateway.test${route.path}`, {
+    method: route.method,
+    headers: {
+      ...(route.body ? { 'content-type': 'application/json' } : {}),
+      ...headers,
+    },
+    ...(route.body ? { body: JSON.stringify(route.body) } : {}),
+  });
+}
+
+describe('token-spending routes fail closed', () => {
+  it.each(TOKEN_SPENDING_ROUTES)(
+    '$method $path rejects a wrong key with 401 before any provider work',
+    async (route) => {
+      const { env } = makeTestEnv({ GATEWAY_API_KEY: 'secret-key' });
+      const res = await app.fetch(
+        routeRequest(route, { authorization: 'Bearer wrong-key' }),
+        env,
+        makeCtx()
+      );
+
+      expect(res.status).toBe(401);
+      await expect(res.json()).resolves.toMatchObject({
+        error: { code: 'invalid_api_key' },
+      });
+    }
+  );
+
+  it.each(TOKEN_SPENDING_ROUTES)(
+    '$method $path returns 503 when no gateway key is configured',
+    async (route) => {
+      const { env } = makeTestEnv({ GATEWAY_API_KEY: '' });
+      const res = await app.fetch(
+        routeRequest(route, { authorization: 'Bearer test-gateway-key' }),
+        env,
+        makeCtx()
+      );
+
+      expect(res.status).toBe(503);
+      await expect(res.json()).resolves.toMatchObject({
+        error: { code: 'auth_not_configured' },
+      });
+    }
+  );
+});
+
 function analyticsRequest(headers: HeadersInit = {}) {
   return new Request('https://gateway.test/v1/analytics?days=7', {
     method: 'GET',

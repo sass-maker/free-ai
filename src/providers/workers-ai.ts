@@ -1,4 +1,5 @@
 import { isWorkersAiEnabled } from '../config';
+import { MalformedProviderOutputError } from '../router/classify-error';
 import {
   estimateChatInputChars,
   estimateNeuronCost,
@@ -37,14 +38,15 @@ function normalizeWorkersResponse(result: unknown): string {
     return result;
   }
 
-  return JSON.stringify(result);
+  throw new MalformedProviderOutputError('Workers AI returned no usable text');
 }
 
 async function callWorkersAiRest(
   accountId: string,
   token: string,
   model: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  signal?: AbortSignal
 ): Promise<{ response: string; usage?: Record<string, unknown> }> {
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
   const response = await fetch(url, {
@@ -54,7 +56,9 @@ async function callWorkersAiRest(
       'content-type': 'application/json',
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(15_000),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(15_000)])
+      : AbortSignal.timeout(15_000),
   });
 
   const json = (await response.json()) as {
@@ -76,7 +80,7 @@ async function callWorkersAiRest(
   }
 
   return {
-    response: json.result?.response ?? '',
+    response: normalizeWorkersResponse(json.result),
     usage: json.result?.usage,
   };
 }
@@ -185,6 +189,7 @@ function streamRestResult(model: string, restResult: { response: string }) {
 }
 
 export const callWorkersAi: ProviderCaller = async (input) => {
+  input.signal?.throwIfAborted();
   if (!isWorkersAiEnabled(input.env)) {
     throw new Error('Workers AI is disabled');
   }
@@ -196,6 +201,7 @@ export const callWorkersAi: ProviderCaller = async (input) => {
     outputTokens: input.max_tokens,
   });
   const debit = await tryDebitNeurons(input.env, cost);
+  input.signal?.throwIfAborted();
   if (!debit.allowed) {
     throw new BudgetExhaustedError(
       `Daily Workers AI Neuron budget exhausted (${debit.used}/9500)`,
@@ -222,10 +228,13 @@ export const callWorkersAi: ProviderCaller = async (input) => {
       );
     }
 
-    const restResult = await callWorkersAiRest(accountId, token, input.model, {
-      ...payload,
-      stream: false,
-    });
+    const restResult = await callWorkersAiRest(
+      accountId,
+      token,
+      input.model,
+      { ...payload, stream: false },
+      input.signal
+    );
 
     if (input.stream) {
       return streamRestResult(input.model, restResult);
@@ -240,6 +249,7 @@ export const callWorkersAi: ProviderCaller = async (input) => {
   }
 
   const result = await input.env.AI!.run(input.model, payload);
+  input.signal?.throwIfAborted();
 
   if (input.stream) {
     if (result && typeof result === 'object' && Symbol.asyncIterator in result) {
@@ -251,7 +261,7 @@ export const callWorkersAi: ProviderCaller = async (input) => {
       };
     }
 
-    throw new Error('Workers AI stream source is not async iterable');
+    throw new MalformedProviderOutputError('Workers AI stream source is not async iterable');
   }
 
   const content = normalizeWorkersResponse(result);
@@ -301,7 +311,7 @@ export const callWorkersAiEmbeddings: ProviderEmbeddingCaller = async (input) =>
 
   const rows = extractWorkersAiEmbeddingRows(result);
   if (rows.length === 0) {
-    throw new Error('Workers AI returned no embeddings');
+    throw new MalformedProviderOutputError('Workers AI returned no embeddings');
   }
 
   return {

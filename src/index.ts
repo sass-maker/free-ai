@@ -29,6 +29,7 @@ import {
   classifyError,
   isProviderAccountFailure,
   isRetriableFailure,
+  MalformedProviderOutputError,
 } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
 import { registerGatewayAuthMiddleware } from './middleware/gateway-auth';
@@ -744,28 +745,49 @@ function buildChatRoundRobinKey(params: {
   return `chat:${params.endpoint}:${params.min_reasoning_level ?? 'auto'}:${params.stream ? 'stream' : 'nonstream'}:${providerSet}`;
 }
 
-function isSafetyRefusal(completion: Record<string, unknown> | undefined): boolean {
-  const choice = Array.isArray(completion?.choices)
-    ? (completion.choices[0] as
-        | { finish_reason?: string; message?: { content?: string | null } }
-        | undefined)
-    : undefined;
+const chatCompletionChoiceSchema = z
+  .object({
+    finish_reason: z.string().nullish(),
+    message: z
+      .object({
+        content: z.string().nullish(),
+        refusal: z.string().nullish(),
+        tool_calls: z
+          .array(
+            z.object({
+              id: z.string().min(1),
+              type: z.literal('function'),
+              function: z.object({ name: z.string().min(1), arguments: z.string() }),
+            })
+          )
+          .optional(),
+        function_call: z.object({ name: z.string().min(1), arguments: z.string() }).optional(),
+      })
+      .nullish(),
+  })
+  .refine(({ finish_reason, message }) => {
+    // A refusal is a final outcome, including when the provider omits its message.
+    const finishReason = finish_reason?.toLowerCase() ?? '';
+    return (
+      finishReason.includes('content_filter') ||
+      finishReason.includes('safety') ||
+      typeof message?.content === 'string' ||
+      Boolean(message?.refusal) ||
+      Boolean(message?.tool_calls?.length) ||
+      Boolean(message?.function_call)
+    );
+  });
 
-  if (!choice) {
+function isUsableChatCompletion(completion: unknown): completion is Record<string, unknown> {
+  if (!completion || typeof completion !== 'object') {
     return false;
   }
-
-  const finishReason = choice.finish_reason?.toLowerCase() ?? '';
-  if (finishReason.includes('content_filter') || finishReason.includes('safety')) {
-    return true;
-  }
-
-  const content = choice.message?.content?.toLowerCase() ?? '';
-  if (content.includes('cannot help with') || content.includes('safety policy')) {
-    return true;
-  }
-
-  return false;
+  const choices = (completion as { choices?: unknown }).choices;
+  return (
+    Array.isArray(choices) &&
+    choices.length > 0 &&
+    choices.every((choice) => chatCompletionChoiceSchema.safeParse(choice).success)
+  );
 }
 
 function buildGatewayMeta(params: {
@@ -1133,16 +1155,19 @@ function buildChatFinalResponse(
   return {
     ...(completion.id
       ? completion
-      : buildCompletionEnvelope({
-          model: candidate.model,
-          content:
-            String(
-              (completion.choices as Array<{ message?: { content?: unknown } }>)?.[0]?.message
-                ?.content ?? ''
-            ) || '',
-          requestId,
-          gatewayMeta: meta,
-        })),
+      : {
+          ...buildCompletionEnvelope({
+            model: candidate.model,
+            content:
+              String(
+                (completion.choices as Array<{ message?: { content?: unknown } }>)?.[0]?.message
+                  ?.content ?? ''
+              ) || '',
+            requestId,
+            gatewayMeta: meta,
+          }),
+          ...completion,
+        }),
     degraded,
     x_gateway: meta,
   };
@@ -1178,6 +1203,14 @@ function handleChatProviderSuccess(
   const latencyMs = Date.now() - startedAt;
   const key = getModelKey(candidate.provider, candidate.model);
 
+  const isStream = Boolean(providerResult.stream && providerResult.streamSource);
+  const completion = providerResult.completion as Record<string, unknown> | undefined;
+  if (!isStream && !isUsableChatCompletion(completion)) {
+    throw new MalformedProviderOutputError(
+      `${candidate.provider}/${candidate.model} returned a malformed chat completion`
+    );
+  }
+
   state.routingFallbackHops.push({
     provider: candidate.provider,
     model: candidate.model,
@@ -1201,7 +1234,7 @@ function handleChatProviderSuccess(
     projectId,
   });
 
-  if (providerResult.stream && providerResult.streamSource) {
+  if (isStream) {
     const stream =
       candidate.provider === 'workers_ai'
         ? createWorkersAiStream(
@@ -1223,14 +1256,9 @@ function handleChatProviderSuccess(
     return;
   }
 
-  const completion = (providerResult.completion as Record<string, unknown> | undefined) ?? {};
-
-  if (isSafetyRefusal(completion)) {
-    // Safety refusal counts as successful final response and should not trigger fallback.
-  }
-
+  // Non-stream completions were validated before the success hop was recorded.
   state.finalResponse = buildChatFinalResponse(
-    completion,
+    completion as Record<string, unknown>,
     candidate,
     requestId,
     state.chosenMeta,
@@ -1316,10 +1344,15 @@ function createChatRetryCallback(
         tools: normalized.tools,
         tool_choice: normalized.tool_choice,
         response_format: normalized.response_format,
+        signal: c.req.raw.signal,
       });
 
+      c.req.raw.signal.throwIfAborted();
       handleChatProviderSuccess(ctx, candidate, providerResult, startedAt);
     } catch (error) {
+      if (c.req.raw.signal.aborted) {
+        throw new AbortError('Request aborted');
+      }
       if (isProviderAccountFailure(error)) unavailableProviders.add(candidate.provider);
       handleChatProviderError(ctx, candidate, error, startedAt);
     }
@@ -1691,12 +1724,18 @@ app.openapi(chatRoute, async (c) => {
   };
 
   await pRetry(createChatRetryCallback(c, selected, normalized, requestId, projectId, state), {
+    signal: c.req.raw.signal,
     retries: 1,
     minTimeout: 500,
     maxTimeout: 5000,
     factor: 2,
     randomize: true,
-  }).catch(() => undefined);
+  }).catch(() => {
+    if (c.req.raw.signal.aborted) {
+      state.lastErrorClass = 'provider_fatal';
+      state.lastErrorMessage = 'Request aborted';
+    }
+  });
 
   return handleChatResult(
     c,
@@ -2063,6 +2102,7 @@ app.openapi(responsesRoute, async (c) => {
 
   const proxiedRequest = new Request(new URL('/v1/chat/completions', c.req.url), {
     method: 'POST',
+    signal: c.req.raw.signal,
     headers,
     body: JSON.stringify({
       model: body.model,

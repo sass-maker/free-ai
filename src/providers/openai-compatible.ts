@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 
+import { MalformedProviderOutputError } from '../router/classify-error';
 import type { EmbeddingProvider, TextProvider } from '../types';
 import type {
   ProviderCallInput,
@@ -23,6 +24,8 @@ function createClient<TProvider extends TextProvider | EmbeddingProvider>(
     baseURL: config.baseURL,
     defaultHeaders: config.defaultHeaders,
     timeout: 15_000,
+    // The gateway owns retries for both chat and embeddings.
+    maxRetries: 0,
   });
 }
 
@@ -46,6 +49,7 @@ export async function runOpenAICompatibleRequest(
 
     const stream = (await client.chat.completions.create(streamBody as never, {
       maxRetries: 0,
+      signal: input.signal,
     })) as unknown as AsyncIterable<unknown>;
     return {
       provider: config.provider,
@@ -70,7 +74,7 @@ export async function runOpenAICompatibleRequest(
     completionBody as never,
     // The gateway owns the two-attempt budget and selects the next candidate.
     // SDK retries would repeat the same failed model outside that accounting.
-    { maxRetries: 0 }
+    { maxRetries: 0, signal: input.signal }
   )) as ProviderCallResult['completion'];
   return {
     provider: config.provider,
@@ -109,7 +113,7 @@ export async function runOpenAICompatibleEmbeddingsRequest(
     : [];
 
   if (data.length === 0) {
-    throw new Error('Provider returned no embeddings');
+    throw new MalformedProviderOutputError('Provider returned no embeddings');
   }
 
   return {
