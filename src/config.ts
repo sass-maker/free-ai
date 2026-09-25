@@ -204,23 +204,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── OpenRouter (needs OPENROUTER_API_KEY) ────────────────────────────
   {
-    id: 'openrouter-stealth-ox-alpha',
-    provider: 'openrouter',
-    model: 'stealth/ox-alpha',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.82,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: true,
-      nativeReasoning: true,
-      contextWindow: 1_048_576,
-      maxOutputTokens: 131_072,
-    },
-  },
-  {
     id: 'openrouter-zai-glm-5-2-free',
     provider: 'openrouter',
     model: 'z-ai/glm-5.2:free',
@@ -1205,22 +1188,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
   {
-    id: 'groq-qwen-qwen3-6-27b',
-    provider: 'groq',
-    model: 'qwen/qwen3.6-27b',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
     id: 'openrouter-cohere-north-mini-code-free',
     provider: 'openrouter',
     model: 'cohere/north-mini-code:free',
@@ -1242,22 +1209,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     id: 'openrouter-poolside-laguna-xs-2-1-free',
     provider: 'openrouter',
     model: 'poolside/laguna-xs-2.1:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'cerebras-gemma-4-31b',
-    provider: 'cerebras',
-    model: 'gemma-4-31b',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
@@ -1362,6 +1313,136 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       maxOutputTokens: 8_192,
     },
   },
+
+  // ── Auto-added by weekly model check (review priority + capabilities) ──
+  {
+    id: 'groq-qwen-qwen3-8-27b',
+    provider: 'groq',
+    model: 'qwen/qwen3.8-27b',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-inclusionai-ling-3-0-flash-vl-free',
+    provider: 'openrouter',
+    model: 'inclusionai/ling-3.0-flash-vl:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-nex-agi-nex-n2-5-mini-free',
+    provider: 'openrouter',
+    model: 'nex-agi/nex-n2.5-mini:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-nex-agi-nex-n2-5-pro-free',
+    provider: 'openrouter',
+    model: 'nex-agi/nex-n2.5-pro:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-inclusionai-ling-3-0-flash-sante-free',
+    provider: 'openrouter',
+    model: 'inclusionai/ling-3.0-flash-sante:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-inclusionai-ling-3-0-flash-fin-free',
+    provider: 'openrouter',
+    model: 'inclusionai/ling-3.0-flash-fin:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-qwen-qwen3-8-27b-free',
+    provider: 'openrouter',
+    model: 'qwen/qwen3.8-27b:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'cerebras-qwen-3-8-27b',
+    provider: 'cerebras',
+    model: 'qwen-3.8-27b',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
 ];
 
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
@@ -1380,7 +1461,7 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'gemini:gemini-2.5-flash': { requestsPerDay: 500 },
   'gemini:gemini-2.5-flash-lite': { requestsPerDay: 1500 },
   // OpenRouter (free models, rate-limited upstream)
-  'openrouter:stealth/ox-alpha': { requestsPerDay: 100 },
+
   'openrouter:z-ai/glm-5.2:free': { requestsPerDay: 100 },
   'openrouter:nvidia/nemotron-3.5-lightning:free': { requestsPerDay: 100 },
   'openrouter:thinkingmachines/inkling:free': { requestsPerDay: 100 },
@@ -1451,10 +1532,10 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 
   'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'groq:qwen/qwen3.6-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+
   'openrouter:cohere/north-mini-code:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:poolside/laguna-xs-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'cerebras:gemma-4-31b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+
   // AUTO-ADDED limits
 
   // Z.ai / Zhipu GLM — free Flash models, rate-limited upstream
@@ -1464,6 +1545,15 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // AUTO-ADDED limits
   'openrouter:poolside/laguna-s-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'modelscope:Qwen/Qwen3-32B': { requestsPerDay: 50 },
+  // AUTO-ADDED limits
+  'groq:qwen/qwen3.8-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:inclusionai/ling-3.0-flash-vl:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:nex-agi/nex-n2.5-mini:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:nex-agi/nex-n2.5-pro:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:inclusionai/ling-3.0-flash-sante:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:inclusionai/ling-3.0-flash-fin:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:qwen/qwen3.8-27b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'cerebras:qwen-3.8-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
 
 export interface RateLimitConfig {
