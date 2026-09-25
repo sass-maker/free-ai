@@ -89,7 +89,20 @@ const CATALOG_SPECS = [
     secret: 'GEMINI_API_KEY',
     url: () => 'https://generativelanguage.googleapis.com/v1beta/models',
     headers: ({ key }) => ({ 'x-goog-api-key': key }),
-    discover: (item) => /^gemini-/.test(modelId(item)) && isTextModel(item),
+    // Only stable 3.x+ text models are candidates. The catalog keeps listing
+    // soft-retired 2.x models (they 404 at inference) and hosts specialty
+    // variants that are useless to a chat router — previews, live/audio/tts,
+    // image, robotics, computer-use, transcribe, and -latest aliases.
+    discover: (item) => {
+      const id = modelId(item);
+      return (
+        /^gemini-(?:[3-9]|\d{2,})[\w.-]*$/.test(id) &&
+        !/preview|latest|live|image|tts|audio|transcribe|robotics|computer-use|omni|deep-research|customtools/i.test(
+          id
+        ) &&
+        isTextModel(item)
+      );
+    },
   },
   {
     provider: 'sambanova',
@@ -183,12 +196,27 @@ async function fetchCatalogItems(spec, key, fetchImpl) {
   throw new Error('catalog pagination exceeded the 20-page safety limit');
 }
 
-async function fetchCatalog(spec, env = process.env, fetchImpl = fetch) {
+async function fetchCatalog(
+  spec,
+  env = process.env,
+  fetchImpl = fetch,
+  enabledProviders = undefined
+) {
   if (spec.unsupported) {
     return {
       provider: spec.provider,
       status: 'unsupported',
       reason: spec.unsupported,
+      all: new Set(),
+      addable: new Set(),
+    };
+  }
+
+  if (enabledProviders && !enabledProviders.has(spec.provider)) {
+    return {
+      provider: spec.provider,
+      status: 'unsupported',
+      reason: 'no enabled registry models — catalog check skipped',
       all: new Set(),
       addable: new Set(),
     };
@@ -236,8 +264,14 @@ async function fetchCatalog(spec, env = process.env, fetchImpl = fetch) {
   }
 }
 
-export async function fetchCatalogs(env = process.env, fetchImpl = fetch) {
-  return Promise.all(CATALOG_SPECS.map((spec) => fetchCatalog(spec, env, fetchImpl)));
+export async function fetchCatalogs(
+  env = process.env,
+  fetchImpl = fetch,
+  enabledProviders = undefined
+) {
+  return Promise.all(
+    CATALOG_SPECS.map((spec) => fetchCatalog(spec, env, fetchImpl, enabledProviders))
+  );
 }
 
 // ── Parse current config ─────────────────────────────────────────────────────
@@ -258,6 +292,19 @@ export function parseConfigModels(source = readFileSync(CONFIG_PATH, 'utf-8')) {
     models.push({ id: match[1], provider: match[2], model: match[3] });
   }
   return models;
+}
+
+// Providers with zero enabled registry entries cannot drift in a way that
+// affects routing, so checking their catalogs only produces missing_key noise
+// for credentials nobody intends to configure yet.
+export function parseEnabledProviders(source = readFileSync(CONFIG_PATH, 'utf-8')) {
+  const providers = new Set();
+  const blockRe = /\{[^}]*?provider:\s*'([^']+)'[^}]*?enabled:\s*true[^}]*?\}/gs;
+  let match;
+  while ((match = blockRe.exec(source)) !== null) {
+    providers.add(match[1]);
+  }
+  return providers;
 }
 
 export function buildRegistryReport(configModels, catalogResults) {
@@ -328,7 +375,8 @@ export function buildRegistryReport(configModels, catalogResults) {
 
 async function main() {
   const configModels = parseConfigModels();
-  const catalogs = await fetchCatalogs();
+  const enabledProviders = parseEnabledProviders();
+  const catalogs = await fetchCatalogs(process.env, fetch, enabledProviders);
   const report = buildRegistryReport(configModels, catalogs);
 
   if (JSON_OUT) {

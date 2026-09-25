@@ -321,14 +321,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
 
-  // ── SambaNova (free tier, needs SAMBANOVA_API_KEY) ─────────────────
+  // ── SambaNova — free tier withdrawn (inference returns 402); entries kept disabled ──
   {
     id: 'sambanova-llama-70b',
     provider: 'sambanova',
     model: 'Meta-Llama-3.3-70B-Instruct',
     reasoning: 'high',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // SambaNova withdrew its free tier — inference returns 402
     priority: 0.76,
     capabilities: {
       toolCalling: true,
@@ -344,7 +344,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'DeepSeek-V3-0324',
     reasoning: 'high',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // SambaNova withdrew its free tier — inference returns 402
     priority: 0.75,
     capabilities: {
       toolCalling: true,
@@ -360,7 +360,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'Qwen3-32B',
     reasoning: 'high',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // SambaNova withdrew its free tier — inference returns 402
     priority: 0.74,
     capabilities: {
       toolCalling: true,
@@ -962,54 +962,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'openrouter-inclusionai-ling-3-0-flash-vl-free',
-    provider: 'openrouter',
-    model: 'inclusionai/ling-3.0-flash-vl:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-nex-agi-nex-n2-5-mini-free',
-    provider: 'openrouter',
-    model: 'nex-agi/nex-n2.5-mini:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-nex-agi-nex-n2-5-pro-free',
-    provider: 'openrouter',
-    model: 'nex-agi/nex-n2.5-pro:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
     id: 'openrouter-inclusionai-ling-3-0-flash-sante-free',
     provider: 'openrouter',
     model: 'inclusionai/ling-3.0-flash-sante:free',
@@ -1071,6 +1023,86 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       vision: false,
       contextWindow: 32768,
       maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-stealth-space-bunny-alpha',
+    provider: 'openrouter',
+    model: 'stealth/space-bunny-alpha',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'gemini-3-1-flash-lite',
+    provider: 'gemini',
+    model: 'gemini-3.1-flash-lite',
+    reasoning: 'low',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 1048576,
+      maxOutputTokens: 8192,
+    },
+  },
+  {
+    id: 'gemini-3-6-flash',
+    provider: 'gemini',
+    model: 'gemini-3.6-flash',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 1048576,
+      maxOutputTokens: 8192,
+    },
+  },
+  {
+    id: 'gemini-3-7-flash',
+    provider: 'gemini',
+    model: 'gemini-3.7-flash',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 1048576,
+      maxOutputTokens: 8192,
+    },
+  },
+  {
+    id: 'gemini-3-8-flash',
+    provider: 'gemini',
+    model: 'gemini-3.8-flash',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: true,
+      contextWindow: 1048576,
+      maxOutputTokens: 8192,
     },
   },
 ];
