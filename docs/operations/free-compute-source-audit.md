@@ -35,6 +35,36 @@ the TypeScript unions in `src/types.ts` and the caller maps in
 each modality registry filters providers through an availability check before
 routing.
 
+## Registry Resync — 2026-09-25
+
+Provider and credential state after the multi-key Gemini rollout and the
+weekly catalog check repair:
+
+- **Gemini multi-key.** `GEMINI_API_KEY` accepts a comma-separated list; each
+  request picks one key at random so independent AI Studio free-tier quotas
+  stack (~1,500 req/day per key on flash-lite). Five keys are configured on
+  both the Worker and Actions. Implemented in `src/providers/api-key.ts` —
+  reusable for any provider later.
+- **Gemini 2.5 soft-retired.** `gemini-2.5-flash` / `-lite` remain in the
+  catalog but 404 at inference for new accounts. Registry moved to
+  `gemini-3.5-flash` / `-lite`; image entry moved to `gemini-3-pro-image`
+  (`imagen-4.0-generate-001` is gone for new keys). Image generation is
+  quota-gated on fresh accounts — all image models return 429.
+- **SambaNova disabled.** Free tier withdrawn (402 at inference); its three
+  chat entries are `enabled: false` and stay in the registry for re-enable
+  if a free tier returns.
+- **Z.ai key expired.** Both the local `.dev.vars` copy and the Worker-side
+  key appear stale — catalog returns 401, runtime calls 502. Needs a fresh
+  key from z.ai before its three GLM models recover.
+- **Accepted Actions-only gaps.** NVIDIA, Cohere, and Mistral keys exist on
+  the Worker (runtime works) but not as Actions secrets — Cloudflare secrets
+  are write-only, so the weekly catalog check cannot cover them unless the
+  values are pasted into Actions separately.
+- **Skipped, not integrated.** ModelScope (signup requires Alibaba Cloud
+  real-name verification) and SiliconFlow (no zero-price model) remain
+  staged-only. The catalog checker now skips providers with zero enabled
+  registry models, so their missing keys no longer count as coverage gaps.
+
 ## Registry Resync — 2026-08-07
 
 The OpenRouter catalog can be read without a credential, so
