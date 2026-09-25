@@ -51,9 +51,9 @@ describe('model selection performance', () => {
     const observedHashes: Record<number, string> = {};
 
     const expectedHashes: Record<number, string> = {
-      20: '5019201b3a067c5c8db1158598a2d17a20887b82ca6b017ffb6a726fa0ec5ec3',
-      50: 'b79300b558482ed898ee58b4a2b4effcaa755257521a71bd8b67ab7dac1a3688',
-      53: 'b79300b558482ed898ee58b4a2b4effcaa755257521a71bd8b67ab7dac1a3688',
+      20: 'c479192af2ee26b21021bb3d999f1674fa3e570748d879c5af1603c656e28563',
+      50: 'df77f7846b5d8770f9e1885ef5efcdfc97b9467644be3c9cd211e9b871e835bc',
+      53: 'df77f7846b5d8770f9e1885ef5efcdfc97b9467644be3c9cd211e9b871e835bc',
     };
 
     for (const size of [20, 50, 53]) {

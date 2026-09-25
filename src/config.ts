@@ -170,9 +170,9 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── Gemini (free tier, generous limits) ─────────────────────────────
   {
-    id: 'gemini-2.5-flash',
+    id: 'gemini-3.5-flash',
     provider: 'gemini',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash',
     reasoning: 'high',
     supportsStreaming: true,
     enabled: true,
@@ -186,9 +186,9 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'gemini-2.5-flash-lite',
+    id: 'gemini-3.5-flash-lite',
     provider: 'gemini',
-    model: 'gemini-2.5-flash-lite',
+    model: 'gemini-3.5-flash-lite',
     reasoning: 'low',
     supportsStreaming: true,
     enabled: true,
@@ -1088,8 +1088,8 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'groq:openai/gpt-oss-120b': { requestsPerDay: 200 },
   'groq:openai/gpt-oss-20b': { requestsPerDay: 500 },
   // Gemini
-  'gemini:gemini-2.5-flash': { requestsPerDay: 500 },
-  'gemini:gemini-2.5-flash-lite': { requestsPerDay: 1500 },
+  'gemini:gemini-3.5-flash': { requestsPerDay: 500 },
+  'gemini:gemini-3.5-flash-lite': { requestsPerDay: 1500 },
   // OpenRouter (free models, rate-limited upstream)
 
   'openrouter:z-ai/glm-5.2:free': { requestsPerDay: 100 },
@@ -1372,11 +1372,11 @@ const DEFAULT_IMAGE_MODELS: ImageModelCandidate[] = [
     enabled: true,
     priority: 0.91,
   },
-  // Gemini Imagen
+  // Gemini image generation
   {
-    id: 'imagen-4',
+    id: 'gemini-3-pro-image',
     provider: 'gemini',
-    model: 'imagen-4.0-generate-001',
+    model: 'gemini-3-pro-image',
     enabled: true,
     priority: 0.86,
   },
@@ -1562,7 +1562,7 @@ const DEFAULT_STT_MODELS: AudioSttModelCandidate[] = [
   {
     id: 'gemini-audio',
     provider: 'gemini',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash',
     enabled: true,
     priority: 0.78,
   },
@@ -1577,7 +1577,7 @@ const DEFAULT_MODALITY_LIMITS: Record<string, ProviderLimitConfig> = {
   'together:black-forest-labs/FLUX.2-flex': { requestsPerDay: 150 },
   'together:black-forest-labs/FLUX.2-pro': { requestsPerDay: 100 },
   'together:black-forest-labs/FLUX.2-max': { requestsPerDay: 50 },
-  'gemini:imagen-4.0-generate-001': { requestsPerDay: 50 },
+  'gemini:gemini-3-pro-image': { requestsPerDay: 50 },
   'gemini:gemini-2.5-flash-image': { requestsPerDay: 200 },
   'workers_ai:@cf/black-forest-labs/flux-1-schnell': { requestsPerDay: 500 },
   'workers_ai:@cf/stabilityai/stable-diffusion-xl-base-1.0': { requestsPerDay: 500 },
@@ -1607,7 +1607,7 @@ const DEFAULT_MODALITY_LIMITS: Record<string, ProviderLimitConfig> = {
   'groq:whisper-large-v3-turbo': { requestsPerDay: 1000 },
   'groq:whisper-large-v3': { requestsPerDay: 500 },
   'workers_ai:@cf/openai/whisper': { requestsPerDay: 1000 },
-  'gemini:gemini-2.5-flash': { requestsPerDay: 500 },
+  'gemini:gemini-3.5-flash': { requestsPerDay: 500 },
 };
 
 // Merge modality limits into DEFAULT_LIMITS at module load.
