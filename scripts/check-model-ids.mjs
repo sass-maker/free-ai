@@ -197,7 +197,12 @@ async function fetchCatalog(spec, env = process.env, fetchImpl = fetch) {
   // Surrounding whitespace in a pasted secret is indistinguishable from an
   // invalid key at the provider; normalize before the presence check so a
   // blank secret reports missing_key rather than producing a provider 400.
-  const key = env[spec.secret]?.trim();
+  // Secrets may hold a comma-separated key list (see src/providers/api-key.ts);
+  // any single key is enough to read a catalog, so take the first.
+  const key = env[spec.secret]
+    ?.split(',')
+    .map((value) => value.trim())
+    .find(Boolean);
   if (!key && !spec.optionalSecret) {
     return {
       provider: spec.provider,

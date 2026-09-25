@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { pickApiKey } from './api-key';
 
 export interface GeminiImageInput {
   env: Env;
@@ -29,7 +30,8 @@ function sizeToAspect(size?: string): string {
 }
 
 export async function callGeminiImages(input: GeminiImageInput): Promise<GeminiImageOutput> {
-  if (!input.env.GEMINI_API_KEY) {
+  const apiKey = pickApiKey(input.env.GEMINI_API_KEY);
+  if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
 
@@ -40,8 +42,8 @@ export async function callGeminiImages(input: GeminiImageInput): Promise<GeminiI
   const isImagen = input.model.toLowerCase().includes('imagen');
 
   const url = isImagen
-    ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:predict?key=${input.env.GEMINI_API_KEY}`
-    : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${input.env.GEMINI_API_KEY}`;
+    ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:predict?key=${apiKey}`
+    : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${apiKey}`;
 
   const body = isImagen
     ? {
