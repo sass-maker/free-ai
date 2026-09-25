@@ -103,15 +103,8 @@ const CATALOG_SPECS = [
     url: () => 'https://integrate.api.nvidia.com/v1/models',
     headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
   },
-  {
-    provider: 'github_models',
-    secret: 'GITHUB_MODELS_TOKEN',
-    url: () => 'https://models.github.ai/catalog/models',
-    headers: ({ key }) => ({
-      Authorization: `Bearer ${key}`,
-      Accept: 'application/vnd.github+json',
-    }),
-  },
+  // github_models removed: GitHub retired the Models inference API and catalog
+  // on 2026-07-30 (410 Gone for all customers). No endpoint remains to check.
   {
     provider: 'pollinations',
     unsupported: 'no stable official text model-list contract is configured',

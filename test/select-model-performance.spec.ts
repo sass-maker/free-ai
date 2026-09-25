@@ -46,17 +46,17 @@ function digest(value: unknown): string {
 
 describe('model selection performance', () => {
   it('model selection scales across the supported registry size', () => {
-    expect(registry).toHaveLength(76);
+    expect(registry).toHaveLength(53);
     const metrics: string[] = [];
     const observedHashes: Record<number, string> = {};
 
     const expectedHashes: Record<number, string> = {
       20: '5019201b3a067c5c8db1158598a2d17a20887b82ca6b017ffb6a726fa0ec5ec3',
-      50: 'd5e7046a4c0292439e6f6913671bcf29ab3336cefb5c4b7e6b821614abf2c2bb',
-      76: '502f6cf25c9a4c3913cc6cd7b1b25995f1f7222a3e53c3ab9a1949e67ae2f8b3',
+      50: 'b79300b558482ed898ee58b4a2b4effcaa755257521a71bd8b67ab7dac1a3688',
+      53: 'b79300b558482ed898ee58b4a2b4effcaa755257521a71bd8b67ab7dac1a3688',
     };
 
-    for (const size of [20, 50, 76]) {
+    for (const size of [20, 50, 53]) {
       const candidates = registry.slice(0, size);
       const states = new Map(
         candidates.map((candidate, index) => {
