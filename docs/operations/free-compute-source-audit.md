@@ -13,7 +13,7 @@ The gateway has adapters for these text providers:
 - Cerebras
 - SambaNova
 - NVIDIA
-- GitHub Models
+- GitHub Models (**retired by GitHub 2026-07-30** — inference API and catalog return 410; registry entries removed 2026-09-25, adapter retained for explicit diagnostics)
 - Pollinations
 - Cohere
 - Mistral
@@ -145,9 +145,13 @@ Recommended follow-up:
 - Add an optional OpenRouter key-status poller to surface remaining daily free-model quota in `/v1/stats/providers`.
 - Keep OpenRouter models lower than direct providers when a direct provider has better limits or health.
 
-### Already useful: GitHub Models
+### Retired: GitHub Models
 
-GitHub Models includes rate-limited free usage for GitHub accounts, but paid usage can be enabled. This is a good fallback source, but it should stay behind hard per-provider limits unless the account budget is confirmed.
+GitHub retired GitHub Models on 2026-07-30 — playground, model catalog,
+inference API, and BYOK all return 410 for every customer
+([changelog](https://github.blog/changelog/2026-07-30-github-models-is-now-retired/)).
+Do not re-add it. The provider adapter and `github_models` registry entries
+were removed from default routing on 2026-09-25.
 
 ### Already useful: Groq and Cerebras
 

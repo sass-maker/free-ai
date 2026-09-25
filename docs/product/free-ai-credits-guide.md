@@ -18,10 +18,10 @@ Providers marked **[integrated]** are built into this gateway — just add the A
 | **Groq** [integrated] | Llama, Qwen3, Kimi K2, GPT-OSS, Whisper. 30 RPM, 1K-14K req/day | Fastest inference. Tool calling + JSON mode | https://console.groq.com |
 | **Cerebras** [integrated] | Up to 24M tokens/day free | Extremely fast Llama inference | https://cloud.cerebras.ai |
 | **Cloudflare Workers AI** [integrated] | 10,000 neurons/day, 20+ models | Embedding + chat, zero config | https://developers.cloudflare.com/workers-ai |
-| **SambaNova** [integrated] | Free tier, Llama 70B, DeepSeek V3, Qwen3 | Fast inference on custom hardware | https://cloud.sambanova.ai |
+| ~~SambaNova~~ | **Free tier withdrawn ~2026-08** — inference returns 402 PAYMENT_METHOD_REQUIRED | — | https://cloud.sambanova.ai |
 | **NVIDIA NIM** [integrated] | Free tier, Llama 70B, DeepSeek R1, Qwen3 | Huge model catalog, ~40 RPM | https://build.nvidia.com |
 | **OpenRouter** [integrated] | 25+ free models, 50 req/day | Multi-model access, single API | https://openrouter.ai |
-| **GitHub Models** [integrated] | Rate-limited free usage for GitHub accounts | Free for any GitHub user | https://github.com/marketplace/models |
+| ~~GitHub Models~~ | **Retired 2026-07-30** — endpoint returns 410 for all customers | — | [changelog](https://github.blog/changelog/2026-07-30-github-models-is-now-retired/) |
 | **Pollinations** [integrated] | Free text + image generation, no key required | Zero-config fallback, image gen | https://pollinations.ai |
 | **Cohere** [integrated] | Trial API key, 20 calls/min, 1000/month | Embed, Rerank, Command models | https://dashboard.cohere.com |
 | **Mistral** [integrated] | Free tier for Mistral Small | European provider, good quality | https://console.mistral.ai |

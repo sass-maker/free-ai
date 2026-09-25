@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { pickApiKey } from './api-key';
 
 export interface GeminiSttInput {
   env: Env;
@@ -36,7 +37,8 @@ function mimeTypeFor(file: File | Blob): string {
 }
 
 export async function callGeminiStt(input: GeminiSttInput): Promise<GeminiSttOutput> {
-  if (!input.env.GEMINI_API_KEY) {
+  const apiKey = pickApiKey(input.env.GEMINI_API_KEY);
+  if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
 
@@ -49,7 +51,7 @@ export async function callGeminiStt(input: GeminiSttInput): Promise<GeminiSttOut
       ? `Transcribe this audio verbatim in ${input.language}. Return only the transcription, no commentary.`
       : 'Transcribe this audio verbatim. Return only the transcription text, no commentary.';
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${input.env.GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${apiKey}`;
 
   const body = {
     contents: [

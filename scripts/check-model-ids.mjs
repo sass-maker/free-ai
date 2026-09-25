@@ -103,15 +103,8 @@ const CATALOG_SPECS = [
     url: () => 'https://integrate.api.nvidia.com/v1/models',
     headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
   },
-  {
-    provider: 'github_models',
-    secret: 'GITHUB_MODELS_TOKEN',
-    url: () => 'https://models.github.ai/catalog/models',
-    headers: ({ key }) => ({
-      Authorization: `Bearer ${key}`,
-      Accept: 'application/vnd.github+json',
-    }),
-  },
+  // github_models removed: GitHub retired the Models inference API and catalog
+  // on 2026-07-30 (410 Gone for all customers). No endpoint remains to check.
   {
     provider: 'pollinations',
     unsupported: 'no stable official text model-list contract is configured',
@@ -204,7 +197,12 @@ async function fetchCatalog(spec, env = process.env, fetchImpl = fetch) {
   // Surrounding whitespace in a pasted secret is indistinguishable from an
   // invalid key at the provider; normalize before the presence check so a
   // blank secret reports missing_key rather than producing a provider 400.
-  const key = env[spec.secret]?.trim();
+  // Secrets may hold a comma-separated key list (see src/providers/api-key.ts);
+  // any single key is enough to read a catalog, so take the first.
+  const key = env[spec.secret]
+    ?.split(',')
+    .map((value) => value.trim())
+    .find(Boolean);
   if (!key && !spec.optionalSecret) {
     return {
       provider: spec.provider,

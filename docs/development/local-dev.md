@@ -31,7 +31,7 @@ keys simply exclude that provider's models from routing — no error.
 | --- | --- | --- |
 | Workers AI | `CLOUDFLARE_WORKERS_AI_API_KEY` + `CLOUDFLARE_ACCOUNT_ID` | Uses CF AI binding in prod; REST fallback for local |
 | Groq | `GROQ_API_KEY` | |
-| Gemini | `GEMINI_API_KEY` | |
+| Gemini | `GEMINI_API_KEY` | Comma-separated list allowed; one key is picked at random per request |
 | OpenRouter | `OPENROUTER_API_KEY` | |
 | Cerebras | `CEREBRAS_API_KEY` | |
 | SambaNova | `SAMBANOVA_API_KEY` | |

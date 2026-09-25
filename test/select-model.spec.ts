@@ -613,7 +613,8 @@ describe('default registry catalog metadata', () => {
   it('separates native reasoning support from the routing reasoning tier', () => {
     const registry = getModelRegistry({
       GROQ_API_KEY: 'test',
-      GITHUB_TOKEN: 'test',
+      GEMINI_API_KEY: 'test',
+      NVIDIA_API_KEY: 'test',
     } as Env);
 
     const nativeReasoning = registry.filter((candidate) => candidate.capabilities.nativeReasoning);

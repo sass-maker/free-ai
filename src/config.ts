@@ -204,23 +204,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── OpenRouter (needs OPENROUTER_API_KEY) ────────────────────────────
   {
-    id: 'openrouter-stealth-ox-alpha',
-    provider: 'openrouter',
-    model: 'stealth/ox-alpha',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.82,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: true,
-      nativeReasoning: true,
-      contextWindow: 1_048_576,
-      maxOutputTokens: 131_072,
-    },
-  },
-  {
     id: 'openrouter-zai-glm-5-2-free',
     provider: 'openrouter',
     model: 'z-ai/glm-5.2:free',
@@ -534,376 +517,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
 
-  // ── GitHub Models (needs GITHUB_TOKEN, free tier) ───────────────────
-  {
-    id: 'gh-gpt-5',
-    provider: 'github_models',
-    model: 'openai/gpt-5',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.95,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 272000,
-      maxOutputTokens: 16384,
-    },
-  },
-  {
-    id: 'gh-gpt-5-mini',
-    provider: 'github_models',
-    model: 'openai/gpt-5-mini',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.93,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 272000,
-      maxOutputTokens: 16384,
-    },
-  },
-  {
-    id: 'gh-gpt-5-nano',
-    provider: 'github_models',
-    model: 'openai/gpt-5-nano',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.88,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 272000,
-      maxOutputTokens: 16384,
-    },
-  },
-  {
-    id: 'gh-gpt-4.1',
-    provider: 'github_models',
-    model: 'openai/gpt-4.1',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.91,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: true,
-      contextWindow: 1047576,
-      maxOutputTokens: 32768,
-    },
-  },
-  {
-    id: 'gh-gpt-4.1-mini',
-    provider: 'github_models',
-    model: 'openai/gpt-4.1-mini',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.89,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: true,
-      contextWindow: 1047576,
-      maxOutputTokens: 32768,
-    },
-  },
-  {
-    id: 'gh-gpt-4o-mini',
-    provider: 'github_models',
-    model: 'openai/gpt-4o-mini',
-    reasoning: 'low',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.86,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: true,
-      contextWindow: 128000,
-      maxOutputTokens: 16384,
-    },
-  },
-  {
-    id: 'gh-o3',
-    provider: 'github_models',
-    model: 'openai/o3',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.94,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 200000,
-      maxOutputTokens: 100000,
-    },
-  },
-  {
-    id: 'gh-o4-mini',
-    provider: 'github_models',
-    model: 'openai/o4-mini',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.9,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 200000,
-      maxOutputTokens: 100000,
-    },
-  },
-  {
-    id: 'gh-deepseek-r1',
-    provider: 'github_models',
-    model: 'deepseek/deepseek-r1',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.87,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 163840,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-deepseek-r1-0528',
-    provider: 'github_models',
-    model: 'deepseek/deepseek-r1-0528',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.86,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 163840,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-deepseek-v3',
-    provider: 'github_models',
-    model: 'deepseek/deepseek-v3-0324',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.85,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-llama-4-maverick',
-    provider: 'github_models',
-    model: 'meta/llama-4-maverick-17b-128e-instruct-fp8',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.82,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: true,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-llama-4-scout',
-    provider: 'github_models',
-    model: 'meta/llama-4-scout-17b-16e-instruct',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.81,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: true,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-llama-3.3-70b',
-    provider: 'github_models',
-    model: 'meta/llama-3.3-70b-instruct',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.83,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-grok-3',
-    provider: 'github_models',
-    model: 'xai/grok-3',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.84,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-grok-3-mini',
-    provider: 'github_models',
-    model: 'xai/grok-3-mini',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.8,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-codestral',
-    provider: 'github_models',
-    model: 'mistral-ai/codestral-2501',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.82,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 262144,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-mistral-medium',
-    provider: 'github_models',
-    model: 'mistral-ai/mistral-medium-2505',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.79,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-command-a',
-    provider: 'github_models',
-    model: 'cohere/cohere-command-a',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.78,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-command-r-plus',
-    provider: 'github_models',
-    model: 'cohere/cohere-command-r-plus-08-2024',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.77,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'gh-phi-4',
-    provider: 'github_models',
-    model: 'microsoft/phi-4',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.72,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 16384,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'gh-phi-4-reasoning',
-    provider: 'github_models',
-    model: 'microsoft/phi-4-reasoning',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.73,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'gh-mai-ds-r1',
-    provider: 'github_models',
-    model: 'microsoft/mai-ds-r1',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.74,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 163840,
-      maxOutputTokens: 8192,
-    },
-  },
-
   // ── Pollinations (no key required) ──────────────────────────────────
   {
     id: 'pollinations-openai',
@@ -1205,22 +818,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
   {
-    id: 'groq-qwen-qwen3-6-27b',
-    provider: 'groq',
-    model: 'qwen/qwen3.6-27b',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
     id: 'openrouter-cohere-north-mini-code-free',
     provider: 'openrouter',
     model: 'cohere/north-mini-code:free',
@@ -1242,22 +839,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     id: 'openrouter-poolside-laguna-xs-2-1-free',
     provider: 'openrouter',
     model: 'poolside/laguna-xs-2.1:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'cerebras-gemma-4-31b',
-    provider: 'cerebras',
-    model: 'gemma-4-31b',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
@@ -1362,6 +943,136 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       maxOutputTokens: 8_192,
     },
   },
+
+  // ── Auto-added by weekly model check (review priority + capabilities) ──
+  {
+    id: 'groq-qwen-qwen3-8-27b',
+    provider: 'groq',
+    model: 'qwen/qwen3.8-27b',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-inclusionai-ling-3-0-flash-vl-free',
+    provider: 'openrouter',
+    model: 'inclusionai/ling-3.0-flash-vl:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-nex-agi-nex-n2-5-mini-free',
+    provider: 'openrouter',
+    model: 'nex-agi/nex-n2.5-mini:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-nex-agi-nex-n2-5-pro-free',
+    provider: 'openrouter',
+    model: 'nex-agi/nex-n2.5-pro:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-inclusionai-ling-3-0-flash-sante-free',
+    provider: 'openrouter',
+    model: 'inclusionai/ling-3.0-flash-sante:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-inclusionai-ling-3-0-flash-fin-free',
+    provider: 'openrouter',
+    model: 'inclusionai/ling-3.0-flash-fin:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'openrouter-qwen-qwen3-8-27b-free',
+    provider: 'openrouter',
+    model: 'qwen/qwen3.8-27b:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'cerebras-qwen-3-8-27b',
+    provider: 'cerebras',
+    model: 'qwen-3.8-27b',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
 ];
 
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
@@ -1380,7 +1091,7 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'gemini:gemini-2.5-flash': { requestsPerDay: 500 },
   'gemini:gemini-2.5-flash-lite': { requestsPerDay: 1500 },
   // OpenRouter (free models, rate-limited upstream)
-  'openrouter:stealth/ox-alpha': { requestsPerDay: 100 },
+
   'openrouter:z-ai/glm-5.2:free': { requestsPerDay: 100 },
   'openrouter:nvidia/nemotron-3.5-lightning:free': { requestsPerDay: 100 },
   'openrouter:thinkingmachines/inkling:free': { requestsPerDay: 100 },
@@ -1405,29 +1116,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'nvidia:deepseek-ai/deepseek-r1-distill-llama-70b': { requestsPerDay: 300 },
   'nvidia:qwen/qwen2.5-coder-32b-instruct': { requestsPerDay: 500 },
   // GitHub Models (free tier ~50 req/day per high-tier, 150/day low-tier)
-  'github_models:openai/gpt-5': { requestsPerDay: 50 },
-  'github_models:openai/gpt-5-mini': { requestsPerDay: 150 },
-  'github_models:openai/gpt-5-nano': { requestsPerDay: 150 },
-  'github_models:openai/gpt-4.1': { requestsPerDay: 50 },
-  'github_models:openai/gpt-4.1-mini': { requestsPerDay: 150 },
-  'github_models:openai/gpt-4o-mini': { requestsPerDay: 150 },
-  'github_models:openai/o3': { requestsPerDay: 50 },
-  'github_models:openai/o4-mini': { requestsPerDay: 50 },
-  'github_models:deepseek/deepseek-r1': { requestsPerDay: 50 },
-  'github_models:deepseek/deepseek-r1-0528': { requestsPerDay: 50 },
-  'github_models:deepseek/deepseek-v3-0324': { requestsPerDay: 50 },
-  'github_models:meta/llama-4-maverick-17b-128e-instruct-fp8': { requestsPerDay: 150 },
-  'github_models:meta/llama-4-scout-17b-16e-instruct': { requestsPerDay: 150 },
-  'github_models:meta/llama-3.3-70b-instruct': { requestsPerDay: 150 },
-  'github_models:xai/grok-3': { requestsPerDay: 50 },
-  'github_models:xai/grok-3-mini': { requestsPerDay: 150 },
-  'github_models:mistral-ai/codestral-2501': { requestsPerDay: 150 },
-  'github_models:mistral-ai/mistral-medium-2505': { requestsPerDay: 150 },
-  'github_models:cohere/cohere-command-a': { requestsPerDay: 150 },
-  'github_models:cohere/cohere-command-r-plus-08-2024': { requestsPerDay: 150 },
-  'github_models:microsoft/phi-4': { requestsPerDay: 150 },
-  'github_models:microsoft/phi-4-reasoning': { requestsPerDay: 150 },
-  'github_models:microsoft/mai-ds-r1': { requestsPerDay: 50 },
   // Pollinations (no key required, IP-rate-limited upstream)
   'pollinations:openai': { requestsPerDay: 300 },
   // Cohere (trial: 1000 req/mo ≈ 33/day across all models)
@@ -1451,10 +1139,10 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 
   'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'groq:qwen/qwen3.6-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+
   'openrouter:cohere/north-mini-code:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:poolside/laguna-xs-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'cerebras:gemma-4-31b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+
   // AUTO-ADDED limits
 
   // Z.ai / Zhipu GLM — free Flash models, rate-limited upstream
@@ -1464,6 +1152,15 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // AUTO-ADDED limits
   'openrouter:poolside/laguna-s-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'modelscope:Qwen/Qwen3-32B': { requestsPerDay: 50 },
+  // AUTO-ADDED limits
+  'groq:qwen/qwen3.8-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:inclusionai/ling-3.0-flash-vl:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:nex-agi/nex-n2.5-mini:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:nex-agi/nex-n2.5-pro:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:inclusionai/ling-3.0-flash-sante:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:inclusionai/ling-3.0-flash-fin:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'openrouter:qwen/qwen3.8-27b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'cerebras:qwen-3.8-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
 
 export interface RateLimitConfig {
