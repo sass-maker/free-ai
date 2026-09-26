@@ -307,6 +307,53 @@ export function parseEnabledProviders(source = readFileSync(CONFIG_PATH, 'utf-8'
   return providers;
 }
 
+function summarizeCatalogs(catalogResults, report) {
+  for (const catalog of catalogResults) {
+    report.catalogs.push({
+      provider: catalog.provider,
+      status: catalog.status,
+      reason: catalog.reason,
+      upstreamModels: catalog.all.size,
+      discoverableModels: catalog.addable.size,
+    });
+    if (catalog.status === 'ok') report.summary.checkedCatalogs += 1;
+    else if (catalog.status === 'unsupported') report.summary.unsupportedCatalogs += 1;
+    else {
+      report.summary.incompleteCatalogs += 1;
+      if (catalog.status === 'missing_key') report.summary.credentialGaps += 1;
+      else report.summary.catalogErrors += 1;
+    }
+  }
+}
+
+function classifyConfigModels(configModels, catalogMap, configured, report) {
+  for (const entry of configModels) {
+    if (!configured.has(entry.provider)) configured.set(entry.provider, new Set());
+    configured.get(entry.provider).add(entry.model);
+
+    const catalog = catalogMap.get(entry.provider);
+    if (!catalog) {
+      report.skipped.push({ ...entry, reason: 'catalog unsupported' });
+    } else if (catalog.status !== 'ok') {
+      report.skipped.push({ ...entry, reason: `${catalog.status}: ${catalog.reason}` });
+    } else if (catalog.all.has(entry.model)) {
+      report.ok.push(entry);
+    } else {
+      report.stale.push(entry);
+    }
+  }
+}
+
+function findNewModels(catalogResults, configured, report) {
+  for (const catalog of catalogResults) {
+    if (catalog.status !== 'ok') continue;
+    const providerModels = configured.get(catalog.provider) ?? new Set();
+    for (const model of catalog.addable) {
+      if (!providerModels.has(model)) report.new.push({ provider: catalog.provider, model });
+    }
+  }
+}
+
 export function buildRegistryReport(configModels, catalogResults) {
   const catalogMap = new Map(catalogResults.map((catalog) => [catalog.provider, catalog]));
   const configured = new Map();
@@ -326,49 +373,149 @@ export function buildRegistryReport(configModels, catalogResults) {
       unsupportedCatalogs: 0,
     },
   };
-
-  for (const catalog of catalogResults) {
-    report.catalogs.push({
-      provider: catalog.provider,
-      status: catalog.status,
-      reason: catalog.reason,
-      upstreamModels: catalog.all.size,
-      discoverableModels: catalog.addable.size,
-    });
-    if (catalog.status === 'ok') report.summary.checkedCatalogs += 1;
-    else if (catalog.status === 'unsupported') report.summary.unsupportedCatalogs += 1;
-    else {
-      report.summary.incompleteCatalogs += 1;
-      if (catalog.status === 'missing_key') report.summary.credentialGaps += 1;
-      else report.summary.catalogErrors += 1;
-    }
-  }
-
-  for (const entry of configModels) {
-    if (!configured.has(entry.provider)) configured.set(entry.provider, new Set());
-    configured.get(entry.provider).add(entry.model);
-
-    const catalog = catalogMap.get(entry.provider);
-    if (!catalog) {
-      report.skipped.push({ ...entry, reason: 'catalog unsupported' });
-    } else if (catalog.status !== 'ok') {
-      report.skipped.push({ ...entry, reason: `${catalog.status}: ${catalog.reason}` });
-    } else if (catalog.all.has(entry.model)) {
-      report.ok.push(entry);
-    } else {
-      report.stale.push(entry);
-    }
-  }
-
-  for (const catalog of catalogResults) {
-    if (catalog.status !== 'ok') continue;
-    const providerModels = configured.get(catalog.provider) ?? new Set();
-    for (const model of catalog.addable) {
-      if (!providerModels.has(model)) report.new.push({ provider: catalog.provider, model });
-    }
-  }
-
+  summarizeCatalogs(catalogResults, report);
+  classifyConfigModels(configModels, catalogMap, configured, report);
+  findNewModels(catalogResults, configured, report);
   return report;
+}
+
+// ── Report printing ──────────────────────────────────────────────────────────
+
+function printReport(report) {
+  if (report.stale.length === 0) {
+    console.log(
+      `✓ All ${report.ok.length} checked models are valid (${report.skipped.length} skipped; ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs} catalogs checked)`
+    );
+  } else {
+    console.log(`⚠ ${report.stale.length} stale model(s) found:\n`);
+    for (const m of report.stale) {
+      console.log(`  ${m.provider}/${m.model}  (id: ${m.id})`);
+    }
+    console.log(`\n✓ ${report.ok.length} valid, ${report.skipped.length} skipped`);
+  }
+  for (const catalog of report.catalogs.filter((item) => item.status !== 'ok')) {
+    console.log(`⚠ ${catalog.provider}: ${catalog.status} (${catalog.reason})`);
+  }
+  if (report.new.length > 0) {
+    console.log(`\n✨ ${report.new.length} new model(s) upstream not in config:`);
+    for (const m of report.new) console.log(`  ${m.provider}/${m.model}`);
+  }
+}
+
+// ── Config patching ──────────────────────────────────────────────────────────
+
+// Walk back from an `id:` match to the enclosing block's opening `{`,
+// including the line's leading indentation so removal doesn't orphan it.
+function blockStartBefore(source, idIdx) {
+  let start = idIdx;
+  while (start > 0 && source[start] !== '{') start--;
+  let lineStart = start;
+  while (lineStart > 0 && (source[lineStart - 1] === ' ' || source[lineStart - 1] === '\t'))
+    lineStart--;
+  if (lineStart === 0 || source[lineStart - 1] === '\n') start = lineStart;
+  return start;
+}
+
+// Walk forward matching braces to the closing `}` of the block at `start`.
+function blockEndAfter(source, start) {
+  let depth = 0;
+  for (let i = start; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}') {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return start;
+}
+
+// Remove a `{ ... id: '<id>' ... }` registry block — uses a brace-counter
+// because regex alone fails on nested `capabilities: {...}`.
+function removeBlockById(source, id) {
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const idIdx = source.search(new RegExp(`id:\\s*'${escapedId}'`));
+  if (idIdx === -1) return source;
+  let start = blockStartBefore(source, idIdx);
+  let end = blockEndAfter(source, start);
+  // Prefer removing the block's own trailing comma. If the block is the
+  // final element and has no trailing comma, remove the preceding comma.
+  if (source[end] === ',') {
+    end++;
+    while (end < source.length && /[ \t]/.test(source[end])) end++;
+    if (source[end] === '\n') end++;
+  } else {
+    let before = start - 1;
+    while (before >= 0 && /\s/.test(source[before])) before--;
+    if (source[before] === ',') start = before;
+  }
+  return source.slice(0, start) + source.slice(end);
+}
+
+function removeStaleEntries(src, stale) {
+  let result = src;
+  for (const m of stale) {
+    result = removeBlockById(result, m.id);
+    // Remove corresponding limit entry (not nested — simple regex OK)
+    const limitKey = `${m.provider}:${m.model}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const limitRe = new RegExp(`^[ \\t]*'${limitKey}':\\s*\\{[^}]*\\},?[^\\n]*(?:\\n|$)`, 'gm');
+    result = result.replace(limitRe, '\n');
+  }
+  return result;
+}
+
+function modelStub(m) {
+  // slugify id from provider+model
+  const slug = `${m.provider}-${m.model.replace(/[^a-z0-9]+/gi, '-')}`.toLowerCase().slice(0, 60);
+  return `  {
+    id: '${slug}',
+    provider: '${m.provider}',
+    model: '${m.model}',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.50, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
+  },`;
+}
+
+// Stage new models disabled. Provider metadata is discovery evidence, not
+// runtime compatibility proof; enable only after a provider-level smoke.
+function insertNewModels(src, newModels) {
+  let result = src;
+  const stubs = newModels.map(modelStub).join('\n');
+  const modelsStart = result.indexOf('const DEFAULT_MODELS: ModelCandidate[] = [');
+  const limitsStart = result.indexOf('const DEFAULT_LIMITS:', modelsStart);
+  const modelsEnd =
+    modelsStart === -1 || limitsStart === -1 ? -1 : result.lastIndexOf('\n];', limitsStart);
+  if (modelsStart !== -1 && modelsEnd !== -1) {
+    result =
+      result.slice(0, modelsEnd) +
+      `\n\n  // ── Auto-added by weekly model check (review priority + capabilities) ──\n${stubs}` +
+      result.slice(modelsEnd);
+  }
+
+  const limitStubs = newModels
+    .map((m) => `  '${m.provider}:${m.model}': { requestsPerDay: 100 }, // AUTO-ADDED — tune`)
+    .join('\n');
+  const limitMarker =
+    /(const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = \{[\s\S]*?)(\n\};)/;
+  if (limitMarker.test(result)) {
+    result = result.replace(limitMarker, `$1\n  // AUTO-ADDED limits\n${limitStubs}$2`);
+  }
+  return result;
+}
+
+function applyConfigPatch(report) {
+  if (report.stale.length === 0 && report.new.length === 0) return;
+  let src = readFileSync(CONFIG_PATH, 'utf-8');
+  src = removeStaleEntries(src, report.stale);
+  if (report.new.length > 0) src = insertNewModels(src, report.new);
+  src = src.replace(/\n{3,}/g, '\n\n');
+  writeFileSync(CONFIG_PATH, src);
+  const parts = [];
+  if (report.stale.length) parts.push(`removed ${report.stale.length} stale`);
+  if (report.new.length) parts.push(`staged ${report.new.length} new (disabled)`);
+  console.log(`\nPatched config.ts — ${parts.join(', ')}`);
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -379,148 +526,9 @@ async function main() {
   const catalogs = await fetchCatalogs(process.env, fetch, enabledProviders);
   const report = buildRegistryReport(configModels, catalogs);
 
-  if (JSON_OUT) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    if (report.stale.length === 0) {
-      console.log(
-        `✓ All ${report.ok.length} checked models are valid (${report.skipped.length} skipped; ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs} catalogs checked)`
-      );
-    } else {
-      console.log(`⚠ ${report.stale.length} stale model(s) found:\n`);
-      for (const m of report.stale) {
-        console.log(`  ${m.provider}/${m.model}  (id: ${m.id})`);
-      }
-      console.log(`\n✓ ${report.ok.length} valid, ${report.skipped.length} skipped`);
-    }
-    for (const catalog of report.catalogs.filter((item) => item.status !== 'ok')) {
-      console.log(`⚠ ${catalog.provider}: ${catalog.status} (${catalog.reason})`);
-    }
-    if (report.new.length > 0) {
-      console.log(`\n✨ ${report.new.length} new model(s) upstream not in config:`);
-      for (const m of report.new) console.log(`  ${m.provider}/${m.model}`);
-    }
-  }
-
-  // ── Patch config if requested ──────────────────────────────────────────
-  if (PATCH && (report.stale.length > 0 || report.new.length > 0)) {
-    let src = readFileSync(CONFIG_PATH, 'utf-8');
-
-    // Remove stale — uses brace-counter (regex alone fails on nested `capabilities: {...}`)
-    const removeBlockById = (source, id) => {
-      const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const idRe = new RegExp(`id:\\s*'${escapedId}'`);
-      const idIdx = source.search(idRe);
-      if (idIdx === -1) return source;
-      // Walk back to opening `{`
-      let start = idIdx;
-      while (start > 0 && source[start] !== '{') start--;
-      // Include the line's leading indentation so removal doesn't orphan it
-      let lineStart = start;
-      while (lineStart > 0 && (source[lineStart - 1] === ' ' || source[lineStart - 1] === '\t'))
-        lineStart--;
-      if (lineStart === 0 || source[lineStart - 1] === '\n') start = lineStart;
-      // Walk forward matching braces
-      let depth = 0;
-      let end = start;
-      for (let i = start; i < source.length; i++) {
-        if (source[i] === '{') depth++;
-        else if (source[i] === '}') {
-          depth--;
-          if (depth === 0) {
-            end = i + 1;
-            break;
-          }
-        }
-      }
-      // Prefer removing the block's own trailing comma. If the block is the
-      // final element and has no trailing comma, remove the preceding comma.
-      if (source[end] === ',') {
-        end++;
-        while (end < source.length && /[ \t]/.test(source[end])) end++;
-        if (source[end] === '\n') end++;
-      } else {
-        let before = start - 1;
-        while (before >= 0 && /\s/.test(source[before])) before--;
-        if (source[before] === ',') start = before;
-      }
-      return source.slice(0, start) + source.slice(end);
-    };
-
-    for (const m of report.stale) {
-      src = removeBlockById(src, m.id);
-
-      // Remove corresponding limit entry (not nested — simple regex OK)
-      const limitKey = `${m.provider}:${m.model}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const limitRe = new RegExp(`^[ \\t]*'${limitKey}':\\s*\\{[^}]*\\},?[^\\n]*(?:\\n|$)`, 'gm');
-      src = src.replace(limitRe, '\n');
-    }
-
-    // Stage new models disabled. Provider metadata is discovery evidence, not
-    // runtime compatibility proof; enable only after a provider-level smoke.
-    if (report.new.length > 0) {
-      const _provComment = {
-        groq: 'Groq',
-        openrouter: 'OpenRouter',
-        cerebras: 'Cerebras',
-        gemini: 'Gemini',
-        sambanova: 'SambaNova',
-        nvidia: 'NVIDIA',
-        github_models: 'GitHub Models',
-        cohere: 'Cohere',
-        mistral: 'Mistral',
-        zai: 'Z.ai',
-        modelscope: 'ModelScope',
-        siliconflow: 'SiliconFlow',
-      };
-      const stubs = report.new
-        .map((m) => {
-          // slugify id from provider+model
-          const slug = `${m.provider}-${m.model.replace(/[^a-z0-9]+/gi, '-')}`
-            .toLowerCase()
-            .slice(0, 60);
-          return `  {
-    id: '${slug}',
-    provider: '${m.provider}',
-    model: '${m.model}',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.50, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: { toolCalling: false, jsonMode: true, vision: false, contextWindow: 32768, maxOutputTokens: 4096 },
-  },`;
-        })
-        .join('\n');
-
-      const modelsStart = src.indexOf('const DEFAULT_MODELS: ModelCandidate[] = [');
-      const limitsStart = src.indexOf('const DEFAULT_LIMITS:', modelsStart);
-      const modelsEnd =
-        modelsStart === -1 || limitsStart === -1 ? -1 : src.lastIndexOf('\n];', limitsStart);
-      if (modelsStart !== -1 && modelsEnd !== -1) {
-        src =
-          src.slice(0, modelsEnd) +
-          `\n\n  // ── Auto-added by weekly model check (review priority + capabilities) ──\n${stubs}` +
-          src.slice(modelsEnd);
-      }
-
-      // Add limits section entries
-      const limitStubs = report.new
-        .map((m) => `  '${m.provider}:${m.model}': { requestsPerDay: 100 }, // AUTO-ADDED — tune`)
-        .join('\n');
-      const limitMarker =
-        /(const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = \{[\s\S]*?)(\n\};)/;
-      if (limitMarker.test(src)) {
-        src = src.replace(limitMarker, `$1\n  // AUTO-ADDED limits\n${limitStubs}$2`);
-      }
-    }
-
-    src = src.replace(/\n{3,}/g, '\n\n');
-    writeFileSync(CONFIG_PATH, src);
-    const parts = [];
-    if (report.stale.length) parts.push(`removed ${report.stale.length} stale`);
-    if (report.new.length) parts.push(`staged ${report.new.length} new (disabled)`);
-    console.log(`\nPatched config.ts — ${parts.join(', ')}`);
-  }
+  if (JSON_OUT) console.log(JSON.stringify(report, null, 2));
+  else printReport(report);
+  if (PATCH) applyConfigPatch(report);
 
   // Signal the caller when maintenance review is needed. The workflow keeps
   // missing optional catalog credentials visible in its issue, while using
