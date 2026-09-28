@@ -182,7 +182,7 @@ const rb = '}';
         </a>
         <ul class="nav-links">
           <li><a href="/" class="active">Home</a></li>
-          <li><a href="/getting-started/">Docs</a></li>
+          <li><a href="/getting-started/" data-app-health-event="documentation.opened">Docs</a></li>
               <li><a href="/faq/">FAQ</a></li>
               <li><a href="/changelog/">Changelog</a></li>
               <li><a href="/dashboard">Dashboard</a></li>
@@ -193,7 +193,7 @@ const rb = '}';
           <span class="status-dot"></span>
           Live health status
         </a>
-        <a class="nav-cta" href="/authentication/">
+        <a class="nav-cta" href="/authentication/" data-app-health-event="access_requirements.opened">
           Access requirements
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
         </a>
@@ -216,11 +216,11 @@ const rb = '}';
           Routing depends on configured credentials, model health and remaining quota. Operator-provisioned access; no self-serve signup.
         </p>
         <div class="hero-actions afu d4">
-          <a class="btn btn-primary" href="/authentication/">
+          <a class="btn btn-primary" href="/authentication/" data-app-health-event="access_requirements.opened">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 3.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/><path d="M5.5 6.5l-2 4 4.5 4.5 4-2-2-2-2.5-2.5z"/></svg>
             Check access requirements
           </a>
-          <a class="btn btn-ghost" href={`${gw}/v1/routing/status`} target="_blank">
+          <a class="btn btn-ghost" href={`${gw}/v1/routing/status`} target="_blank" data-app-health-event="provider_status.opened">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
             See live provider status
           </a>
@@ -467,6 +467,14 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
         </div>
       </div>
     </footer>
+    <script is:inline type="module" src="https://sassmaker.com/newsletter-capture.js"></script>
+    <saas-maker-newsletter-capture
+      catalog-id="free-ai"
+      product-name="Free AI"
+      kind="newsletter"
+      source="footer"
+      privacy-url="https://ai-gateway.sassmaker.com/privacy"
+    ></saas-maker-newsletter-capture>
     <script
       is:inline
       src="https://sassmaker.com/project-strip.js"
@@ -479,5 +487,14 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
       data-name="Free AI"
       defer
     ></script>
+    <script is:inline>
+      document.addEventListener('click', function (event) {
+        var link = event.target.closest('[data-app-health-event]');
+        var name = link && link.getAttribute('data-app-health-event');
+        if (name && window.appHealth && typeof window.appHealth.track === 'function') {
+          window.appHealth.track(name);
+        }
+      });
+    </script>
   </body>
 </html>
