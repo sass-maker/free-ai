@@ -1,4 +1,5 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
+import { matchedRouteTemplate } from '../lib/telemetry';
 
 import { isGatewayAuthConfigured, isValidGatewayApiKey } from '../auth/gateway';
 import { capture } from '../lib/telemetry';
@@ -37,7 +38,7 @@ function captureAuthFailure(route: string, reason: string): void {
 
 export function registerGatewayAuthMiddleware(app: GatewayApp): void {
   app.use('/v1/*', async (context, next) => {
-    const route = new URL(context.req.url).pathname;
+    const route = matchedRouteTemplate(context);
     const isExemptGet = context.req.method === 'GET' && AUTH_EXEMPT_GET.has(route);
 
     if (isExemptGet) {
