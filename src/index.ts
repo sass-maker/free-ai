@@ -2,7 +2,13 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { honoMiddleware } from '@saas-maker/app-health/hono';
-import { capture, configurePostHog, flushPostHog, trace } from './lib/telemetry';
+import {
+  capture,
+  configurePostHog,
+  flushPostHog,
+  matchedRouteTemplate,
+  trace,
+} from './lib/telemetry';
 import { getAppHealthClient } from './lib/app-health';
 import pLimit from 'p-limit';
 import pRetry, { AbortError } from 'p-retry';
@@ -3241,7 +3247,7 @@ app.onError((err, c) => {
     event: 'error_captured',
     properties: {
       project_id: 'free-ai',
-      route: new URL(c.req.url).pathname,
+      route: matchedRouteTemplate(c),
       method: c.req.method,
       type,
       source: 'worker_onError',

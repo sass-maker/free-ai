@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Hono } from 'hono';
+import { matchedRouteTemplate } from '../src/lib/telemetry';
 
 async function loadTelemetry() {
   vi.resetModules();
@@ -11,6 +13,26 @@ afterEach(() => {
 });
 
 describe('PostHog telemetry', () => {
+  it('uses the matched route template instead of dynamic path values', async () => {
+    const app = new Hono();
+    let middlewareRoute = '';
+    app.use('/v1/*', async (context, next) => {
+      middlewareRoute = matchedRouteTemplate(context);
+      await next();
+    });
+    app.get('/v1/videos/generations/:id', () => {
+      throw new Error('route failed');
+    });
+    app.onError((_error, context) => {
+      return context.text(matchedRouteTemplate(context));
+    });
+
+    const response = await app.request('/v1/videos/generations/person@example.com');
+
+    expect(middlewareRoute).toBe('/v1/videos/generations/:id');
+    expect(await response.text()).toBe('/v1/videos/generations/:id');
+  });
+
   it('does not send or queue events before configuration', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
