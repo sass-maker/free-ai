@@ -198,7 +198,7 @@ const jsonLd = {
 
       <div class="section">
         <h2>Provider Stats</h2>
-        <p class="sub">Recent routing attempts, model availability, and quota status by provider.</p>
+        <p class="sub">Recent routing attempts, model availability, and quota status by provider. — means unavailable or no attempt history.</p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -260,10 +260,12 @@ const jsonLd = {
       }
 
       function fmt(n) {
+        if (n === null) return '—';
         return new Intl.NumberFormat('en-US').format(n);
       }
 
       function pct(n) {
+        if (n === null) return '—';
         return (n * 100).toFixed(1) + '%';
       }
 
@@ -278,6 +280,7 @@ const jsonLd = {
       }
 
       function healthColor(rate) {
+        if (rate === null) return 'var(--text-muted)';
         if (rate >= 0.9) return '#10b981';
         if (rate >= 0.5) return '#f59e0b';
         return '#ef4444';
@@ -340,13 +343,17 @@ const jsonLd = {
       function renderProviders(data) {
         const tbody = document.getElementById('providers-tbody');
         const stats = normalizeProviderStats(data?.stats);
+        if (stats === null) {
+          tbody.innerHTML = '<tr><td colspan="6" class="error-msg">Provider stats unavailable — response missing or invalid. Try refreshing.</td></tr>';
+          return;
+        }
         if (stats.length === 0) {
           tbody.innerHTML = '<tr><td colspan="6" class="loading-msg">No provider stats yet — requests will appear here after the first API call.</td></tr>';
           return;
         }
         const quotas = data.quotas || {};
         const rows = stats
-          .sort((a, b) => b.total_attempts - a.total_attempts)
+          .sort((a, b) => (b.total_attempts ?? 0) - (a.total_attempts ?? 0))
           .map((s) => {
             const q = quotas[s.provider];
             let quotaCell = '<span style="color:var(--text-muted)">—</span>';
@@ -362,12 +369,14 @@ const jsonLd = {
               <td style="text-align:right;font-family:var(--font-mono)">${fmt(s.active_models)} / ${fmt(s.total_models)}</td>
               <td style="text-align:right;font-family:var(--font-mono)">${fmt(s.total_attempts)}</td>
               <td style="text-align:right;font-family:var(--font-mono);color:${healthColor(s.success_rate)}">${pct(s.success_rate)}</td>
-              <td style="text-align:right;font-family:var(--font-mono)">${fmt(Math.round(s.avg_latency_ms))} ms</td>
+              <td style="text-align:right;font-family:var(--font-mono)">${s.avg_latency_ms === null ? '—' : `${fmt(Math.round(s.avg_latency_ms))} ms`}</td>
               <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">${quotaCell}</td>
             </tr>`;
           })
           .join('');
-        tbody.innerHTML = rows;
+        tbody.innerHTML = rows + (stats.length < data.stats.length
+          ? '<tr><td colspan="6" class="error-msg">Some provider rows are invalid — totals are unavailable.</td></tr>'
+          : '');
       }
 
       function renderSummary(modelsData, providersData) {
@@ -418,8 +427,10 @@ const jsonLd = {
           renderProviders(providers);
           renderSummary(models, providers);
 
-          dot.className = 'dot';
-          text.textContent = 'Live';
+          const providerRows = normalizeProviderStats(providers?.stats);
+          const complete = providerRows !== null && providerRows.length === providers.stats.length;
+          dot.className = complete ? 'dot' : 'dot error';
+          text.textContent = complete ? 'Live' : (providerRows?.length ? 'Partial provider stats' : 'Provider stats unavailable');
           time.textContent = new Date().toLocaleTimeString();
         } catch (err) {
           dot.className = 'dot error';
