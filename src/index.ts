@@ -845,7 +845,7 @@ function scheduleChatRoutingLedger(
   ctx.waitUntil(recordRoutingLedger(db, buildChatLedgerRecord(params)));
 }
 
-async function recordAnalytics(params: {
+export async function recordAnalytics(params: {
   db: D1Database;
   projectId?: string;
   outcome: 'ok' | 'error';

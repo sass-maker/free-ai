@@ -16,7 +16,7 @@
         "e2e/**/*.ts",
         "e2e-live/**/*.ts"
       ],
-      "ignoreDependencies": ["jscpd"]
+      "ignoreDependencies": ["jscpd", "cloudflare"]
     },
     "site": {
       "entry": ["scripts/**/*.mjs"],
