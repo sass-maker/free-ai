@@ -112,7 +112,7 @@ const jsonLd = {
         text-align: left; padding: 0.6rem 0.75rem; font-weight: 600;
         color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase;
         letter-spacing: 0.06em; border-bottom: 1px solid var(--border);
-        position: sticky; top: 52px; background: var(--bg);
+        background: var(--bg);
       }
       tbody td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
       tbody tr:hover { background: rgba(14,165,233,0.04); }
@@ -143,6 +143,23 @@ const jsonLd = {
       @media (max-width: 768px) {
         .stats-grid { grid-template-columns: repeat(2, 1fr); }
         .container { padding: 1rem; }
+      }
+      @media (max-width: 640px) {
+        .nav {
+          height: auto;
+          min-height: 52px;
+          flex-wrap: wrap;
+          gap: 0.25rem;
+          padding: 0.5rem 1rem;
+        }
+        .nav-brand { flex-basis: 100%; }
+        .nav-links {
+          width: 100%;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          gap: 0.25rem 0.75rem;
+        }
+        .nav-links a { min-height: 32px; }
       }
     </style>
   </head>
@@ -181,16 +198,16 @@ const jsonLd = {
 
       <div class="section">
         <h2>Provider Stats</h2>
-        <p class="sub">Aggregate request counts and success rates per provider from the analytics database.</p>
+        <p class="sub">Recent routing attempts, model availability, and quota status by provider.</p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Provider</th>
-                <th style="text-align:right">Requests</th>
-                <th style="text-align:right">Successful</th>
-                <th style="text-align:right">Failed</th>
+                <th style="text-align:right">Models (active / total)</th>
+                <th style="text-align:right">Attempts</th>
                 <th style="text-align:right">Success Rate</th>
+                <th style="text-align:right">Avg Latency</th>
                 <th>Quota</th>
               </tr>
             </thead>
@@ -231,6 +248,8 @@ const jsonLd = {
     </div>
 
     <script>
+      import { normalizeProviderStats, summarizeProviderStats } from '../lib/provider-stats';
+
       const REFRESH_MS = 30000;
       let timer = null;
 
@@ -246,6 +265,16 @@ const jsonLd = {
 
       function pct(n) {
         return (n * 100).toFixed(1) + '%';
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        })[char]);
       }
 
       function healthColor(rate) {
@@ -310,19 +339,16 @@ const jsonLd = {
 
       function renderProviders(data) {
         const tbody = document.getElementById('providers-tbody');
-        if (!data || !data.stats || Object.keys(data.stats).length === 0) {
+        const stats = normalizeProviderStats(data?.stats);
+        if (stats.length === 0) {
           tbody.innerHTML = '<tr><td colspan="6" class="loading-msg">No provider stats yet — requests will appear here after the first API call.</td></tr>';
           return;
         }
         const quotas = data.quotas || {};
-        const rows = Object.entries(data.stats)
-          .sort(([,a], [,b]) => (b.requests || 0) - (a.requests || 0))
-          .map(([provider, s]) => {
-            const total = s.requests || 0;
-            const success = s.successful || 0;
-            const failed = s.failed || 0;
-            const rate = total > 0 ? success / total : 0;
-            const q = quotas[provider];
+        const rows = stats
+          .sort((a, b) => b.total_attempts - a.total_attempts)
+          .map((s) => {
+            const q = quotas[s.provider];
             let quotaCell = '<span style="color:var(--text-muted)">—</span>';
             if (q) {
               if (q.remaining !== undefined && q.limit !== undefined) {
@@ -332,11 +358,11 @@ const jsonLd = {
               }
             }
             return `<tr>
-              <td class="provider-name">${provider}</td>
-              <td style="text-align:right;font-family:var(--font-mono)">${fmt(total)}</td>
-              <td style="text-align:right;font-family:var(--font-mono);color:var(--emerald)">${fmt(success)}</td>
-              <td style="text-align:right;font-family:var(--font-mono);color:var(--red)">${fmt(failed)}</td>
-              <td style="text-align:right;font-family:var(--font-mono);color:${healthColor(rate)}">${pct(rate)}</td>
+              <td class="provider-name">${escapeHtml(s.provider)}</td>
+              <td style="text-align:right;font-family:var(--font-mono)">${fmt(s.active_models)} / ${fmt(s.total_models)}</td>
+              <td style="text-align:right;font-family:var(--font-mono)">${fmt(s.total_attempts)}</td>
+              <td style="text-align:right;font-family:var(--font-mono);color:${healthColor(s.success_rate)}">${pct(s.success_rate)}</td>
+              <td style="text-align:right;font-family:var(--font-mono)">${fmt(Math.round(s.avg_latency_ms))} ms</td>
               <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">${quotaCell}</td>
             </tr>`;
           })
@@ -351,10 +377,8 @@ const jsonLd = {
         const embedCount = modelsData?.data?.filter(m => m.type === 'embedding').length || 0;
         const liveCount = modelsData?.data?.filter(m => m.enabled && (!m.cooldown_until || m.cooldown_until <= Date.now())).length || 0;
 
-        const pStats = providersData?.stats || {};
-        const totalReqs = Object.values(pStats).reduce((s, p) => s + (p.requests || 0), 0);
-        const totalSuccess = Object.values(pStats).reduce((s, p) => s + (p.successful || 0), 0);
-        const overallRate = totalReqs > 0 ? (totalSuccess / totalReqs) : null;
+        const providerSummary = summarizeProviderStats(providersData?.stats);
+        const overallRate = providerSummary.successRate;
 
         grid.innerHTML = `
           <div class="stat-card">
