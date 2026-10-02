@@ -1,10 +1,12 @@
 import { isWorkersAiEnabled } from '../config';
 import { MalformedProviderOutputError } from '../router/classify-error';
 import {
-  estimateChatInputChars,
+  estimateChatInputBytes,
   estimateNeuronCost,
+  DEFAULT_WORKERS_AI_OUTPUT_TOKENS,
   tryDebitNeurons,
 } from '../state/neuron-budget';
+import type { Env } from '../types';
 import type { ProviderCaller, ProviderEmbeddingCaller } from './types';
 
 class BudgetExhaustedError extends Error {
@@ -16,6 +18,16 @@ class BudgetExhaustedError extends Error {
   constructor(message: string, retryAfter: number) {
     super(message);
     this.retryAfter = retryAfter;
+  }
+}
+
+async function reserveWorkersAiBudget(env: Env, cost: number | null): Promise<void> {
+  const debit = await tryDebitNeurons(env, cost);
+  if (!debit.allowed) {
+    throw new BudgetExhaustedError(
+      `Daily Workers AI Neuron budget exhausted (${debit.used}/9500)`,
+      debit.retryAfter
+    );
   }
 }
 
@@ -196,23 +208,18 @@ export const callWorkersAi: ProviderCaller = async (input) => {
 
   // Gate every Workers AI invocation through the daily Neuron budget so we
   // never exceed the 10k/day free quota.
+  const outputTokens = input.max_tokens ?? DEFAULT_WORKERS_AI_OUTPUT_TOKENS;
   const cost = estimateNeuronCost(input.model, {
-    inputChars: estimateChatInputChars(input.messages),
-    outputTokens: input.max_tokens,
+    inputBytes: estimateChatInputBytes(input.messages) ?? -1,
+    outputTokens,
   });
-  const debit = await tryDebitNeurons(input.env, cost);
+  await reserveWorkersAiBudget(input.env, cost);
   input.signal?.throwIfAborted();
-  if (!debit.allowed) {
-    throw new BudgetExhaustedError(
-      `Daily Workers AI Neuron budget exhausted (${debit.used}/9500)`,
-      debit.retryAfter
-    );
-  }
 
   const payload: Record<string, unknown> = {
     messages: input.messages,
     temperature: input.temperature,
-    max_tokens: input.max_tokens,
+    max_tokens: outputTokens,
     stream: input.stream,
   };
 
@@ -279,17 +286,14 @@ export const callWorkersAiEmbeddings: ProviderEmbeddingCaller = async (input) =>
     throw new Error('Workers AI is disabled');
   }
 
-  const inputChars = Array.isArray(input.input)
-    ? input.input.reduce((sum, item) => sum + String(item).length, 0)
-    : String(input.input ?? '').length;
-  const cost = estimateNeuronCost(input.model, { inputChars });
-  const debit = await tryDebitNeurons(input.env, cost);
-  if (!debit.allowed) {
-    throw new BudgetExhaustedError(
-      `Daily Workers AI Neuron budget exhausted (${debit.used}/9500)`,
-      debit.retryAfter
-    );
-  }
+  const validInput =
+    typeof input.input === 'string' ||
+    (Array.isArray(input.input) && input.input.every((item) => typeof item === 'string'));
+  const inputBytes = validInput
+    ? new TextEncoder().encode(JSON.stringify(input.input)).byteLength
+    : -1;
+  const cost = estimateNeuronCost(input.model, { inputBytes });
+  await reserveWorkersAiBudget(input.env, cost);
 
   const payload: Record<string, unknown> = {
     text: input.input,
