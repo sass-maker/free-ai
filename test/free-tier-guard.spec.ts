@@ -203,7 +203,18 @@ describe('Workers AI free-tier guard', () => {
     });
   });
 
-  it('estimates Workers AI text neurons from approximate input and output tokens', () => {
+  it('fails closed when resolving the budget namespace throws', async () => {
+    const brokenNamespace = {
+      idFromName: vi.fn(() => {
+        throw new Error('namespace unavailable');
+      }),
+    } as unknown as DurableObjectNamespace;
+    const env = makeEnv({ NEURON_BUDGET: brokenNamespace });
+    await expect(tryDebitNeurons(env, 1)).resolves.toMatchObject({ allowed: false });
+    await expect(getNeuronUsage(env)).resolves.toBeNull();
+  });
+
+  it('estimates Workers AI text neurons from conservative byte and output-token bounds', () => {
     const short = estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
       inputBytes: 400,
       outputTokens: 100,
@@ -215,6 +226,12 @@ describe('Workers AI free-tier guard', () => {
 
     expect(short ?? 0).toBeGreaterThanOrEqual(2);
     expect(long ?? 0).toBeGreaterThan(short ?? 0);
+    expect(
+      estimateNeuronCost('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+        inputBytes: 0,
+        outputTokens: 512,
+      })
+    ).toBe(22);
   });
 
   it('covers current published text and embedding prices and rejects unknown or unbounded models', () => {

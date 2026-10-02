@@ -12,7 +12,7 @@ interface TokenPricing {
   output: number;
 }
 const TEXT_TOKEN_PRICING: Record<string, TokenPricing> = {
-  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': { input: 26668, output: 204805 },
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': { input: 4119, output: 34868 },
   '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b': { input: 45170, output: 443756 },
   '@cf/meta/llama-3.1-8b-instruct': { input: 25608, output: 75147 },
   '@cf/meta/llama-3-8b-instruct': { input: 25608, output: 75147 },
@@ -120,9 +120,9 @@ export async function tryDebitNeurons(env: Env, neurons: number | null): Promise
     neurons > DAILY_NEURON_CAP
   )
     return denied();
-  const stub = getBudgetStub(env);
-  if (!stub) return denied();
   try {
+    const stub = getBudgetStub(env);
+    if (!stub) return denied();
     const response = await stub.fetch(`${DO_ORIGIN}/try-debit`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -139,9 +139,9 @@ export async function tryDebitNeurons(env: Env, neurons: number | null): Promise
 export async function getNeuronUsage(
   env: Env
 ): Promise<{ used: number; remaining: number; cap: number; dayKey: string } | null> {
-  const stub = getBudgetStub(env);
-  if (!stub) return null;
   try {
+    const stub = getBudgetStub(env);
+    if (!stub) return null;
     const response = await stub.fetch(`${DO_ORIGIN}/usage`);
     if (!response.ok) return null;
     const result = (await response.json()) as {

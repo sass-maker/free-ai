@@ -206,8 +206,7 @@ export const callWorkersAi: ProviderCaller = async (input) => {
     throw new Error('Workers AI is disabled');
   }
 
-  // Gate every Workers AI invocation through the daily Neuron budget so we
-  // never exceed the 10k/day free quota.
+  // Gate every Workers AI invocation routed through this gateway's daily budget.
   const outputTokens = input.max_tokens ?? DEFAULT_WORKERS_AI_OUTPUT_TOKENS;
   const cost = estimateNeuronCost(input.model, {
     inputBytes: estimateChatInputBytes(input.messages) ?? -1,

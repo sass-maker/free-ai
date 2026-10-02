@@ -3211,8 +3211,8 @@ app.get('/v1/stats/providers', async (c) => {
   return c.json({ stats, quotas });
 });
 
-// Workers AI daily Neuron budget — sole chokepoint for Fleet-wide AI traffic.
-// Hard cap is 9500 Neurons/day (500 buffer below the 10k/day free quota).
+// Workers AI daily Neuron budget for requests routed through this gateway.
+// Application cap is 9500 Neurons/day, 500 below the 10k/day free allocation.
 app.get('/v1/budget', async (c) => {
   const usage = await getNeuronUsage(c.env);
   if (!usage) {
