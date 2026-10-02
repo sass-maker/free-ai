@@ -12,7 +12,7 @@ interface TokenPricing {
   output: number;
 }
 const TEXT_TOKEN_PRICING: Record<string, TokenPricing> = {
-  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': { input: 4119, output: 34868 },
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast': { input: 26668, output: 204805 },
   '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b': { input: 45170, output: 443756 },
   '@cf/meta/llama-3.1-8b-instruct': { input: 25608, output: 75147 },
   '@cf/meta/llama-3-8b-instruct': { input: 25608, output: 75147 },

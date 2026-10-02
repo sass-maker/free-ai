@@ -226,12 +226,17 @@ describe('Workers AI free-tier guard', () => {
 
     expect(short ?? 0).toBeGreaterThanOrEqual(2);
     expect(long ?? 0).toBeGreaterThan(short ?? 0);
-    expect(
-      estimateNeuronCost('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-        inputBytes: 0,
-        outputTokens: 512,
-      })
-    ).toBe(22);
+    const llama70b = estimateNeuronCost('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+      inputBytes: 1_000,
+      outputTokens: 512,
+    });
+    const llama8b = estimateNeuronCost('@cf/meta/llama-3.1-8b-instruct', {
+      inputBytes: 1_000,
+      outputTokens: 512,
+    });
+    expect(llama70b).toBe(158);
+    expect(llama8b).toBe(77);
+    expect(llama70b).toBeGreaterThan(llama8b ?? 0);
   });
 
   it('covers current published text and embedding prices and rejects unknown or unbounded models', () => {
@@ -252,6 +257,7 @@ describe('Workers AI free-tier guard', () => {
 
     expect(estimateNeuronCost('@cf/black-forest-labs/flux-1-schnell')).toBeNull();
     expect(estimateNeuronCost('@cf/unknown/model')).toBeNull();
+    expect(estimateNeuronCost('@cf/meta/llama-3.1-8b-instruct-fast')).toBeNull();
   });
 
   it('adds image parts to chat input estimates', () => {
