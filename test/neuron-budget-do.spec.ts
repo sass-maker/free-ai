@@ -4,6 +4,7 @@ import { NeuronBudgetDO } from '../src/state/neuron-budget-do';
 
 function makeState() {
   const values = new Map<string, unknown>();
+  const puts: Array<{ key: string; value: unknown }> = [];
   let concurrentReads = 0;
   let releaseConcurrentReads = () => {};
   const concurrentReadsReady = new Promise<void>((resolve) => {
@@ -29,6 +30,7 @@ function makeState() {
           get: async <V>(key: string) => values.get(key) as V | undefined,
           put: async (key, value) => {
             values.set(key, value);
+            puts.push({ key, value });
           },
         });
       } finally {
@@ -52,7 +54,7 @@ function makeState() {
     },
   } as unknown as DurableObjectState;
 
-  return { state, values, transaction };
+  return { state, values, puts, transaction };
 }
 
 function post(path: string, body: string, headers: HeadersInit = {}): Request {
@@ -123,18 +125,6 @@ describe('NeuronBudgetDO', () => {
     });
   });
 
-  it('fails closed for Vectorize until the exact current month has a reviewed baseline', async () => {
-    const { state } = makeState();
-    const budget = new NeuronBudgetDO(state);
-    const response = await budget.fetch(
-      post('/try-debit-vectorize', JSON.stringify({ dimensions: 3_840 }))
-    );
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'Verified monthly Vectorize baseline unavailable',
-    });
-  });
-
   it('preserves malformed Vectorize history instead of replacing it with a baseline', async () => {
     const { state, values } = makeState();
     const key = new Date().toISOString().slice(0, 7);
@@ -146,5 +136,85 @@ describe('NeuronBudgetDO', () => {
     );
     expect(response.status).toBe(503);
     expect(values.get('vectorize-budget')).toBe(corrupt);
+  });
+
+  it('seeds the reviewed October baseline once and blocks the next unseeded month', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-02T12:00:00.000Z'));
+    try {
+      const { state, values, puts } = makeState();
+      const budget = new NeuronBudgetDO(state);
+      const first = await budget.fetch(
+        post('/try-debit-vectorize', JSON.stringify({ dimensions: 1 }))
+      );
+      await expect(first.json()).resolves.toMatchObject({
+        allowed: true,
+        used: 35_000_001,
+        remaining: 9_999_999,
+        monthKey: '2026-10',
+        baselineVerified: true,
+      });
+      const seeded = puts.find((entry) => entry.key === 'vectorize-budget')?.value as {
+        monthKey: string;
+        used: number;
+        baselineVerified: boolean;
+      };
+      expect(seeded).toEqual({ monthKey: '2026-10', used: 35_000_000, baselineVerified: true });
+      expect(45_000_000 - seeded.used).toBe(10_000_000);
+
+      const second = await budget.fetch(
+        post('/try-debit-vectorize', JSON.stringify({ dimensions: 768 }))
+      );
+      await expect(second.json()).resolves.toMatchObject({
+        allowed: true,
+        used: 35_000_769,
+        remaining: 9_999_231,
+      });
+      expect(values.get('vectorize-budget')).toEqual({
+        monthKey: '2026-10',
+        used: 35_000_769,
+        baselineVerified: true,
+      });
+
+      vi.setSystemTime(new Date('2026-11-01T00:00:00.000Z'));
+      const nextMonth = await budget.fetch(
+        post('/try-debit-vectorize', JSON.stringify({ dimensions: 1 }))
+      );
+      expect(nextMonth.status).toBe(503);
+      await expect(nextMonth.json()).resolves.toMatchObject({
+        error: 'Verified monthly Vectorize baseline unavailable',
+      });
+      expect(values.get('vectorize-budget')).toEqual({
+        monthKey: '2026-10',
+        used: 35_000_769,
+        baselineVerified: true,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps same-month usage above the reviewed baseline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-02T12:00:00.000Z'));
+    try {
+      const { state, values } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-10',
+        used: 36_000_000,
+        baselineVerified: true,
+      });
+      const budget = new NeuronBudgetDO(state);
+      const response = await budget.fetch(
+        post('/try-debit-vectorize', JSON.stringify({ dimensions: 1 }))
+      );
+      await expect(response.json()).resolves.toMatchObject({
+        allowed: true,
+        used: 36_000_001,
+        remaining: 8_999_999,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
