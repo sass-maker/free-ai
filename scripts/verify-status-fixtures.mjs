@@ -37,43 +37,72 @@ const cases = {
   zero: { stats: [{ ...measured, total_attempts: 4, success_rate: 0, avg_latency_ms: 0 }] },
 };
 const results = [];
+async function createFixtureContext(browser, width) {
+  const context = await browser.newContext({
+    viewport: { width, height: 844 },
+    serviceWorkers: 'block',
+  });
+  let state = 'populated';
+  let release;
+  const pending = new Promise((resolve) => {
+    release = resolve;
+  });
+  let hold = true;
+  const blocked = [];
+  await context.route('**/*', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.origin !== 'http://fixture.invalid') {
+      blocked.push({ method: request.method(), url: request.url() });
+      return route.abort();
+    }
+    if (url.pathname === '/status/') return route.fulfill({ contentType: 'text/html', body: html });
+    if (!['/v1/models', '/v1/stats/providers'].includes(url.pathname)) return route.abort();
+    if (hold) await pending;
+    if (state === 'failure') return route.fulfill({ status: 503, json: {} });
+    return route.fulfill({ json: url.pathname === '/v1/models' ? { data: [] } : cases[state] });
+  });
+  const page = await context.newPage();
+  return {
+    context,
+    page,
+    blocked,
+    setState(next) {
+      state = next;
+    },
+    releaseRequests() {
+      hold = false;
+      release();
+    },
+  };
+}
+
+async function measureGeometry(page) {
+  return page.evaluate(() => ({
+    width: innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    links: [...document.querySelectorAll('.nav a')].map((link) => {
+      const rect = link.getBoundingClientRect();
+      return { text: link.textContent.trim(), left: rect.left, right: rect.right };
+    }),
+  }));
+}
+
 test('network-isolated status fixtures at mobile, tablet and desktop widths', async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    channel: process.env.STATUS_FIXTURE_BROWSER_CHANNEL || undefined,
+  });
   try {
     for (const width of [390, 768, 1440]) {
-      const context = await browser.newContext({
-        viewport: { width, height: 844 },
-        serviceWorkers: 'block',
-      });
-      let state = 'populated';
-      let release;
-      const pending = new Promise((resolve) => {
-        release = resolve;
-      });
-      let hold = true;
-      const blocked = [];
-      await context.route('**/*', async (route) => {
-        const request = route.request();
-        const url = new URL(request.url());
-        if (request.method() !== 'GET' || url.origin !== 'http://fixture.invalid') {
-          blocked.push({ method: request.method(), url: request.url() });
-          return route.abort();
-        }
-        if (url.pathname === '/status/')
-          return route.fulfill({ contentType: 'text/html', body: html });
-        if (!['/v1/models', '/v1/stats/providers'].includes(url.pathname)) return route.abort();
-        if (hold) await pending;
-        if (state === 'failure') return route.fulfill({ status: 503, json: {} });
-        return route.fulfill({ json: url.pathname === '/v1/models' ? { data: [] } : cases[state] });
-      });
-      const page = await context.newPage();
+      const fixture = await createFixtureContext(browser, width);
+      const { context, page, blocked } = fixture;
       await page.goto('http://fixture.invalid/status/', { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(
         () => document.querySelector('#status-text').textContent === 'Fetching…'
       );
       await page.screenshot({ path: `${output}/loading-${width}.png` });
-      hold = false;
-      release();
+      fixture.releaseRequests();
       for (const next of [
         'populated',
         'empty',
@@ -84,7 +113,7 @@ test('network-isolated status fixtures at mobile, tablet and desktop widths', as
         'failure',
         'populated',
       ]) {
-        state = next;
+        fixture.setState(next);
         if (results.some((result) => result.width === width))
           await page.locator('#refresh-btn').click();
         const expected =
@@ -115,14 +144,7 @@ test('network-isolated status fixtures at mobile, tablet and desktop widths', as
           assert.match(table, /0 ms/);
         }
         if (next === 'failure') assert.match(table, /fixture/);
-        const geometry = await page.evaluate(() => ({
-          width: innerWidth,
-          scrollWidth: document.documentElement.scrollWidth,
-          links: [...document.querySelectorAll('.nav a')].map((link) => {
-            const rect = link.getBoundingClientRect();
-            return { text: link.textContent.trim(), left: rect.left, right: rect.right };
-          }),
-        }));
+        const geometry = await measureGeometry(page);
         assert.equal(geometry.scrollWidth, width);
         assert(geometry.links.every((link) => link.left >= 0 && link.right <= width));
         const capture = `${output}/${results.length}-${next}-${width}.png`;
