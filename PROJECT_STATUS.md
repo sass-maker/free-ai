@@ -19,13 +19,23 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
 
 - Cloudflare Workers, Workers AI, KV, and the provider free tiers routed by the
   gateway.
-- Fleet consumers use the public gateway contract; architecture details live
+- Managed Fleet consumers use the private `FleetGateway` service contract;
+  public API authentication remains unchanged. Architecture details live
   in [`docs/architecture/overview.md`](docs/architecture/overview.md).
 - Ultracite 7.10.2 is an exact development-only Biome preset dependency. Local
   exceptions preserve Free AI's established gateway and documentation style;
   it does not affect runtime routing or provider behavior.
 
 ## Timeline
+
+- **2026-10-02** — The private `FleetGateway` entrypoint is live at 100% traffic,
+  verified by its exact source tag and named `fetch`/`run` handlers. Attributed
+  chat reuses the existing router; native BGE calls preserve caller payloads
+  and reserve once under the shared budget. Unpriced native requests fail
+  closed. All 383 tests, compiled Workers-runtime binding smoke, exact-main CI
+  and six Fleet gates passed. Per-consumer releases and limitations are recorded
+  in [rollout #83](https://github.com/sass-maker/free-ai/issues/83); producer
+  deployment alone does not prove consumer coverage.
 
 - **2026-09-19** — Chat and embedding fallback now cover malformed upstream
   output. A non-stream completion without a usable `choices` payload, or an
@@ -162,11 +172,11 @@ The shipped timeline lives in
 - **Quality gate:** exact Ultracite-backed Biome presets with explicit local
   compatibility exceptions; `pnpm lint` remains non-writing.
 
-## Work queue
+## Fleet rollout verification
 
 - [Fleet private gateway rollout #83](https://github.com/sass-maker/free-ai/issues/83):
-  named service access and consumer defaults are in implementation; source tests
-  do not establish production rollout. Existing shared spend guards remain live.
+  records the individual consumer source, checks, production versions and
+  binding receipts. Existing shared spend guards remain live.
 
 Open work is tracked only in [GitHub Issues](https://github.com/sass-maker/free-ai/issues).
 An open issue is a to-do, a linked pull request is in progress, and merge plus
