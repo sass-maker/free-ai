@@ -1,6 +1,6 @@
 # free-ai — PROJECT STATUS
 
-Last updated: 2026-09-12
+Last updated: 2026-10-02
 
 ## Why / What
 
@@ -163,6 +163,10 @@ The shipped timeline lives in
   compatibility exceptions; `pnpm lint` remains non-writing.
 
 ## Work queue
+
+- [Fleet private gateway rollout #83](https://github.com/sass-maker/free-ai/issues/83):
+  named service access and consumer defaults are in implementation; source tests
+  do not establish production rollout. Existing shared spend guards remain live.
 
 Open work is tracked only in [GitHub Issues](https://github.com/sass-maker/free-ai/issues).
 An open issue is a to-do, a linked pull request is in progress, and merge plus

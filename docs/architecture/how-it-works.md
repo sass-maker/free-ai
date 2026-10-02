@@ -196,6 +196,25 @@ key to leak, so a fleet project gets "OpenAI-compatible" LLM access with none of
 the cost. The public custom domain (`ai-gateway.sassmaker.com`) exists mainly for
 the docs site and external clients.
 
+The managed Fleet consumers use the named `FleetGateway` entrypoint. Its
+private HTTP handler accepts only chat and embedding generation, requires the
+canonical `x-gateway-project-id`, and authenticates the internal dispatch with
+the gateway's existing key. Consumers never receive that key; their SDK uses
+the placeholder `service-binding` only on the private binding. Public HTTP
+still requires a valid gateway key, even with spoofed internal headers.
+The private handler bounds request bodies to 512 KiB and passes response
+streams through without buffering. Explicit user BYOK/local choices remain
+application-owned.
+
+`FleetGateway.run(projectId, model, input)` preserves native embedding payloads,
+including Meme Lab's CLS pooling and the existing BGE coordinate spaces. It
+admits only known embedding models, reserves centrally before each invocation,
+and fails closed on unpriced models or unavailable budgets. Native reranking
+remains denied while its price is unverified. Consumers retain their Vectorize
+query/storage controls but do not debit the neuron budget again for gateway
+calls. [Rollout and release evidence](https://github.com/sass-maker/free-ai/issues/83)
+tracks the individual consuming deployments.
+
 ## The design decisions in one place
 
 Every "why" above traces to a durable decision:
