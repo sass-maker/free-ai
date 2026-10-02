@@ -9,7 +9,7 @@ import {
 } from '../src/router/classify-error';
 import {
   buildBudgetExhaustedResponse,
-  estimateChatInputChars,
+  estimateChatInputBytes,
   estimateNeuronCost,
   getNeuronUsage,
   tryDebitNeurons,
@@ -42,7 +42,17 @@ describe('Workers AI free-tier guard', () => {
       const env = makeEnv({
         WORKERS_AI_ENABLED: 'true',
         AI: { run: vi.fn(async () => result) },
-        NEURON_BUDGET: budgetNamespace(vi.fn(async () => Response.json({ allowed: true }))),
+        NEURON_BUDGET: budgetNamespace(
+          vi.fn(async () =>
+            Response.json({
+              allowed: true,
+              used: 500,
+              remaining: 9000,
+              retryAfter: 0,
+              dayKey: new Date().toISOString().slice(0, 10),
+            })
+          )
+        ),
       });
       await expect(
         callWorkersAi({
@@ -65,7 +75,17 @@ describe('Workers AI free-tier guard', () => {
       WORKERS_AI_ENABLED: 'true',
       CLOUDFLARE_ACCOUNT_ID: 'synthetic-account',
       CLOUDFLARE_WORKERS_AI_API_KEY: 'synthetic-key',
-      NEURON_BUDGET: budgetNamespace(vi.fn(async () => Response.json({ allowed: true }))),
+      NEURON_BUDGET: budgetNamespace(
+        vi.fn(async () =>
+          Response.json({
+            allowed: true,
+            used: 500,
+            remaining: 9000,
+            retryAfter: 0,
+            dayKey: new Date().toISOString().slice(0, 10),
+          })
+        )
+      ),
     });
     await expect(
       callWorkersAi({
@@ -76,6 +96,82 @@ describe('Workers AI free-tier guard', () => {
         stream: false,
       })
     ).rejects.toBeInstanceOf(MalformedProviderOutputError);
+  });
+
+  it('blocks unknown Workers AI models before budget access or inference', async () => {
+    const run = vi.fn();
+    const budgetFetch = vi.fn();
+    const env = makeEnv({
+      WORKERS_AI_ENABLED: 'true',
+      AI: { run },
+      NEURON_BUDGET: budgetNamespace(budgetFetch),
+    });
+    await expect(
+      callWorkersAi({
+        env,
+        provider: 'workers_ai',
+        model: '@cf/unknown/model',
+        messages: [{ role: 'user', content: 'hello' }],
+        stream: false,
+      })
+    ).rejects.toMatchObject({ code: 'neuron_budget_exhausted' });
+    expect(budgetFetch).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('blocks unpriced multimodal text inference before budget access or inference', async () => {
+    const run = vi.fn();
+    const budgetFetch = vi.fn();
+    const env = makeEnv({
+      WORKERS_AI_ENABLED: 'true',
+      AI: { run },
+      NEURON_BUDGET: budgetNamespace(budgetFetch),
+    });
+    await expect(
+      callWorkersAi({
+        env,
+        provider: 'workers_ai',
+        model: '@cf/meta/llama-3.2-1b-instruct',
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'image_url', image_url: { url: 'https://example.com/image.png' } }],
+          },
+        ],
+        stream: false,
+      })
+    ).rejects.toMatchObject({ code: 'neuron_budget_exhausted' });
+    expect(budgetFetch).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('sends the conservative default output limit when a caller omits max_tokens', async () => {
+    const run = vi.fn(async () => ({ response: 'ok' }));
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        allowed: true,
+        used: 500,
+        remaining: 9_000,
+        retryAfter: 0,
+        dayKey: new Date().toISOString().slice(0, 10),
+      })
+    );
+    const env = makeEnv({
+      WORKERS_AI_ENABLED: 'true',
+      AI: { run },
+      NEURON_BUDGET: budgetNamespace(fetchMock),
+    });
+    await callWorkersAi({
+      env,
+      provider: 'workers_ai',
+      model: '@cf/meta/llama-3.2-1b-instruct',
+      messages: [{ role: 'user', content: 'hello' }],
+      stream: false,
+    });
+    expect(run).toHaveBeenCalledWith(
+      '@cf/meta/llama-3.2-1b-instruct',
+      expect.objectContaining({ max_tokens: 512 })
+    );
   });
 
   it('keeps Workers AI disabled unless explicitly opted in', () => {
@@ -107,42 +203,65 @@ describe('Workers AI free-tier guard', () => {
     });
   });
 
-  it('estimates Workers AI text neurons from approximate input and output tokens', () => {
+  it('fails closed when resolving the budget namespace throws', async () => {
+    const brokenNamespace = {
+      idFromName: vi.fn(() => {
+        throw new Error('namespace unavailable');
+      }),
+    } as unknown as DurableObjectNamespace;
+    const env = makeEnv({ NEURON_BUDGET: brokenNamespace });
+    await expect(tryDebitNeurons(env, 1)).resolves.toMatchObject({ allowed: false });
+    await expect(getNeuronUsage(env)).resolves.toBeNull();
+  });
+
+  it('estimates Workers AI text neurons from conservative byte and output-token bounds', () => {
     const short = estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
-      inputChars: 400,
+      inputBytes: 400,
       outputTokens: 100,
     });
     const long = estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
-      inputChars: 4_000,
+      inputBytes: 4_000,
       outputTokens: 1_000,
     });
 
-    expect(short).toBeGreaterThanOrEqual(2);
-    expect(long).toBeGreaterThan(short);
+    expect(short ?? 0).toBeGreaterThanOrEqual(2);
+    expect(long ?? 0).toBeGreaterThan(short ?? 0);
+    const llama70b = estimateNeuronCost('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+      inputBytes: 1_000,
+      outputTokens: 512,
+    });
+    const llama8b = estimateNeuronCost('@cf/meta/llama-3.1-8b-instruct', {
+      inputBytes: 1_000,
+      outputTokens: 512,
+    });
+    expect(llama70b).toBe(158);
+    expect(llama8b).toBe(77);
+    expect(llama70b).toBeGreaterThan(llama8b ?? 0);
   });
 
-  it('covers text defaults, embeddings, fixed prices, and the conservative fallback', () => {
-    expect(estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct')).toBeGreaterThanOrEqual(1);
+  it('covers current published text and embedding prices and rejects unknown or unbounded models', () => {
+    expect(estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct') ?? 0).toBeGreaterThanOrEqual(1);
     expect(
       estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
-        inputChars: 0,
+        inputBytes: 0,
         outputTokens: 0,
       })
-    ).toBe(1);
+    ).toBeNull();
 
     const shortEmbedding = estimateNeuronCost('@cf/baai/bge-small-en-v1.5');
     const longEmbedding = estimateNeuronCost('@cf/baai/bge-small-en-v1.5', {
-      inputChars: 40_000,
+      inputBytes: 40_000,
     });
     expect(shortEmbedding).toBe(1);
-    expect(longEmbedding).toBeGreaterThan(shortEmbedding);
+    expect(longEmbedding ?? 0).toBeGreaterThan(shortEmbedding ?? 0);
 
-    expect(estimateNeuronCost('@cf/black-forest-labs/flux-1-schnell')).toBe(200);
-    expect(estimateNeuronCost('@cf/unknown/model')).toBe(80);
+    expect(estimateNeuronCost('@cf/black-forest-labs/flux-1-schnell')).toBeNull();
+    expect(estimateNeuronCost('@cf/unknown/model')).toBeNull();
+    expect(estimateNeuronCost('@cf/meta/llama-3.1-8b-instruct-fast')).toBeNull();
   });
 
   it('adds image parts to chat input estimates', () => {
-    const chars = estimateChatInputChars([
+    const bytes = estimateChatInputBytes([
       {
         role: 'user',
         content: [
@@ -152,13 +271,20 @@ describe('Workers AI free-tier guard', () => {
       },
     ]);
 
-    expect(chars).toBeGreaterThan(1_000);
+    expect(bytes).toBeNull();
     expect(
-      estimateChatInputChars([
+      estimateChatInputBytes([
         { role: 'system', content: 'system prompt' },
         { role: 'user', content: '' },
       ])
-    ).toBe('system prompt'.length);
+    ).toBe(
+      new TextEncoder().encode(
+        JSON.stringify([
+          { role: 'system', content: 'system prompt' },
+          { role: 'user', content: '' },
+        ])
+      ).byteLength
+    );
   });
 
   it('debits through the global budget durable object', async () => {
@@ -167,7 +293,7 @@ describe('Workers AI free-tier guard', () => {
       used: 120,
       remaining: 9_380,
       retryAfter: 0,
-      dayKey: '2026-07-31',
+      dayKey: new Date().toISOString().slice(0, 10),
     };
     const fetchMock = vi.fn().mockResolvedValue(Response.json(result));
     const env = makeEnv({ NEURON_BUDGET: budgetNamespace(fetchMock) });
@@ -196,6 +322,43 @@ describe('Workers AI free-tier guard', () => {
     });
   });
 
+  it.each([
+    Response.json(
+      {
+        allowed: true,
+        used: 12,
+        remaining: 9_488,
+        retryAfter: 0,
+        dayKey: new Date().toISOString().slice(0, 10),
+      },
+      { status: 503 }
+    ),
+    Response.json({
+      allowed: true,
+      used: 12,
+      remaining: 9_488,
+      retryAfter: 0,
+      dayKey: '2020-01-01',
+    }),
+    Response.json({
+      allowed: 'true',
+      used: 12,
+      remaining: 9_488,
+      retryAfter: 0,
+      dayKey: new Date().toISOString().slice(0, 10),
+    }),
+  ])('rejects untrusted budget response %#', async (response) => {
+    const env = makeEnv({ NEURON_BUDGET: budgetNamespace(vi.fn(async () => response)) });
+    await expect(tryDebitNeurons(env, 12)).resolves.toMatchObject({ allowed: false, dayKey: '' });
+  });
+
+  it('rejects malformed reservations before reaching the durable object', async () => {
+    const fetchMock = vi.fn();
+    const env = makeEnv({ NEURON_BUDGET: budgetNamespace(fetchMock) });
+    await expect(tryDebitNeurons(env, 1.5)).resolves.toMatchObject({ allowed: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('reads usage and degrades to null when usage is unavailable', async () => {
     await expect(getNeuronUsage(makeEnv())).resolves.toBeNull();
 
@@ -203,7 +366,7 @@ describe('Workers AI free-tier guard', () => {
       used: 320,
       remaining: 9_180,
       cap: 9_500,
-      dayKey: '2026-07-31',
+      dayKey: new Date().toISOString().slice(0, 10),
     };
     const fetchMock = vi.fn().mockResolvedValue(Response.json(usage));
     const env = makeEnv({ NEURON_BUDGET: budgetNamespace(fetchMock) });
@@ -220,7 +383,7 @@ describe('Workers AI free-tier guard', () => {
       used: 9_500,
       remaining: 0,
       retryAfter: 0,
-      dayKey: '2026-07-31',
+      dayKey: new Date().toISOString().slice(0, 10),
     });
 
     expect(response.status).toBe(503);
@@ -234,7 +397,7 @@ describe('Workers AI free-tier guard', () => {
       x_budget: {
         used: 9_500,
         remaining: 0,
-        day_key: '2026-07-31',
+        day_key: new Date().toISOString().slice(0, 10),
       },
     });
 
@@ -244,7 +407,7 @@ describe('Workers AI free-tier guard', () => {
         used: 9_500,
         remaining: 0,
         retryAfter: 120,
-        dayKey: '2026-07-31',
+        dayKey: new Date().toISOString().slice(0, 10),
       }).headers.get('retry-after')
     ).toBe('120');
   });
