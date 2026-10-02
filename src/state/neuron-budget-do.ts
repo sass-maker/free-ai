@@ -33,8 +33,14 @@ const DAILY_NEURON_CAP = 9500;
 const VERIFIED_DAILY_BASELINES: Readonly<Record<string, number>> = { '2026-10-02': 250 };
 /** Leave headroom below the 50M queried-dimension paid allowance. */
 const MONTHLY_VECTORIZE_CAP = 45_000_000;
-/** Reviewed exact-month baselines; an empty map intentionally blocks queries. */
-const VERIFIED_VECTORIZE_BASELINES: Readonly<Record<string, number>> = {};
+/**
+ * Oct 2026 estimate from the reviewed read-only provider receipt. This seeds
+ * admitted queried dimensions; it is not an account-wide billing cap or a
+ * separate stored-dimensions allowance.
+ */
+const VERIFIED_VECTORIZE_BASELINES: Readonly<Record<string, number>> = {
+  '2026-10': 35_000_000,
+};
 
 const json = (value: unknown, status = 200): Response =>
   Response.json(value, {
