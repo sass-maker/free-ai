@@ -31,6 +31,16 @@ describe('classifyError', () => {
     expect(failure).toBe('input_nonretriable');
   });
 
+  it('allows fallback for invalid generated JSON but preserves caller errors and safety', () => {
+    const output = { status: 400, code: 'json_validate_failed', message: 'Failed generation' };
+    expect(classifyError(output)).toBe('provider_fatal');
+    expect(canFallbackFromProviderFailure(output, classifyError(output))).toBe(true);
+    expect(classifyError({ ...output, code: 'invalid_request_error' })).toBe('input_nonretriable');
+    expect(classifyError({ ...output, message: 'content filter refusal' })).toBe('safety_refusal');
+    expect(classifyError({ ...output, status: 403 })).toBe('provider_fatal');
+    expect(isMalformedProviderOutput({ ...output, status: 403 })).toBe(false);
+  });
+
   it('marks 500 as usage_retriable', () => {
     const failure = classifyError({ status: 500, message: 'Internal server error' });
     expect(failure).toBe('usage_retriable');

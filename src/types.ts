@@ -178,9 +178,12 @@ export interface Tool {
   function: ToolFunction;
 }
 
-export interface ResponseFormat {
-  type: 'text' | 'json_object';
-}
+export type ResponseFormat =
+  | { type: 'text' | 'json_object' }
+  | {
+      type: 'json_schema';
+      json_schema: { name: string; strict: true; schema: Record<string, unknown> };
+    };
 
 export interface NormalizedChatRequest {
   model: string;
