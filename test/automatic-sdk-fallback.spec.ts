@@ -28,7 +28,7 @@ function candidate(model: string, provider: 'gemini' | 'groq', vision = false): 
   };
 }
 
-function request(signal?: AbortSignal, vision = false) {
+function request(signal?: AbortSignal, vision = false, stream = false) {
   return new Request('https://gateway.test/v1/chat/completions', {
     method: 'POST',
     signal,
@@ -40,7 +40,7 @@ function request(signal?: AbortSignal, vision = false) {
       model: 'auto',
       project_id: 'automatic-sdk-regression',
       max_tokens: 800,
-      stream: false,
+      stream,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -54,9 +54,11 @@ function request(signal?: AbortSignal, vision = false) {
   });
 }
 
-function env() {
+function env(
+  geminiKeys = 'synthetic-one,synthetic-two,synthetic-three,synthetic-four,synthetic-five'
+) {
   return makeTestEnv({
-    GEMINI_API_KEY: 'synthetic-one,synthetic-two,synthetic-three,synthetic-four,synthetic-five',
+    GEMINI_API_KEY: geminiKeys,
     GROQ_API_KEY: 'synthetic-groq',
   }).env;
 }
@@ -100,7 +102,7 @@ describe('automatic cross-provider fallback through the real SDK', () => {
       }
       return success();
     });
-    const response = await app.fetch(request(), env(), makeCtx());
+    const response = await app.fetch(request(), env('synthetic-one'), makeCtx());
     expect(response.status).toBe(200);
     expect(calls.map((sent) => new URL(sent.url).hostname)).toEqual([
       'generativelanguage.googleapis.com',
@@ -125,7 +127,7 @@ describe('automatic cross-provider fallback through the real SDK', () => {
         event: 'gateway.upstream_failed',
         upstream_status: 403,
         key_slot: 1,
-        key_pool_size: 5,
+        key_pool_size: 1,
         key_retry_pending: false,
       })
     );
@@ -165,7 +167,7 @@ describe('automatic cross-provider fallback through the real SDK', () => {
   it('does not send image requests to a text-only fallback', async () => {
     const upstream = vi.fn(async () => new Response(null, { status: 403 }));
     vi.stubGlobal('fetch', upstream);
-    const response = await app.fetch(request(undefined, true), env(), makeCtx());
+    const response = await app.fetch(request(undefined, true), env('synthetic-one'), makeCtx());
     expect(response.status).toBe(502);
     expect(upstream).toHaveBeenCalledTimes(1);
     expect(await response.json()).toMatchObject({ error: { upstream_status: 403, attempts: 1 } });
@@ -184,7 +186,7 @@ describe('automatic cross-provider fallback through the real SDK', () => {
   it('preserves the two-attempt ceiling when the alternate provider also fails', async () => {
     const upstream = vi.fn(async () => new Response(null, { status: 403 }));
     vi.stubGlobal('fetch', upstream);
-    const response = await app.fetch(request(), env(), makeCtx());
+    const response = await app.fetch(request(), env('synthetic-one'), makeCtx());
     expect(upstream).toHaveBeenCalledTimes(2);
     expect(await response.json()).toMatchObject({ error: { upstream_status: 403, attempts: 2 } });
   });
@@ -198,5 +200,64 @@ describe('automatic cross-provider fallback through the real SDK', () => {
     vi.stubGlobal('fetch', upstream);
     await app.fetch(request(controller.signal), env(), makeCtx());
     expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([429, 503])('retains automatic model fallback after upstream %i', async (status) => {
+    const calls: Request[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(new Request(input, init));
+      return calls.length === 1 ? new Response(null, { status }) : success();
+    });
+    const response = await app.fetch(request(), env(), makeCtx());
+    expect(response.status).toBe(200);
+    expect(calls.map((sent) => new URL(sent.url).hostname)).toEqual([
+      'generativelanguage.googleapis.com',
+      'generativelanguage.googleapis.com',
+    ]);
+    expect(((await calls[1].json()) as { model: string }).model).toBe('gemini-sibling');
+    expect(await response.json()).toMatchObject({
+      x_gateway: { attempts: 2, model: 'gemini-sibling' },
+    });
+  });
+
+  it('stops after two denied keys without starting a third provider attempt', async () => {
+    const calls: Request[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(new Request(input, init));
+      return new Response(null, { status: 403 });
+    });
+    const response = await app.fetch(request(), env(), makeCtx());
+    expect(response.status).toBe(502);
+    expect(calls).toHaveLength(2);
+    expect(calls.map((sent) => new URL(sent.url).hostname)).toEqual([
+      'generativelanguage.googleapis.com',
+      'generativelanguage.googleapis.com',
+    ]);
+    expect(calls[0].headers.get('authorization')).not.toBe(calls[1].headers.get('authorization'));
+    expect(await response.json()).toMatchObject({ error: { upstream_status: 403, attempts: 2 } });
+  });
+
+  it('recovers an automatic streaming handshake with a distinct key', async () => {
+    const auth: Array<string | null> = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      auth.push(new Request(input, init).headers.get('authorization'));
+      if (auth.length === 1) return new Response(null, { status: 403 });
+      return new Response(
+        'data: ' +
+          JSON.stringify({
+            model: 'gemini-first',
+            choices: [{ index: 0, delta: { content: 'Recovered' } }],
+          }) +
+          '\n\ndata: [DONE]\n\n',
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+    });
+    const response = await app.fetch(request(undefined, false, true), env(), makeCtx());
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-gateway-attempts')).toBe('2');
+    expect(response.headers.get('x-gateway-model')).toBe('gemini-first');
+    expect(await response.text()).toContain('Recovered');
+    expect(auth).toHaveLength(2);
+    expect(auth[0]).not.toBe(auth[1]);
   });
 });
