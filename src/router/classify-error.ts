@@ -52,6 +52,10 @@ export function classifyError(error: unknown): FailureClass {
     return 'usage_retriable';
   }
 
+  // Groq uses 400 for invalid generated JSON. It is provider output, not
+  // malformed caller input; allow normal fallback within the existing cap.
+  if (isMalformedProviderOutput(error)) return 'provider_fatal';
+
   if (INPUT_ERROR_STATUSES.has(status ?? -1)) {
     return 'input_nonretriable';
   }
@@ -81,7 +85,12 @@ export class MalformedProviderOutputError extends Error {
 
 export function isMalformedProviderOutput(error: unknown): boolean {
   // A SyntaxError here is the SDK failing to JSON.parse the upstream body.
-  return error instanceof MalformedProviderOutputError || error instanceof SyntaxError;
+  return (
+    error instanceof MalformedProviderOutputError ||
+    error instanceof SyntaxError ||
+    (getUpstreamStatus(error) === 400 &&
+      (error as { code?: unknown })?.code === 'json_validate_failed')
+  );
 }
 
 /** These statuses concern the gateway's upstream account, not the caller's credentials. */
