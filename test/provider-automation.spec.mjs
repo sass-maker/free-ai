@@ -4,7 +4,9 @@ import {
   evaluateLiveProviderHealth,
   runLiveProviderHealth,
 } from '../scripts/check-live-provider-health.mjs';
+import { buildRegistryReport, parseConfigModels } from '../scripts/check-model-ids.mjs';
 import { runTextProviderSmoke } from '../scripts/smoke-text-providers.mjs';
+import { getProviderLimits } from '../src/config';
 
 describe('live provider health automation', () => {
   it('accepts fresh fallback-ready health with a bounded failure rate', () => {
@@ -295,5 +297,29 @@ describe('bounded text-provider smoke', () => {
     });
     expect(JSON.stringify(report)).not.toContain('secret-token');
     expect(JSON.stringify(report)).not.toContain('provider.example');
+  });
+});
+
+describe('OpenRouter catalog metadata retirement', () => {
+  it('does not leave retired inactive aliases as stale checker entries', () => {
+    const report = buildRegistryReport(parseConfigModels(), [
+      {
+        provider: 'openrouter',
+        status: 'ok',
+        reason: null,
+        all: new Set(['dots-studio/dots-3-note-preview:free']),
+        addable: new Set(),
+      },
+    ]);
+    const staleIds = report.stale.map((model) => model.id);
+
+    expect(staleIds).not.toContain('openrouter-qwen-qwen3-8-27b-free');
+    expect(staleIds).not.toContain('openrouter-stealth-space-bunny-alpha');
+  });
+
+  it('removes the Qwen quota after its only disabled model is retired', () => {
+    const limits = getProviderLimits({});
+
+    expect(limits['openrouter:qwen/qwen3.8-27b:free']).toBeUndefined();
   });
 });
