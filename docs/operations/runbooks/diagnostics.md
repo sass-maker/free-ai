@@ -9,8 +9,10 @@ Operational procedures for common gateway issues. For deploy steps see
    ```bash
    curl -s https://ai-gateway.sassmaker.com/v1/routing/status | jq
    ```
-   If every entry has `"degraded": true`, providers are likely rate-limited —
-   usually clears in a few minutes as windows reset.
+   Inspect each entry's `status` and `reasons`. Degraded can mean low success
+   rate or high latency as well as retriable errors; it does not establish
+   rate limiting. Health history retains the last 100 attempts per model, so
+   aggregate provider figures can include old or disabled models.
 2. Check `/v1/provider-quotas` for OpenRouter credit exhaustion:
    ```bash
    curl -s https://ai-gateway.sassmaker.com/v1/provider-quotas | jq
@@ -110,3 +112,34 @@ dependency change, verify:
 - `@cloudflare/workers-types` is listed under `types` in `tsconfig.json`.
 - `e2e-live/` is excluded from the main tsconfig (it needs `@types/node` which
   conflicts with workers-types globals).
+
+
+## Automatic routing blocked after upstream 403
+
+An upstream permission-denied response concerns the provider account, while a
+known content-filter refusal must remain terminal. The correction treats
+401, 402 and 403 as account failures for ordinary automatic routing, skips that
+provider for the remaining attempt and preserves the existing two-attempt cap.
+Explicitly forced providers stay confined to their selected registry. This
+403 automatic-fallback correction is covered by app-level and real-SDK tests.
+The accompanying instrumentation records Gemini key slots for automatic
+requests as well as pinned ones. Automatic requests continue to use normal
+cross-model/provider fallback rather than the pinned-model alternate-key path.
+Slot counts and success/failure events contain no key values, prompts or
+upstream response bodies. Verify both accepted and failed slot events after
+release before attributing automatic failures to a configured slot.
+
+Separate gateway admission from upstream failure. A response with
+`error.type: rate_limit_error`, no upstream attempt count and `Retry-After` is
+the gateway's own limiter. Addressless Fleet requests share a per-project
+bucket; the default allows a burst of 10 and refills at 20 requests per minute.
+Pace diagnostics and respect Retry-After rather than raising limits or changing
+client identity. Upstream 503 can also map to gateway 429 under
+`usage_retriable`; inspect `upstream_status` and `error.type`.
+
+The OpenAI SDK's “status code (no body)” is not proof that the HTTP response was
+empty. The installed SDK parses valid JSON and expects a top-level `error`
+field; a different valid JSON shape can lose its message when constructing
+APIError. Exact provider diagnoses require bounded raw-response inspection
+with credentials and user content excluded. Current status-only receipts do
+not establish the provider error shape or the reason for historical 400s.

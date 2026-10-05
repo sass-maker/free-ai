@@ -87,7 +87,7 @@ export function isMalformedProviderOutput(error: unknown): boolean {
 /** These statuses concern the gateway's upstream account, not the caller's credentials. */
 export function isProviderAccountFailure(error: unknown): boolean {
   const status = getUpstreamStatus(error);
-  return status === 401 || status === 402;
+  return status === 401 || status === 402 || status === 403;
 }
 
 /** Unavailable upstream accounts/models and malformed output may fall back; content refusals may not. */

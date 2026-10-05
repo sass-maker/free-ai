@@ -161,7 +161,7 @@ describe('chat automatic health rotation', () => {
     expect(mocks.call.mock.calls[0][0].provider).toBe('groq');
   });
 
-  it.each([401, 402])(
+  it.each([401, 402, 403])(
     'skips a provider with upstream %i and uses another selected provider',
     async (status) => {
       mocks.registry = [
@@ -198,7 +198,7 @@ describe('chat automatic health rotation', () => {
     expect(mocks.call).toHaveBeenCalledTimes(1);
   });
 
-  it.each([400, 403, 422])(
+  it.each([400, 422])(
     'does not treat upstream %i as account fallback permission',
     async (status) => {
       mocks.registry = [candidate('first'), candidate('alternate', 'cohere')];
@@ -210,11 +210,12 @@ describe('chat automatic health rotation', () => {
 
   it('preserves safety refusal and the gateway authentication boundary', async () => {
     mocks.registry = [candidate('first'), candidate('alternate', 'cohere')];
-    mocks.call.mockRejectedValue(
-      Object.assign(new Error('content filter refusal'), { status: 402 })
-    );
-    await request(0, []);
-    expect(mocks.call).toHaveBeenCalledTimes(1);
+    for (const status of [402, 403]) {
+      mocks.call.mockClear();
+      mocks.call.mockRejectedValue(Object.assign(new Error('content filter refusal'), { status }));
+      await request(0, []);
+      expect(mocks.call).toHaveBeenCalledTimes(1);
+    }
     mocks.call.mockClear();
     const response = await request(0, [], { authorization: 'Bearer invalid' });
     expect(response.status).toBe(401);

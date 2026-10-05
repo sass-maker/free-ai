@@ -18,13 +18,17 @@ export class GeminiKeyPool {
   private readonly keys: string[];
   private readonly used = new Set<string>();
 
-  constructor(raw: string | undefined, pinned: boolean) {
-    this.raw = pinned ? raw : undefined;
+  constructor(
+    raw: string | undefined,
+    private readonly pinned: boolean
+  ) {
+    this.raw = raw;
     this.keys = [...new Set(parseApiKeys(this.raw))];
   }
 
   select(provider: TextProvider): KeyChoice {
-    const apiKey = provider === 'gemini' ? pickApiKey(this.raw, this.used) : undefined;
+    const apiKey =
+      provider === 'gemini' ? pickApiKey(this.raw, this.pinned ? this.used : undefined) : undefined;
     if (apiKey) this.used.add(apiKey);
     return {
       apiKey,
@@ -36,7 +40,8 @@ export class GeminiKeyPool {
   }
 
   canRetry(choice: KeyChoice, attempts: number, error: unknown): boolean {
-    if (!choice.apiKey || attempts >= 2 || this.used.size >= this.keys.length) return false;
+    if (!this.pinned || !choice.apiKey || attempts >= 2 || this.used.size >= this.keys.length)
+      return false;
     const failureClass = classifyError(error);
     return (
       isRetriableFailure(failureClass) ||
