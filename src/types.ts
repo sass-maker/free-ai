@@ -153,6 +153,9 @@ export interface AttemptRecord {
   latencyMs: number;
   success: boolean;
   failureClass?: FailureClass;
+  // Keep the failed attempt visible, but wait for the alternate key before
+  // penalizing availability of the entire pinned model.
+  keyRetryPending?: boolean;
 }
 
 export interface GatewayMeta {

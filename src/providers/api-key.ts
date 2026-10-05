@@ -1,6 +1,5 @@
-// Provider secrets accept a comma-separated list of keys. Each call picks one
-// at random so independent free-tier quotas stack without extra state, and a
-// retry attempt has a fair chance of landing on a different key.
+// Provider secrets accept comma-separated keys. Quotas may be shared by keys
+// in the same upstream project; multiple keys do not imply multiple quotas.
 
 export function parseApiKeys(raw: string | undefined): string[] {
   return (raw ?? '')
@@ -9,8 +8,11 @@ export function parseApiKeys(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
-export function pickApiKey(raw: string | undefined): string | undefined {
-  const keys = parseApiKeys(raw);
+export function pickApiKey(
+  raw: string | undefined,
+  excluded: ReadonlySet<string> = new Set()
+): string | undefined {
+  const keys = [...new Set(parseApiKeys(raw))].filter((key) => !excluded.has(key));
   if (keys.length === 0) return undefined;
   return keys[Math.floor(Math.random() * keys.length)];
 }

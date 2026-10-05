@@ -16,6 +16,8 @@ export interface ProviderCallInput {
   temperature?: number;
   max_tokens?: number;
   reasoning_effort?: ReasoningEffort;
+  // Internal, request-scoped key selection. Never include this in metadata.
+  apiKey?: string;
   stream: boolean;
   signal?: AbortSignal;
   tools?: Tool[];

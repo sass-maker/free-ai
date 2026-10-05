@@ -85,7 +85,7 @@ function toSnapshot(
 
   const recent = state.history.slice(-SHORT_WINDOW);
   const shortRetriableFailures = recent.filter(
-    (item) => !item.success && item.failureClass === 'usage_retriable'
+    (item) => !item.success && !item.keyRetryPending && item.failureClass === 'usage_retriable'
   ).length;
 
   const dailyLimit = limitConfig?.requestsPerDay ?? null;
@@ -334,6 +334,7 @@ export class HealthStateDO {
         success: boolean;
         latencyMs: number;
         failureClass?: FailureClass;
+        keyRetryPending?: boolean;
         now: number;
       };
 
@@ -345,6 +346,7 @@ export class HealthStateDO {
         success: body.success,
         latencyMs: body.latencyMs,
         failureClass: body.failureClass,
+        keyRetryPending: body.keyRetryPending,
       });
 
       if (modelState.history.length > HISTORY_LIMIT) {
@@ -357,10 +359,11 @@ export class HealthStateDO {
 
       const recent = modelState.history.slice(-SHORT_WINDOW);
       const shortRetriableFailures = recent.filter(
-        (attempt) => !attempt.success && attempt.failureClass === 'usage_retriable'
+        (attempt) =>
+          !attempt.success && !attempt.keyRetryPending && attempt.failureClass === 'usage_retriable'
       ).length;
 
-      if (!body.success && body.failureClass === 'usage_retriable') {
+      if (!body.success && !body.keyRetryPending && body.failureClass === 'usage_retriable') {
         modelState.cooldownUntil = Math.max(
           modelState.cooldownUntil,
           body.now + RETRIABLE_BASE_COOLDOWN_MS

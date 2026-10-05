@@ -24,6 +24,10 @@ describe('parseApiKeys', () => {
 });
 
 describe('pickApiKey', () => {
+  it('never reselects an excluded key, including duplicate entries', () => {
+    expect(pickApiKey('k1,k1,k2', new Set(['k1']))).toBe('k2');
+    expect(pickApiKey('k1,k2', new Set(['k1', 'k2']))).toBeUndefined();
+  });
   it('returns undefined when no key is configured', () => {
     expect(pickApiKey(undefined)).toBeUndefined();
     expect(pickApiKey('')).toBeUndefined();

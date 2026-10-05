@@ -33,11 +33,17 @@ import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './provid
 import {
   canFallbackFromProviderFailure,
   classifyError,
+  getUpstreamStatus,
   isProviderAccountFailure,
   isRetriableFailure,
   MalformedProviderOutputError,
 } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
+import {
+  GeminiKeyPool,
+  logUpstreamAccepted,
+  logUpstreamFailure,
+} from './router/gemini-key-recovery';
 import { registerGatewayAuthMiddleware } from './middleware/gateway-auth';
 import {
   EMBEDDING_CANDIDATES,
@@ -1186,6 +1192,7 @@ interface ChatRetryState {
   streamResponse: Response | null;
   lastErrorClass: string;
   lastErrorMessage: string;
+  lastUpstreamStatus?: number;
   lastAttemptedProvider: TextProvider | undefined;
   lastAttemptedModel: string | undefined;
   routingFallbackHops: FallbackHop[];
@@ -1224,12 +1231,14 @@ function handleChatProviderSuccess(
     latency_ms: latencyMs,
   });
 
-  healthRecord(c.env, {
-    key,
-    success: true,
-    latencyMs,
-    now: Date.now(),
-  });
+  c.executionCtx.waitUntil(
+    healthRecord(c.env, {
+      key,
+      success: true,
+      latencyMs,
+      now: Date.now(),
+    })
+  );
 
   state.chosenMeta = buildGatewayMeta({
     provider: candidate.provider,
@@ -1276,12 +1285,14 @@ function handleChatProviderError(
   ctx: ChatRetryContext,
   candidate: ModelCandidate,
   error: unknown,
-  startedAt: number
+  startedAt: number,
+  keyRetryPending = false
 ): void {
   const { c, state } = ctx;
   const failureClass = classifyError(error);
   state.lastErrorClass = failureClass;
   state.lastErrorMessage = getErrorMessage(error);
+  state.lastUpstreamStatus = getUpstreamStatus(error);
 
   state.routingFallbackHops.push({
     provider: candidate.provider,
@@ -1290,16 +1301,21 @@ function handleChatProviderError(
     latency_ms: Date.now() - startedAt,
   });
 
-  healthRecord(c.env, {
-    key: getModelKey(candidate.provider, candidate.model),
-    success: false,
-    latencyMs: Date.now() - startedAt,
-    failureClass,
-    now: Date.now(),
-  });
+  c.executionCtx.waitUntil(
+    healthRecord(c.env, {
+      key: getModelKey(candidate.provider, candidate.model),
+      success: false,
+      latencyMs: Date.now() - startedAt,
+      failureClass,
+      keyRetryPending,
+      now: Date.now(),
+    })
+  );
 
   if (
-    (!isRetriableFailure(failureClass) && !canFallbackFromProviderFailure(error, failureClass)) ||
+    (!keyRetryPending &&
+      !isRetriableFailure(failureClass) &&
+      !canFallbackFromProviderFailure(error, failureClass)) ||
     state.attemptCounter >= 2
   ) {
     throw new AbortError(state.lastErrorMessage);
@@ -1319,11 +1335,17 @@ function createChatRetryCallback(
   const ctx: ChatRetryContext = { c, normalized, requestId, projectId, state };
   let nextCandidate = 0;
   const unavailableProviders = new Set<TextProvider>();
+  const geminiKeys = new GeminiKeyPool(
+    c.env.GEMINI_API_KEY,
+    Boolean(c.req.header('x-gateway-force-model'))
+  );
+  let keyRetryCandidate: ModelCandidate | undefined;
   return async () => {
     while (selected[nextCandidate] && unavailableProviders.has(selected[nextCandidate].provider)) {
       nextCandidate += 1;
     }
-    const candidate = selected[nextCandidate++];
+    const candidate = keyRetryCandidate ?? selected[nextCandidate++];
+    keyRetryCandidate = undefined;
     if (!candidate || state.attemptCounter >= 2) {
       throw new AbortError('No more candidates');
     }
@@ -1332,6 +1354,13 @@ function createChatRetryCallback(
     state.lastAttemptedProvider = candidate.provider;
     state.lastAttemptedModel = candidate.model;
     const startedAt = Date.now();
+    const keyChoice = geminiKeys.select(candidate.provider);
+    const attemptMeta = {
+      provider: candidate.provider,
+      model: candidate.model,
+      attempt: state.attemptCounter,
+      ...keyChoice.metadata,
+    };
 
     try {
       const caller = providerCallers[candidate.provider];
@@ -1347,6 +1376,7 @@ function createChatRetryCallback(
         temperature: normalized.temperature,
         max_tokens: normalized.max_tokens,
         reasoning_effort: normalized.reasoning_effort,
+        apiKey: keyChoice.apiKey,
         stream: normalized.stream,
         tools: normalized.tools,
         tool_choice: normalized.tool_choice,
@@ -1356,12 +1386,16 @@ function createChatRetryCallback(
 
       c.req.raw.signal.throwIfAborted();
       handleChatProviderSuccess(ctx, candidate, providerResult, startedAt);
+      if (keyChoice.apiKey) logUpstreamAccepted(attemptMeta, normalized.stream);
     } catch (error) {
       if (c.req.raw.signal.aborted) {
         throw new AbortError('Request aborted');
       }
-      if (isProviderAccountFailure(error)) unavailableProviders.add(candidate.provider);
-      handleChatProviderError(ctx, candidate, error, startedAt);
+      const keyRetryPending = geminiKeys.canRetry(keyChoice, state.attemptCounter, error);
+      if (keyRetryPending) keyRetryCandidate = candidate;
+      else if (isProviderAccountFailure(error)) unavailableProviders.add(candidate.provider);
+      logUpstreamFailure(attemptMeta, error, keyRetryPending);
+      handleChatProviderError(ctx, candidate, error, startedAt, keyRetryPending);
     }
   };
 }
@@ -1493,6 +1527,8 @@ function handleChatResult(
       error: {
         message: `All providers failed: ${state.lastErrorMessage}`,
         type: state.lastErrorClass,
+        upstream_status: state.lastUpstreamStatus,
+        attempts: state.attemptCounter,
       },
     },
     status

@@ -1,6 +1,6 @@
 import type { FailureClass } from '../types';
 
-function getStatus(error: unknown): number | undefined {
+export function getUpstreamStatus(error: unknown): number | undefined {
   if (!error || typeof error !== 'object') {
     return undefined;
   }
@@ -41,7 +41,7 @@ const INPUT_ERROR_STATUSES = new Set([400, 422]);
 const AUTH_ERROR_STATUSES = new Set([401, 403]);
 
 export function classifyError(error: unknown): FailureClass {
-  const status = getStatus(error);
+  const status = getUpstreamStatus(error);
   const message = getMessage(error).toLowerCase();
 
   if (SAFETY_KEYWORDS.some((keyword) => message.includes(keyword))) {
@@ -86,7 +86,7 @@ export function isMalformedProviderOutput(error: unknown): boolean {
 
 /** These statuses concern the gateway's upstream account, not the caller's credentials. */
 export function isProviderAccountFailure(error: unknown): boolean {
-  const status = getStatus(error);
+  const status = getUpstreamStatus(error);
   return status === 401 || status === 402;
 }
 
@@ -98,7 +98,7 @@ export function canFallbackFromProviderFailure(
   return (
     failureClass === 'provider_fatal' &&
     (isProviderAccountFailure(error) ||
-      getStatus(error) === 404 ||
+      getUpstreamStatus(error) === 404 ||
       isMalformedProviderOutput(error))
   );
 }

@@ -45,6 +45,29 @@ Operational procedures for common gateway issues. For deploy steps see
    the model may be miscataloged.
 3. If the provider key is exhausted, rotate it via `wrangler secret put`.
 
+## Pinned Gemini fails despite a multi-key pool
+
+Check the upstream status before interpreting gateway HTTP 429 as quota
+exhaustion: the retriable class also includes upstream 5xx and timeouts. Google
+documents quotas [per project, not per key](https://ai.google.dev/gemini-api/docs/rate-limits).
+Separate projects can have different model access and allowance; key count alone
+does not establish either. Do not expose key values during diagnosis.
+
+For pinned chat requests the recovery path uses the existing two-attempt budget to try a distinct
+Gemini key after an access or retriable failure. It preserves the model, refusal
+handling, cancellation and SDK retry limits; it does not walk all keys or change
+embedding routing. A pending key retry stays in health history without cooling
+the entire model immediately. Terminal retriable failure still triggers cooldown.
+
+After release, inspect the prompt-free `gateway.upstream_failed` log entries:
+`upstream_status`, `key_slot`, `key_pool_size`, `attempt` and
+`key_retry_pending`. Slots refer to positions in the configured pool, not key
+values. `gateway.upstream_accepted` records successful slots too, so absence of
+failure logs cannot be mistaken for tested access. For streams it confirms the
+handshake, not completion of the entire stream. Error responses also retain `upstream_status` and `attempts` so a provider
+503 cannot be mistaken for an observed Google quota error. Access-denied slots
+need an account/project investigation; 503 by itself does not identify a bad key.
+
 ## Analytics show a spike in failures
 
 1. `GET /v1/analytics?days=7` — look for the provider/model/day with the failure

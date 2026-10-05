@@ -21,6 +21,50 @@ function makeState() {
 }
 
 describe('HealthStateDO', () => {
+  it('keeps failed key attempts visible without cooling a model recovered by another key', async () => {
+    const health = new HealthStateDO(makeState(), {});
+    const now = Date.now();
+    const record = async (success: boolean, keyRetryPending = false) =>
+      health.fetch(
+        new Request('https://internal.local/record', {
+          method: 'POST',
+          body: JSON.stringify({
+            key: 'gemini:pinned',
+            success,
+            keyRetryPending,
+            latencyMs: 10,
+            failureClass: success ? undefined : 'usage_retriable',
+            now,
+          }),
+        })
+      );
+    for (let i = 0; i < 6; i += 1) {
+      await record(false, true);
+      await record(true);
+    }
+    const before = (await (
+      await health.fetch(new Request('https://internal.local/snapshot'))
+    ).json()) as {
+      snapshots: Array<{
+        attempts: number;
+        dailyUsed: number;
+        cooldownUntil: number;
+        shortRetriableFailures: number;
+      }>;
+    };
+    expect(before.snapshots[0]).toMatchObject({
+      attempts: 12,
+      dailyUsed: 6,
+      cooldownUntil: 0,
+      shortRetriableFailures: 0,
+    });
+    await record(false);
+    const after = (await (
+      await health.fetch(new Request('https://internal.local/snapshot'))
+    ).json()) as typeof before;
+    expect(after.snapshots[0].cooldownUntil).toBeGreaterThan(now);
+    expect(after.snapshots[0].shortRetriableFailures).toBe(1);
+  });
   it('does not invent a daily limit when snapshot limits are unavailable', async () => {
     const state = makeState();
     const health = new HealthStateDO(state, {});
