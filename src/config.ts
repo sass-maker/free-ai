@@ -209,7 +209,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'z-ai/glm-5.2:free',
     reasoning: 'high',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // OpenRouter lists only the paid z-ai/glm-5.2; :free is absent (2026-10-05)
     priority: 0.68,
     capabilities: {
       toolCalling: true,
@@ -276,7 +276,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'dots-studio/dots-3-note-preview:free',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true, // preview model — expires 2026-09-30
+    enabled: true, // OpenRouter catalog expiry: 2026-12-31 (checked 2026-10-05)
     priority: 0.5,
     capabilities: {
       toolCalling: true,
