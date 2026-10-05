@@ -1095,7 +1095,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'gemini-3.8-flash',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: false,
+    enabled: true,
     priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
     capabilities: {
       toolCalling: false,
