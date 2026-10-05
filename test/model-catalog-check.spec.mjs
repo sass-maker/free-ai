@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -107,6 +108,25 @@ describe('model catalog checker', () => {
       all: new Set(),
       addable: new Set(),
     });
+  });
+
+  it('does not send retired inactive aliases to catalog verification', () => {
+    const models = parseConfigModels(
+      readFileSync(new URL('../src/config.ts', import.meta.url), 'utf-8')
+    );
+    const retired = new Set(['z-ai/glm-5.2:free', 'inclusionai/ling-3.0-flash-fin:free']);
+    const available = new Set(
+      models
+        .filter((model) => model.provider === 'openrouter' && !retired.has(model.model))
+        .map((model) => model.model)
+    );
+    const report = buildRegistryReport(models, [
+      { provider: 'openrouter', status: 'ok', all: available, addable: new Set() },
+    ]);
+    expect(report.stale).toEqual([]);
+    expect(report.ok.some((model) => model.model === 'dots-studio/dots-3-note-preview:free')).toBe(
+      true
+    );
   });
 
   it('parses only the text registry', () => {

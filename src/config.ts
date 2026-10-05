@@ -204,23 +204,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── OpenRouter (needs OPENROUTER_API_KEY) ────────────────────────────
   {
-    id: 'openrouter-zai-glm-5-2-free',
-    provider: 'openrouter',
-    model: 'z-ai/glm-5.2:free',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: false, // OpenRouter lists only the paid z-ai/glm-5.2; :free is absent (2026-10-05)
-    priority: 0.68,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      nativeReasoning: true,
-      contextWindow: 256_000,
-      maxOutputTokens: 65_536,
-    },
-  },
-  {
     id: 'openrouter-nvidia-nemotron-3-5-lightning-free',
     provider: 'openrouter',
     model: 'nvidia/nemotron-3.5-lightning:free',
@@ -965,22 +948,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     id: 'openrouter-inclusionai-ling-3-0-flash-sante-free',
     provider: 'openrouter',
     model: 'inclusionai/ling-3.0-flash-sante:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-inclusionai-ling-3-0-flash-fin-free',
-    provider: 'openrouter',
-    model: 'inclusionai/ling-3.0-flash-fin:free',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: false,
