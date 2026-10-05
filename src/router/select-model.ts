@@ -11,10 +11,12 @@ import type {
   Tool,
 } from '../types';
 import { evaluationWeight } from './evaluation-weights';
+import { supportsJsonSchema } from './structured-output';
 
 export interface RequiredCapabilities {
   toolCalling?: boolean;
   jsonMode?: boolean;
+  jsonSchema?: boolean;
   vision?: boolean;
   minContextWindow?: number;
 }
@@ -83,7 +85,8 @@ export function deriveRequiredCapabilities(options: {
 
   return {
     toolCalling: options.tools && options.tools.length > 0 ? true : undefined,
-    jsonMode: options.response_format?.type === 'json_object' ? true : undefined,
+    jsonMode: options.response_format && options.response_format.type !== 'text' ? true : undefined,
+    jsonSchema: options.response_format?.type === 'json_schema' ? true : undefined,
     vision: options.messages && messagesContainImages(options.messages) ? true : undefined,
     minContextWindow: minContext,
   };
@@ -197,6 +200,7 @@ function candidateMatchesCapabilities(
 ): boolean {
   if (caps.toolCalling && !candidate.capabilities.toolCalling) return false;
   if (caps.jsonMode && !candidate.capabilities.jsonMode) return false;
+  if (caps.jsonSchema && !supportsJsonSchema(candidate)) return false;
   if (caps.vision && !supportsVisionInput(candidate)) return false;
   if (caps.minContextWindow && candidate.capabilities.contextWindow < caps.minContextWindow) {
     return false;

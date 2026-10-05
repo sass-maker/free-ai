@@ -1,3 +1,4 @@
+import OpenAI from 'openai';
 import { parseApiKeys, pickApiKey } from '../providers/api-key';
 import type { TextProvider } from '../types';
 import {
@@ -73,6 +74,13 @@ function upstreamErrorCode(error: unknown): string | null {
   return typeof code === 'string' && SAFE_ERROR_CODES.has(code) ? code : null;
 }
 
+function upstreamFailureKind(error: unknown): string {
+  if (error instanceof OpenAI.APIConnectionTimeoutError) return 'timeout';
+  if (error instanceof OpenAI.APIUserAbortError) return 'cancelled';
+  if (error instanceof OpenAI.APIConnectionError) return 'connection';
+  return getUpstreamStatus(error) !== undefined ? 'http' : 'unknown';
+}
+
 export function logUpstreamAccepted(meta: AttemptMeta, stream: boolean): void {
   console.info(
     JSON.stringify({ event: 'gateway.upstream_accepted', ...meta, stream_handshake: stream })
@@ -91,6 +99,7 @@ export function logUpstreamFailure(
       ...meta,
       upstream_status: getUpstreamStatus(error) ?? null,
       upstream_error_code: upstreamErrorCode(error),
+      upstream_failure_kind: upstreamFailureKind(error),
       failure_class: classifyError(error),
       key_retry_pending: keyRetryPending,
     })

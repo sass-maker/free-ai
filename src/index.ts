@@ -186,9 +186,28 @@ const toolChoiceSchema = z.union([
   z.object({ type: z.literal('function'), function: z.object({ name: z.string() }) }),
 ]);
 
-const responseFormatSchema = z.object({
-  type: z.enum(['text', 'json_object']),
-});
+const responseFormatSchema = z.union([
+  z.object({ type: z.enum(['text', 'json_object']) }),
+  z.object({
+    type: z.literal('json_schema'),
+    json_schema: z.object({
+      name: z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[a-zA-Z0-9_-]+$/),
+      strict: z.literal(true),
+      schema: z
+        .object({
+          type: z.literal('object'),
+          properties: z.record(z.string(), z.unknown()),
+          required: z.array(z.string()),
+          additionalProperties: z.literal(false),
+        })
+        .passthrough(),
+    }),
+  }),
+]);
 
 const chatRequestSchema = z
   .object({
@@ -205,6 +224,10 @@ const chatRequestSchema = z
     tool_choice: toolChoiceSchema.optional(),
     response_format: responseFormatSchema.optional(),
   })
+  .refine(
+    (body) => body.response_format?.type !== 'json_schema' || (!body.stream && !body.tools?.length),
+    { message: 'Schema output requires non-streaming chat without tools.' }
+  )
   .openapi('ChatCompletionRequest');
 
 const responsesRequestSchema = z

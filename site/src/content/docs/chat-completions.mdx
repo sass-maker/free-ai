@@ -23,7 +23,7 @@ POST /v1/chat/completions
 | `min_reasoning_level` | string | — | Minimum reasoning tier for auto-routing. One of `"low"`, `"medium"`, `"high"`. |
 | `tools` | array | — | List of tool/function definitions. When present, the gateway only routes to models that support tool calling. |
 | `tool_choice` | string \| object | — | Controls tool use: `"none"`, `"auto"`, `"required"`, or `{ type: "function", function: { name: "..." } }`. |
-| `response_format` | object | — | Set to `{ type: "json_object" }` for structured JSON output. Gateway only routes to models with JSON mode support. |
+| `response_format` | object | — | `{ type: "json_object" }` requests JSON mode. `{ type: "json_schema", json_schema: { name, strict: true, schema } }` requests schema output from qualified models. |
 | `project_id` | string | required* | Project tag for analytics and rate accounting. You can also send `x-gateway-project-id`; one of the two is required. |
 
 ### Message Object
@@ -402,3 +402,18 @@ console.log(completion.choices[0].message.content);
 ```
 </TabItem>
 </Tabs>
+
+### Schema-constrained output
+
+For non-streaming chat without tools, use `response_format.type: "json_schema"`
+with `json_schema: { name: "classifier", strict: true, schema: { ... } }`. The
+root schema must be an object with `properties`, `required`, and
+`additionalProperties: false`. Nested objects should also require every field
+and forbid additional properties. Keep schemas within the providers' supported
+JSON Schema subset. Validate semantic values in the consumer as well.
+
+Automatic routing retains health and cost ranking among qualified schema models:
+Gemini chat models and Groq GPT-OSS 20B/120B or Qwen 3.8 27B. Other models'
+JSON-mode support alone does not qualify them. Token caps and the two-attempt
+gateway limit are unchanged. Generated `json_validate_failed` errors can use
+normal fallback; other upstream 400 caller errors remain non-retriable.
