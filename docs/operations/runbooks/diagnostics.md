@@ -119,15 +119,26 @@ dependency change, verify:
 An upstream permission-denied response concerns the provider account, while a
 known content-filter refusal must remain terminal. The correction treats
 401, 402 and 403 as account failures for ordinary automatic routing, skips that
-provider for the remaining attempt and preserves the existing two-attempt cap.
+provider for the remaining attempt when no alternate Gemini key remains, and
+preserves the existing two-attempt cap. With a multi-key Gemini pool, an access
+denial first tries a distinct key for the automatically selected model. The
+denied key is excluded for the rest of that request; this is not a persistent
+cross-request quarantine. Safety refusals still stop immediately.
 Explicitly forced providers stay confined to their selected registry. This
 403 automatic-fallback correction is covered by app-level and real-SDK tests.
 The accompanying instrumentation records Gemini key slots for automatic
-requests as well as pinned ones. Automatic requests continue to use normal
-cross-model/provider fallback rather than the pinned-model alternate-key path.
+requests as well as pinned ones. Automatic requests retain normal
+cross-model/provider fallback for transient failures such as 429 or 503;
+alternate-key recovery in automatic mode applies only to access denials.
 Slot counts and success/failure events contain no key values, prompts or
 upstream response bodies. Verify both accepted and failed slot events after
 release before attributing automatic failures to a configured slot.
+
+`upstream_error_code` logs a small allowlist of machine-readable SDK codes,
+including `json_validate_failed` and `context_length_exceeded`; unknown codes
+are null. Use it to distinguish Groq JSON-output rejection from context limits
+without logging provider messages or generated output. An observed HTTP 400
+without an error code remains an unknown subtype and is not blindly retried.
 
 Separate gateway admission from upstream failure. A response with
 `error.type: rate_limit_error`, no upstream attempt count and `Retry-After` is
