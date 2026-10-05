@@ -24,6 +24,81 @@ const curlBody = gettingStarted.match(/-d '(\{[\s\S]*?\})'/)?.[1];
 afterEach(() => vi.unstubAllGlobals());
 
 describe('published quickstart contract', () => {
+  it.each([false, true])(
+    'forwards explicit Gemini 3.8 effort through routing and SDK (stream=%s)',
+    async (stream) => {
+      const upstream = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = new Request(input, init);
+        expect(request.url).toBe(
+          'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+        );
+        expect(await request.json()).toMatchObject({
+          model: 'gemini-3.8-flash',
+          reasoning_effort: 'low',
+          max_tokens: 800,
+          stream,
+        });
+        return Response.json({ error: { message: 'Synthetic unavailable' } }, { status: 503 });
+      });
+      vi.stubGlobal('fetch', upstream);
+      const { env } = makeTestEnv({ GEMINI_API_KEY: 'synthetic-provider-key' });
+      const response = await app.fetch(
+        new Request('https://gateway.test/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer test-gateway-key',
+            'content-type': 'application/json',
+            'x-gateway-force-provider': 'gemini',
+            'x-gateway-force-model': 'gemini-3.8-flash',
+          },
+          body: JSON.stringify({
+            model: 'gemini-3.8-flash',
+            project_id: 'gemini-effort-test',
+            reasoning_effort: 'low',
+            max_tokens: 800,
+            stream,
+            messages: [{ role: 'user', content: 'Synthetic caption request' }],
+          }),
+        }),
+        env,
+        makeCtx()
+      );
+      expect(response.ok).toBe(false);
+      expect(upstream).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([
+    ['groq', 'synthetic-model', 'low'],
+    ['gemini', 'gemini-3.5-flash-lite', 'low'],
+    ['gemini', 'gemini-3.8-flash', 'auto'],
+  ] as const)(
+    'preserves provider defaults for %s/%s with effort %s',
+    async (provider, model, reasoning_effort) => {
+      const upstream = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const body = (await new Request(input, init).json()) as Record<string, unknown>;
+        expect(body.reasoning_effort).toBeUndefined();
+        return Response.json({ error: { message: 'Synthetic unavailable' } }, { status: 503 });
+      });
+      vi.stubGlobal('fetch', upstream);
+      const { env } = makeTestEnv();
+      await expect(
+        runOpenAICompatibleRequest(
+          {
+            env,
+            provider,
+            model,
+            reasoning_effort,
+            stream: false,
+            messages: [{ role: 'user', content: 'Synthetic request' }],
+          },
+          { provider, baseURL: 'https://provider.test/v1', apiKey: 'synthetic-key' }
+        )
+      ).rejects.toMatchObject({ status: 503 });
+      expect(upstream).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('makes one upstream request per embedding attempt', async () => {
     const upstream = vi.fn(async () =>
       Response.json({ error: { message: 'Unavailable' } }, { status: 503 })

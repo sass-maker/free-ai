@@ -35,6 +35,16 @@ export async function runOpenAICompatibleRequest(
 ): Promise<ProviderCallResult> {
   const client = createClient(config);
 
+  // Gemini 3.8 supports explicit thinking levels. Preserve provider defaults
+  // for automatic effort and models whose compatibility has not been qualified.
+  const reasoning =
+    config.provider === 'gemini' &&
+    input.model === 'gemini-3.8-flash' &&
+    input.reasoning_effort &&
+    input.reasoning_effort !== 'auto'
+      ? { reasoning_effort: input.reasoning_effort }
+      : {};
+
   if (input.stream) {
     const streamBody = {
       model: input.model,
@@ -42,6 +52,7 @@ export async function runOpenAICompatibleRequest(
       temperature: input.temperature,
       max_tokens: input.max_tokens,
       stream: true as const,
+      ...reasoning,
       ...(input.tools && { tools: input.tools }),
       ...(input.tool_choice && { tool_choice: input.tool_choice }),
       ...(input.response_format && { response_format: input.response_format }),
@@ -65,6 +76,7 @@ export async function runOpenAICompatibleRequest(
     temperature: input.temperature,
     max_tokens: input.max_tokens,
     stream: false as const,
+    ...reasoning,
     ...(input.tools && { tools: input.tools }),
     ...(input.tool_choice && { tool_choice: input.tool_choice }),
     ...(input.response_format && { response_format: input.response_format }),
