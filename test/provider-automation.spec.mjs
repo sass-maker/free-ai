@@ -164,4 +164,136 @@ describe('bounded text-provider smoke', () => {
     expect(replayBodies.every((body) => body.max_tokens === 8)).toBe(true);
     expect(replayBodies.every((body) => body.include_completion === false)).toBe(true);
   });
+
+  it('retains only the numeric upstream status and error class from failed replay responses', async () => {
+    const fetchImpl = vi.fn(async (url) => {
+      if (String(url).endsWith('/v1/models')) {
+        return Response.json({
+          data: [{ id: 'gemini-a', provider: 'gemini', type: 'chat', enabled: true }],
+        });
+      }
+      return Response.json(
+        {
+          ok: false,
+          error: {
+            message: 'token=secret-token https://provider.example/v1/chat raw-response-secret',
+            type: 'provider_fatal',
+            upstream_status: 403,
+            headers: { authorization: 'Bearer secret-token' },
+          },
+        },
+        { status: 502 }
+      );
+    });
+
+    const report = await runTextProviderSmoke({
+      baseUrl: 'https://gateway.test',
+      gatewayKey: 'test-key',
+      fetchImpl,
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.results).toEqual([
+      expect.objectContaining({
+        provider: 'gemini',
+        model: 'gemini-a',
+        status: 502,
+        error: 'provider_fatal',
+        upstream_status: 403,
+      }),
+    ]);
+    const serialized = JSON.stringify(report);
+    expect(serialized).not.toContain('secret-token');
+    expect(serialized).not.toContain('provider.example');
+    expect(serialized).not.toContain('raw-response-secret');
+    expect(serialized).not.toContain('authorization');
+  });
+
+  it.each([undefined, null, '403', 0, 99, 600, 403.5])(
+    'uses null for invalid upstream status %s',
+    async (upstreamStatus) => {
+      const fetchImpl = vi.fn(async (url) => {
+        if (String(url).endsWith('/v1/models')) {
+          return Response.json({
+            data: [{ id: 'gemini-a', provider: 'gemini', type: 'chat', enabled: true }],
+          });
+        }
+        return Response.json(
+          {
+            ok: false,
+            error: { type: 'provider_fatal', upstream_status: upstreamStatus },
+          },
+          { status: 502 }
+        );
+      });
+
+      const report = await runTextProviderSmoke({
+        baseUrl: 'https://gateway.test',
+        gatewayKey: 'test-key',
+        fetchImpl,
+      });
+
+      expect(report.results[0]).toMatchObject({
+        status: 502,
+        error: 'provider_fatal',
+        upstream_status: null,
+      });
+    }
+  );
+
+  it('drops an unrecognized error class from smoke output', async () => {
+    const fetchImpl = vi.fn(async (url) => {
+      if (String(url).endsWith('/v1/models')) {
+        return Response.json({
+          data: [{ id: 'gemini-a', provider: 'gemini', type: 'chat', enabled: true }],
+        });
+      }
+      return Response.json(
+        {
+          ok: false,
+          error: { type: 'token=secret-token https://provider.example' },
+        },
+        { status: 502 }
+      );
+    });
+
+    const report = await runTextProviderSmoke({
+      baseUrl: 'https://gateway.test',
+      gatewayKey: 'test-key',
+      fetchImpl,
+    });
+
+    expect(report.results[0]).toMatchObject({
+      status: 502,
+      error: null,
+      upstream_status: null,
+    });
+    expect(JSON.stringify(report)).not.toContain('secret-token');
+    expect(JSON.stringify(report)).not.toContain('provider.example');
+  });
+
+  it('does not retain raw fetch exception messages in smoke results', async () => {
+    const fetchImpl = vi.fn(async (url) => {
+      if (String(url).endsWith('/v1/models')) {
+        return Response.json({
+          data: [{ id: 'gemini-a', provider: 'gemini', type: 'chat', enabled: true }],
+        });
+      }
+      throw new Error('token=secret-token https://provider.example/v1/chat');
+    });
+
+    const report = await runTextProviderSmoke({
+      baseUrl: 'https://gateway.test',
+      gatewayKey: 'test-key',
+      fetchImpl,
+    });
+
+    expect(report.results[0]).toMatchObject({
+      status: null,
+      error: 'request_failed',
+      upstream_status: null,
+    });
+    expect(JSON.stringify(report)).not.toContain('secret-token');
+    expect(JSON.stringify(report)).not.toContain('provider.example');
+  });
 });
