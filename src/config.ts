@@ -961,41 +961,9 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'openrouter-qwen-qwen3-8-27b-free',
-    provider: 'openrouter',
-    model: 'qwen/qwen3.8-27b:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
     id: 'cerebras-qwen-3-8-27b',
     provider: 'cerebras',
     model: 'qwen-3.8-27b',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-stealth-space-bunny-alpha',
-    provider: 'openrouter',
-    model: 'stealth/space-bunny-alpha',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: false,
@@ -1158,7 +1126,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:nex-agi/nex-n2.5-pro:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:inclusionai/ling-3.0-flash-sante:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:inclusionai/ling-3.0-flash-fin:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:qwen/qwen3.8-27b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'cerebras:qwen-3.8-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
 
