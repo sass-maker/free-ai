@@ -37,3 +37,6 @@ jobs:
 
       - name: Build playground
         run: pnpm run build
+
+      - name: Build Astro docs site (patched dependency consumer)
+        run: pnpm --filter @sass-maker/ai-gateway-docs build
