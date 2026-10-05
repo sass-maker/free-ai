@@ -620,6 +620,7 @@ const replayResponseSchema = z
       .object({
         message: z.string(),
         type: z.string(),
+        upstream_status: z.number().int().min(100).max(599).nullable(),
       })
       .optional(),
   })
@@ -1868,6 +1869,22 @@ function buildNormalizedChatRequest(
   };
 }
 
+function getReplayUpstreamStatus(error: unknown): number | null {
+  const status = getUpstreamStatus(error);
+  if (Number.isInteger(status) && status !== undefined && status >= 100 && status <= 599) {
+    return status;
+  }
+
+  if (!error || typeof error !== 'object') return null;
+  const statusCode = (error as { statusCode?: unknown }).statusCode;
+  return typeof statusCode === 'number' &&
+    Number.isInteger(statusCode) &&
+    statusCode >= 100 &&
+    statusCode <= 599
+    ? statusCode
+    : null;
+}
+
 async function executeReplayCall(
   c: Context,
   candidate: ModelCandidate,
@@ -1920,7 +1937,11 @@ async function executeReplayCall(
         model: candidate.model,
         latency_ms: Date.now() - startedAt,
         selected: selectedPayload,
-        error: { message: getErrorMessage(error), type: classifyError(error) },
+        error: {
+          message: 'Provider replay failed',
+          type: classifyError(error),
+          upstream_status: getReplayUpstreamStatus(error),
+        },
       },
       502
     ) as never;
