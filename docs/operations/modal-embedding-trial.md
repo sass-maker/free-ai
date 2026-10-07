@@ -58,6 +58,25 @@ Do not describe this experiment as guaranteed free or unlimited.
 
 ## Qualification
 
+The October 7 release is qualified at source `75c8979b` and Worker version
+`0015e128-87b2-4c85-bcc5-008e833abd22`, serving 100% of traffic after manual
+workflow [37576123813](https://github.com/sass-maker/free-ai/actions/runs/37576123813)
+and exact-main CI passed. The
+[sanitized release receipt](2026-10-07-modal-embedding-release.json) records
+both real-model requests through the live private `FleetGateway` binding,
+model identity, project attribution, finite normalized vectors and token usage.
+Public catalog and API docs returned 200; anonymous public embeddings returned
+401. Protected Modal HTTPS inference also passed for each model. A public
+bearer-authenticated gateway request was not exercised because the approved
+existing gateway key was unavailable locally. The private binding uses its
+existing production gateway authentication internally; no key was rotated.
+
+The first deployment exposed a runtime incompatibility: Workers rejects fetch
+`redirect: 'error'`. The adapter now uses `manual` and rejects non-success
+responses without following redirects. CI compiles the Worker and exercises
+the protected upstream request in the actual Workers runtime, in addition to
+the Node-based route tests. No production dependency was added.
+
 Focused tests exercise the real gateway route and adapter with synthetic HTTP:
 model pinning, disabled catalog entries, batch/dimension/task validation,
 gateway auth, global fail-closed admission, sanitized upstream errors, malformed
@@ -74,3 +93,8 @@ The backend cold SDK measurements were 35.2 seconds for Gemma and 26.6 seconds
 for BGE; warm SDK medians were 571 and 505 ms. Backend-only inference was faster
 for BGE. These measurements are small samples, not a throughput promise or
 comparative retrieval benchmark.
+
+Live gateway binding checks took 35.3 seconds for Gemma and 93.2 seconds for
+BGE, including cold startup and the remote verification proxy. The proxy emitted
+internal-error diagnostics while both requests completed successfully. These
+single samples do not measure typical public bearer API latency.
