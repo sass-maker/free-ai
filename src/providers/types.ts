@@ -7,6 +7,7 @@ import type {
   TextProvider,
   Tool,
 } from '../types';
+import type { ModalEmbeddingTask } from './modal-embeddings';
 
 export interface ProviderCallInput {
   env: Env;
@@ -74,6 +75,8 @@ export interface ProviderEmbeddingInput {
   input: string[];
   encoding_format?: 'float';
   dimensions?: number;
+  task?: ModalEmbeddingTask;
+  signal?: AbortSignal;
 }
 
 export interface ProviderEmbeddingResult {
