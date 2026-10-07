@@ -14,7 +14,7 @@ export type TextProvider =
   | 'modelscope'
   | 'siliconflow';
 
-export type EmbeddingProvider = 'workers_ai' | 'gemini' | 'voyage_ai';
+export type EmbeddingProvider = 'workers_ai' | 'gemini' | 'voyage_ai' | 'modal';
 
 export type ImageProvider = 'together' | 'workers_ai' | 'pollinations' | 'gemini' | 'nvidia';
 
@@ -219,6 +219,8 @@ export interface Env {
   GROQ_API_KEY?: string;
   GEMINI_API_KEY?: string;
   VOYAGE_API_KEY?: string;
+  MODAL_PROXY_KEY?: string;
+  MODAL_PROXY_SECRET?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_API_TOKEN?: string;
   CLOUDFLARE_WORKERS_AI_API_KEY?: string;

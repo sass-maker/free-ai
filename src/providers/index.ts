@@ -17,6 +17,7 @@ import { callGroq } from './groq';
 import { callGroqTts } from './groq-tts';
 import { callMistral } from './mistral';
 import { callModelScope } from './modelscope';
+import { callModalEmbeddings } from './modal-embeddings';
 import { callNvidia } from './nvidia';
 import { callNvidiaImages, type NvidiaImageInput, type NvidiaImageOutput } from './nvidia-images';
 import { callOpenRouter } from './openrouter';
@@ -67,6 +68,7 @@ export const providerEmbeddingCallers: Record<EmbeddingProvider, ProviderEmbeddi
   workers_ai: callWorkersAiEmbeddings,
   gemini: callGeminiEmbeddings,
   voyage_ai: callVoyageEmbeddings,
+  modal: callModalEmbeddings,
 };
 
 // ── Image generation ────────────────────────────────────────────────
