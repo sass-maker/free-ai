@@ -1,6 +1,6 @@
 # free-ai — PROJECT STATUS
 
-Last updated: 2026-10-02
+Last updated: 2026-10-07
 
 ## Why / What
 
@@ -11,7 +11,8 @@ attributed to AI Game and High Signal, so the earlier claim of no remaining
 callers is contradicted by current telemetry. This does not prove individual
 client deployments or a fresh protected inference request. Production maintenance
 now has owner approval and uses the existing manual deployment workflow. Provider
-expansion and decommission are outside the current repair.
+expansion now includes the owner's October 7 approval for the explicit Modal
+embedding experiment. Decommission remains outside the current work.
 
 See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrails.
 
@@ -27,6 +28,19 @@ See [`docs/current/objective.md`](docs/current/objective.md) for scope guardrail
   it does not affect runtime routing or provider behavior.
 
 ## Timeline
+
+- **2026-10-07** — Modal's pinned EmbeddingGemma 2 text encoder and BGE-small
+  English baseline are available through authenticated `/v1/embeddings`.
+  Both real-model requests passed through the live private Fleet binding;
+  vectors, model identity and project attribution were verified. Anonymous
+  public inference remains 401. These models require explicit selection and
+  share a limited trial allowance; account credits are not a spending cap.
+  The initial release's unsupported fetch redirect mode was repaired and is
+  covered by a compiled Workers-runtime regression in CI. All 495 tests and
+  the full quality gate pass. Public bearer-authenticated inference was not
+  exercised because a local gateway key was unavailable. See the
+  [release receipt](docs/operations/2026-10-07-modal-embedding-release.json)
+  and [trial runbook](docs/operations/modal-embedding-trial.md).
 
 - **2026-10-02** — The private `FleetGateway` entrypoint is live at 100% traffic,
   verified by its exact source tag and named `fetch`/`run` handlers. Attributed
@@ -167,6 +181,10 @@ The shipped timeline lives in
 
 ## Features (shipped)
 
+- **Modal embedding trial:** explicitly select `google/embeddinggemma-2`
+  (128/256/512/768 dimensions) or `BAAI/bge-small-en-v1.5` (384 dimensions).
+  These text-only models never substitute other embedding spaces or enter
+  automatic provider fallback. Requests use the existing gateway key.
 - **Full feature list:** [`docs/product/features.md`](docs/product/features.md).
 - **Architecture:** [`docs/architecture/overview.md`](docs/architecture/overview.md).
 - **Quality gate:** exact Ultracite-backed Biome presets with explicit local

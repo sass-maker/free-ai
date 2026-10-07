@@ -69,9 +69,10 @@ Token limits are 2,048 per string for Gemma, 512 for BGE, and 8,192 across the
 batch, including task prefixes. Excess token input is rejected rather than
 silently truncated.
 
-Allow up to 150 seconds for a request. Measured first requests after scale-down
-took about 27–35 seconds; warm SDK calls took about half a second. These small
-CPU trials do not establish retrieval quality on your corpus.
+Allow up to 150 seconds for a request. Live gateway binding checks took about
+35 seconds for Gemma and 93 seconds for BGE, including cold startup and proxy
+transport. Warm backend SDK calls took about half a second. These small samples
+do not establish typical public API latency or retrieval quality on your corpus.
 
 The trial has a shared allowance across both models and all projects: an initial
 burst of five requests, then approximately one request every 24 minutes. A
