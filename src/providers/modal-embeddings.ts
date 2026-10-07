@@ -181,7 +181,7 @@ export const callModalEmbeddings: ProviderEmbeddingCaller = async (input) => {
   try {
     response = await fetch(model.url, {
       method: 'POST',
-      redirect: 'error',
+      redirect: 'manual',
       headers: {
         'content-type': 'application/json',
         'Modal-Key': input.env.MODAL_PROXY_KEY!,

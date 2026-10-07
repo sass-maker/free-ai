@@ -21,14 +21,45 @@ const consumer = `export default {async fetch(req,env){
   const invalid=await env.FREE_AI.fetch(new Request('https://fleet.internal/v1/chat/completions',{method:'POST',headers:{'x-gateway-project-id':'live'},body:JSON.stringify({max_tokens:8193})}));
   const chat=await env.FREE_AI.fetch(new Request('https://fleet.internal/v1/chat/completions',{method:'POST',headers:{'x-gateway-project-id':'live','content-type':'application/json','x-gateway-force-provider':'workers_ai','x-gateway-force-model':'@cf/meta/llama-3.3-70b-instruct-fp8-fast'},body:JSON.stringify({model:'auto',messages:[{role:'user',content:'synthetic'}],max_tokens:8})}));
   const completion=await chat.json();
-  return Response.json({dimension:result.data[0].length,pooling:result.pooling,model:result.model,denied,calls:await env.AI_STUB.count(),validationStatus:invalid.status,chatStatus:chat.status,chatText:completion.choices?.[0]?.message?.content});
+  const modal=await env.FREE_AI.fetch(new Request('https://fleet.internal/v1/embeddings',{method:'POST',headers:{'x-gateway-project-id':'knowledge-base','content-type':'application/json'},body:JSON.stringify({model:'google/embeddinggemma-2',input:'synthetic',dimensions:128,task:'retrieval_query'})}));
+  const embedded=await modal.json();
+  return Response.json({dimension:result.data[0].length,pooling:result.pooling,model:result.model,denied,calls:await env.AI_STUB.count(),validationStatus:invalid.status,chatStatus:chat.status,chatText:completion.choices?.[0]?.message?.content,modalStatus:modal.status,modalProvider:embedded.x_gateway?.provider,modalModel:embedded.model,modalDimension:embedded.data?.[0]?.embedding?.length});
 }}`;
 test('private Fleet bindings in the compiled Workers runtime', async () => {
   const mf = new Miniflare({
-    outboundService: () => new Response('Runtime smoke forbids external network', { status: 502 }),
     workers: [
       {
         name: 'gateway',
+        outboundService: async (request) => {
+          if (
+            request.url ===
+            'https://sarthakagrawal927--embedding-model-trial-embeddinggemma2-web.modal.run/v1/embeddings'
+          ) {
+            assert.equal(request.headers.get('Modal-Key'), 'runtime-synthetic-modal-key');
+            assert.equal(request.headers.get('Modal-Secret'), 'runtime-synthetic-modal-secret');
+            const body = await request.json();
+            assert.deepEqual(body, {
+              model: 'google/embeddinggemma-2',
+              input: ['synthetic'],
+              dimensions: 128,
+              encoding_format: 'float',
+              task: 'retrieval_query',
+            });
+            return Response.json({
+              object: 'list',
+              model: 'google/embeddinggemma-2',
+              data: [
+                {
+                  object: 'embedding',
+                  index: 0,
+                  embedding: Array.from({ length: 128 }, (_, index) => (index === 0 ? 1 : 0)),
+                },
+              ],
+              usage: { prompt_tokens: 10, total_tokens: 10 },
+            });
+          }
+          return new Response('Runtime smoke forbids external network', { status: 502 });
+        },
         modules: [
           {
             type: 'ESModule',
@@ -38,7 +69,12 @@ test('private Fleet bindings in the compiled Workers runtime', async () => {
         ],
         compatibilityDate: '2026-02-14',
         compatibilityFlags: ['enable_request_signal'],
-        bindings: { GATEWAY_API_KEY: 'runtime-synthetic-key', WORKERS_AI_ENABLED: 'true' },
+        bindings: {
+          GATEWAY_API_KEY: 'runtime-synthetic-key',
+          WORKERS_AI_ENABLED: 'true',
+          MODAL_PROXY_KEY: 'runtime-synthetic-modal-key',
+          MODAL_PROXY_SECRET: 'runtime-synthetic-modal-secret',
+        },
         durableObjects: {
           NEURON_BUDGET: 'NeuronBudgetDO',
           RATE_LIMIT_DO: 'IpRateLimitDO',
@@ -73,6 +109,10 @@ test('private Fleet bindings in the compiled Workers runtime', async () => {
       validationStatus: 400,
       chatStatus: 200,
       chatText: 'synthetic chat',
+      modalStatus: 200,
+      modalProvider: 'modal',
+      modalModel: 'google/embeddinggemma-2',
+      modalDimension: 128,
     });
     const gateway = await mf.getWorker('gateway');
     const publicResponse = await gateway.fetch('https://gateway.test/v1/chat/completions', {
@@ -86,7 +126,7 @@ test('private Fleet bindings in the compiled Workers runtime', async () => {
     });
     assert.equal(publicResponse.status, 401);
     console.log(
-      'Fleet binding runtime passed: native CLS/768 and routed chat, unpriced zero-call denial, public 401.'
+      'Fleet binding runtime passed: native CLS/768, routed chat, protected Modal embeddings, unpriced zero-call denial, public 401.'
     );
   } finally {
     await mf.dispose();

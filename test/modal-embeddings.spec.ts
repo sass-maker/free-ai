@@ -95,6 +95,7 @@ describe('Modal embeddings through Free AI', () => {
         'Modal-Key': 'synthetic-modal-key',
         'Modal-Secret': 'synthetic-modal-secret',
       });
+      expect(init.redirect).toBe('manual');
       expect(JSON.parse(init.body)).toMatchObject({
         model: model.model,
         task: 'retrieval_document',
@@ -158,7 +159,7 @@ describe('Modal embeddings through Free AI', () => {
     expect(admission).not.toHaveBeenCalled();
   });
 
-  it.each([401, 429, 500, 413])(
+  it.each([401, 429, 500, 413, 302])(
     'sanitizes upstream %i and never switches models or retries',
     async (status) => {
       const { env, admission } = configuredEnv();
