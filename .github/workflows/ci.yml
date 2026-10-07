@@ -40,3 +40,9 @@ jobs:
 
       - name: Build Astro docs site (patched dependency consumer)
         run: pnpm --filter @sass-maker/ai-gateway-docs build
+
+      - name: Compile Worker for binding smoke
+        run: pnpm exec wrangler deploy --dry-run --outdir .fleet-runtime
+
+      - name: Verify bindings in the compiled Workers runtime
+        run: node --test scripts/smoke-fleet-bindings.mjs
