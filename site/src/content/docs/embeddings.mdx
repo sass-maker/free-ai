@@ -1,6 +1,6 @@
 ---
 title: "Embeddings"
-description: "Generate vector embeddings using /v1/embeddings, backed by Workers AI, Gemini, and Voyage AI."
+description: "Generate vector embeddings using /v1/embeddings, including the Modal EmbeddingGemma 2 experiment."
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
@@ -19,6 +19,8 @@ POST /v1/embeddings
 | `input` | string \| string[] | **yes** | Text to embed. Pass a single string or an array of strings for batch embedding. |
 | `encoding_format` | string | no | Output format. Currently `"float"` is supported. |
 | `dimensions` | number | no | Number of dimensions for the output vector. Supported by select models. |
+| `task` | string | no | Modal models only. Defaults to `retrieval_document`. Use `retrieval_query` for searches. |
+| `project_id` | string | **yes** | Project attribution, or supply the `x-gateway-project-id` header. |
 
 :::caution[Model is required]
 Unlike the chat endpoint, `model` has no `"auto"` default for embeddings. You must explicitly choose a model that matches your use case — different models are not interchangeable as their vector spaces are incompatible.
@@ -31,8 +33,54 @@ Unlike the chat endpoint, `model` has no `"auto"` default for embeddings. You mu
 | **Cloudflare Workers AI** | `@cf/baai/bge-small-en-v1.5`, `@cf/baai/bge-base-en-v1.5`, `@cf/baai/bge-large-en-v1.5` | General-purpose English embeddings |
 | **Google Gemini** | `gemini-embedding-001` (`text-embedding-004`, `text-embedding-3-small`, and `text-embedding-3-large` aliases) | Multilingual, supports requested dimensions |
 | **Voyage AI** | `voyage-3.5-lite`, `voyage-3-lite` | Domain-specialised embeddings |
+| **Modal experiment** | `google/embeddinggemma-2` | Text/code embeddings; 128, 256, 512 or 768 dimensions (default 768) |
+| **Modal experiment** | `BAAI/bge-small-en-v1.5` | Smaller English baseline; 384 dimensions |
 
 Use [`GET /v1/models`](/models) to get the full current list with provider metadata, dimensions, aliases, and `enabled` availability based on configured provider credentials/bindings.
+
+### Modal experiment
+
+Use your existing Free AI gateway key. Modal models are explicit experiments:
+each request returns the selected model or an error, without switching embedding
+spaces. Other provider requests never fall back into Modal. `enabled` in the
+catalog indicates configured credentials; it does not prove live model health.
+
+```bash
+curl https://ai-gateway.sassmaker.com/v1/embeddings \
+  -H "Authorization: Bearer <GATEWAY_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "google/embeddinggemma-2",
+    "project_id": "embedding-trial",
+    "input": "How do I find relevant documents?",
+    "task": "retrieval_query",
+    "dimensions": 256
+  }'
+```
+
+Embed stored documents with `task: "retrieval_document"`; use
+`task: "retrieval_query"` when searching them. Keep the model and dimensions
+identical for documents and queries. Gemma also supports `code_retrieval`,
+`sentence_similarity`, `classification` and `clustering`. BGE supports
+retrieval and `sentence_similarity`.
+
+Each batch accepts 1–8 nonblank strings of at most 16,000 characters each.
+Token limits are 2,048 per string for Gemma, 512 for BGE, and 8,192 across the
+batch, including task prefixes. Excess token input is rejected rather than
+silently truncated.
+
+Allow up to 150 seconds for a request. Live gateway binding checks took about
+35 seconds for Gemma and 93 seconds for BGE, including cold startup and proxy
+transport. Warm backend SDK calls took about half a second. These small samples
+do not establish typical public API latency or retrieval quality on your corpus.
+
+The trial has a shared allowance across both models and all projects: an initial
+burst of five requests, then approximately one request every 24 minutes. A
+blocked allowance returns HTTP 429; an unavailable allowance service returns
+HTTP 503. Failed upstream calls still consume allowance. The persistent bucket
+can reset when its 24-hour alarm fires. This controls demand rather than setting
+a dollar budget. Modal bills compute against the account's shared $30 monthly
+credit; other account usage can consume that credit.
 
 ## Response
 

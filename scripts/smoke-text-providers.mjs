@@ -3,6 +3,12 @@
 const DEFAULT_BASE_URL = process.env.FREE_AI_BASE_URL || 'https://ai-gateway.sassmaker.com';
 const REQUEST_TIMEOUT_MS = 45_000;
 const MAX_OUTPUT_TOKENS = 8;
+const KNOWN_FAILURE_CLASSES = new Set([
+  'safety_refusal',
+  'usage_retriable',
+  'input_nonretriable',
+  'provider_fatal',
+]);
 
 function oneEnabledModelPerProvider(payload, includeWorkersAi) {
   const selected = new Map();
@@ -65,22 +71,32 @@ async function smokeSingleProvider(fetchImpl, baseUrl, gatewayKey, model) {
         include_completion: false,
       }),
     });
+    const error = replay.body?.error;
+    const upstreamStatus = error?.upstream_status;
     return {
       provider: model.provider,
       model: model.id,
       ok: replay.response.ok && replay.body?.ok === true,
       status: replay.response.status,
       latency_ms: Date.now() - startedAt,
-      error: replay.body?.error?.type ?? null,
+      error:
+        typeof error?.type === 'string' && KNOWN_FAILURE_CLASSES.has(error.type)
+          ? error.type
+          : null,
+      upstream_status:
+        Number.isInteger(upstreamStatus) && upstreamStatus >= 100 && upstreamStatus <= 599
+          ? upstreamStatus
+          : null,
     };
-  } catch (error) {
+  } catch {
     return {
       provider: model.provider,
       model: model.id,
       ok: false,
       status: null,
       latency_ms: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : String(error),
+      error: 'request_failed',
+      upstream_status: null,
     };
   }
 }
@@ -119,11 +135,11 @@ export async function runTextProviderSmoke(options = {}) {
       providers_checked: results.length,
       results,
     };
-  } catch (error) {
+  } catch {
     return {
       ok: false,
       status: 'failed',
-      reason: error instanceof Error ? error.message : String(error),
+      reason: 'request_failed',
       base_url: baseUrl,
       max_output_tokens: MAX_OUTPUT_TOKENS,
       results: [],

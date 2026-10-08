@@ -22,6 +22,9 @@ and schedules.
 
 ## Documentation maintenance rules
 
+The [Modal embedding experiment](operations/modal-embedding-trial.md) records
+the upstream access boundary, cost assumptions and release qualification.
+
 1. **One canonical home per fact.** If a fact appears in two places, pick one and link
    from the other. Do not duplicate.
 2. **Each documentation surface has one source of truth.** This maintainer tree

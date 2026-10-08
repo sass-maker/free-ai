@@ -4,8 +4,17 @@ import pRetry, { AbortError } from 'p-retry';
 import { isWorkersAiEnabled } from '../config';
 import { providerEmbeddingCallers } from '../providers';
 import {
+  MODAL_EMBEDDING_MODELS,
+  MODAL_EMBEDDING_TASKS,
+  isModalEmbeddingModel,
+  modalEmbeddingsEnabled,
+  validateModalEmbeddingInput,
+} from '../providers/modal-embeddings';
+import type { ModalEmbeddingTask } from '../providers/modal-embeddings';
+import {
   canFallbackFromProviderFailure,
   classifyError,
+  getUpstreamStatus,
   isRetriableFailure,
 } from '../router/classify-error';
 import type { EmbeddingProvider, Env, GatewayMeta, Provider } from '../types';
@@ -16,12 +25,21 @@ export interface EmbeddingCandidate {
   provider: EmbeddingProvider;
   model: string;
   dimensions: number;
+  contextWindow?: number;
   supportsDimensions?: boolean;
   aliases?: string[];
   priority: number;
 }
 
 export const EMBEDDING_CANDIDATES: EmbeddingCandidate[] = [
+  ...MODAL_EMBEDDING_MODELS.map((candidate) => ({
+    provider: 'modal' as const,
+    model: candidate.model,
+    dimensions: candidate.dimensions.at(-1)!,
+    contextWindow: candidate.maxTokens,
+    supportsDimensions: candidate.dimensions.length > 1,
+    priority: 0,
+  })),
   {
     provider: 'gemini',
     model: 'gemini-embedding-001',
@@ -85,6 +103,7 @@ const embeddingsRequestSchema = z
     input: z.union([z.string(), z.array(z.string().min(1)).min(1)]),
     encoding_format: z.enum(['float']).optional(),
     dimensions: z.number().int().min(1).max(4096).optional(),
+    task: z.enum(MODAL_EMBEDDING_TASKS).optional(),
     project_id: projectIdSchema.optional(),
   })
   .openapi('EmbeddingsRequest');
@@ -179,6 +198,7 @@ function workersAiEmbeddingAvailable(env: Env): boolean {
 }
 
 export function embeddingCandidateEnabled(env: Env, candidate: EmbeddingCandidate): boolean {
+  if (candidate.provider === 'modal') return modalEmbeddingsEnabled(env);
   if (candidate.provider === 'gemini') {
     return Boolean(env.GEMINI_API_KEY);
   }
@@ -202,7 +222,7 @@ function getForcedEmbeddingProvider(context: {
     return undefined;
   }
 
-  if (['workers_ai', 'gemini', 'voyage_ai'].includes(value)) {
+  if (['workers_ai', 'gemini', 'voyage_ai', 'modal'].includes(value)) {
     return value as EmbeddingProvider;
   }
 
@@ -231,6 +251,10 @@ function resolveEmbeddingCandidates(
   const preferredModel = alias ?? requestedModel;
 
   const filtered = EMBEDDING_CANDIDATES.filter((candidate) => {
+    // Modal trials are explicit only, and their embedding spaces must stay pinned.
+    if (isModalEmbeddingModel(preferredModel)) {
+      if (candidate.provider !== 'modal' || candidate.model !== preferredModel) return false;
+    } else if (candidate.provider === 'modal') return false;
     if (params.forcedProvider && candidate.provider !== params.forcedProvider) {
       return false;
     }
@@ -328,7 +352,11 @@ function validateEmbeddingRequest(params: {
     };
   }
 
-  const normalizedInput = normalizeEmbeddingInput(params.input);
+  const normalizedInput = isModalEmbeddingModel(requestedModel)
+    ? typeof params.input === 'string'
+      ? [params.input]
+      : params.input
+    : normalizeEmbeddingInput(params.input);
   if (normalizedInput.length === 0) {
     return {
       ok: false,
@@ -363,6 +391,7 @@ interface EmbeddingAttemptResult {
   lastErrorMessage: string;
   lastAttemptedProvider: EmbeddingProvider | undefined;
   lastAttemptedModel: string | undefined;
+  modalErrorStatus: number | undefined;
 }
 
 async function runEmbeddingAttempts(params: {
@@ -371,6 +400,8 @@ async function runEmbeddingAttempts(params: {
   normalizedInput: string[];
   encodingFormat?: 'float';
   dimensions?: number;
+  task?: ModalEmbeddingTask;
+  signal?: AbortSignal;
   requestId: string;
   projectId: string;
 }): Promise<EmbeddingAttemptResult> {
@@ -381,6 +412,7 @@ async function runEmbeddingAttempts(params: {
   let lastErrorMessage = 'Unknown error';
   let lastAttemptedProvider: EmbeddingProvider | undefined;
   let lastAttemptedModel: string | undefined;
+  let modalErrorStatus: number | undefined;
   const maxEmbeddingAttempts = Math.max(1, params.candidates.length);
 
   await pRetry(
@@ -403,6 +435,8 @@ async function runEmbeddingAttempts(params: {
           input: params.normalizedInput,
           encoding_format: params.encodingFormat,
           dimensions: params.dimensions,
+          task: params.task,
+          signal: params.signal,
         });
 
         chosenMeta = buildGatewayMeta({
@@ -417,6 +451,7 @@ async function runEmbeddingAttempts(params: {
           x_gateway: chosenMeta,
         };
       } catch (error) {
+        if (candidate.provider === 'modal') modalErrorStatus = getUpstreamStatus(error);
         const failureClass = classifyError(error);
         lastErrorClass = failureClass;
         lastErrorMessage = getErrorMessage(error);
@@ -447,10 +482,12 @@ async function runEmbeddingAttempts(params: {
     lastErrorMessage,
     lastAttemptedProvider,
     lastAttemptedModel,
+    modalErrorStatus,
   };
 }
 
-function embeddingErrorStatus(errorClass: string): 400 | 429 | 502 {
+function embeddingErrorStatus(errorClass: string, modalStatus?: number): 400 | 429 | 502 | 503 {
+  if (modalStatus === 503 || modalStatus === 502) return modalStatus;
   if (errorClass === 'input_nonretriable') return 400;
   if (errorClass === 'usage_retriable') return 429;
   return 502;
@@ -463,6 +500,24 @@ function buildEmbeddingErrorBody(lastErrorMessage: string, lastErrorClass: strin
       type: lastErrorClass,
     },
   };
+}
+
+function embeddingOptionsError(input: {
+  model: string;
+  input: string[];
+  dimensions?: number;
+  task?: ModalEmbeddingTask;
+}): string | undefined {
+  if (isModalEmbeddingModel(input.model)) {
+    try {
+      validateModalEmbeddingInput(input);
+    } catch (error) {
+      return getErrorMessage(error);
+    }
+  } else if (input.task) {
+    return 'task is supported only by Modal embedding models';
+  }
+  return undefined;
 }
 
 export function registerEmbeddingGenerationRoute(
@@ -487,6 +542,15 @@ export function registerEmbeddingGenerationRoute(
     }
 
     const { projectId, requestedModel, normalizedInput } = validation;
+    const optionsError = embeddingOptionsError({
+      model: requestedModel,
+      input: normalizedInput,
+      dimensions: body.dimensions,
+      task: body.task,
+    });
+    if (optionsError) {
+      return context.json({ error: { message: optionsError, type: 'invalid_request_error' } }, 400);
+    }
 
     const candidates = resolveEmbeddingCandidates(context.env, {
       requestedModel,
@@ -503,6 +567,8 @@ export function registerEmbeddingGenerationRoute(
       normalizedInput,
       encodingFormat: body.encoding_format,
       dimensions: body.dimensions,
+      task: body.task,
+      signal: context.req.raw.signal,
       requestId,
       projectId,
     });
@@ -532,7 +598,7 @@ export function registerEmbeddingGenerationRoute(
 
     return context.json(
       buildEmbeddingErrorBody(result.lastErrorMessage, result.lastErrorClass),
-      embeddingErrorStatus(result.lastErrorClass)
+      embeddingErrorStatus(result.lastErrorClass, result.modalErrorStatus)
     );
   });
 }

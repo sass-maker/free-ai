@@ -204,23 +204,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── OpenRouter (needs OPENROUTER_API_KEY) ────────────────────────────
   {
-    id: 'openrouter-zai-glm-5-2-free',
-    provider: 'openrouter',
-    model: 'z-ai/glm-5.2:free',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.68,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      nativeReasoning: true,
-      contextWindow: 256_000,
-      maxOutputTokens: 65_536,
-    },
-  },
-  {
     id: 'openrouter-nvidia-nemotron-3-5-lightning-free',
     provider: 'openrouter',
     model: 'nvidia/nemotron-3.5-lightning:free',
@@ -276,7 +259,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'dots-studio/dots-3-note-preview:free',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true, // preview model — expires 2026-09-30
+    enabled: true, // OpenRouter catalog expiry: 2026-12-31 (checked 2026-10-05)
     priority: 0.5,
     capabilities: {
       toolCalling: true,
@@ -978,57 +961,9 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'openrouter-inclusionai-ling-3-0-flash-fin-free',
-    provider: 'openrouter',
-    model: 'inclusionai/ling-3.0-flash-fin:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-qwen-qwen3-8-27b-free',
-    provider: 'openrouter',
-    model: 'qwen/qwen3.8-27b:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
     id: 'cerebras-qwen-3-8-27b',
     provider: 'cerebras',
     model: 'qwen-3.8-27b',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'openrouter-stealth-space-bunny-alpha',
-    provider: 'openrouter',
-    model: 'stealth/space-bunny-alpha',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: false,
@@ -1095,7 +1030,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'gemini-3.8-flash',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: false,
+    enabled: true,
     priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
     capabilities: {
       toolCalling: false,
@@ -1191,7 +1126,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:nex-agi/nex-n2.5-pro:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:inclusionai/ling-3.0-flash-sante:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:inclusionai/ling-3.0-flash-fin:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:qwen/qwen3.8-27b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'cerebras:qwen-3.8-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
 

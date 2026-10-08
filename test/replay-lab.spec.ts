@@ -100,19 +100,97 @@ describe('POST /v1/debug/replay', () => {
     expect(mocks.groqMock).not.toHaveBeenCalled();
   });
 
-  it('returns classified provider failure details without retrying another provider', async () => {
+  it('returns classified provider failure details without retrying or exposing raw error data', async () => {
+    mocks.groqMock.mockRejectedValueOnce({
+      statusCode: 403,
+      message: 'token=secret-token https://provider.example/v1/chat raw-response-secret',
+      response: { data: { authorization: 'Bearer secret-token' } },
+    });
+
+    const { env } = makeTestEnv({ GROQ_API_KEY: 'groq-key' });
+    const res = await app.fetch(replayRequest({}), env, makeCtx());
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as {
+      ok: boolean;
+      error?: { message: string; type: string; upstream_status: number | null };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatchObject({
+      message: 'Provider replay failed',
+      type: 'provider_fatal',
+      upstream_status: 403,
+    });
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('secret-token');
+    expect(serialized).not.toContain('provider.example');
+    expect(serialized).not.toContain('raw-response-secret');
+    expect(serialized).not.toContain('authorization');
+    expect(mocks.groqMock).toHaveBeenCalledOnce();
+  });
+
+  it('preserves existing classification from error messages when upstream status is unavailable', async () => {
     mocks.groqMock.mockRejectedValueOnce(new Error('upstream 429 rate limit'));
 
     const { env } = makeTestEnv({ GROQ_API_KEY: 'groq-key' });
     const res = await app.fetch(replayRequest({}), env, makeCtx());
 
     expect(res.status).toBe(502);
-    const body = (await res.json()) as { ok: boolean; error?: { message: string; type: string } };
-    expect(body.ok).toBe(false);
-    expect(body.error).toMatchObject({
-      message: 'upstream 429 rate limit',
-      type: 'usage_retriable',
+    await expect(res.json()).resolves.toMatchObject({
+      error: {
+        message: 'Provider replay failed',
+        type: 'usage_retriable',
+        upstream_status: null,
+      },
     });
     expect(mocks.groqMock).toHaveBeenCalledOnce();
+  });
+
+  it('extracts an HTTP status from a nested provider response', async () => {
+    mocks.groqMock.mockRejectedValueOnce({ response: { status: 503 } });
+
+    const { env } = makeTestEnv({ GROQ_API_KEY: 'groq-key' });
+    const res = await app.fetch(replayRequest({}), env, makeCtx());
+
+    expect(res.status).toBe(502);
+    await expect(res.json()).resolves.toMatchObject({
+      error: { type: 'usage_retriable', upstream_status: 503 },
+    });
+  });
+
+  it('reports null when the provider error has no status fields', async () => {
+    mocks.groqMock.mockRejectedValueOnce({ message: 'private provider diagnostic' });
+
+    const { env } = makeTestEnv({ GROQ_API_KEY: 'groq-key' });
+    const res = await app.fetch(replayRequest({}), env, makeCtx());
+
+    expect(res.status).toBe(502);
+    await expect(res.json()).resolves.toMatchObject({
+      error: { upstream_status: null },
+    });
+  });
+
+  it('reports a null upstream status when the error has no numeric HTTP status', async () => {
+    mocks.groqMock.mockRejectedValueOnce({
+      statusCode: 700,
+      response: { status: '403' },
+      message: 'private provider diagnostic token=secret-token https://provider.example',
+    });
+
+    const { env } = makeTestEnv({ GROQ_API_KEY: 'groq-key' });
+    const res = await app.fetch(replayRequest({}), env, makeCtx());
+
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      ok: false,
+      error: {
+        message: 'Provider replay failed',
+        type: 'provider_fatal',
+        upstream_status: null,
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain('secret-token');
+    expect(JSON.stringify(body)).not.toContain('provider.example');
   });
 });

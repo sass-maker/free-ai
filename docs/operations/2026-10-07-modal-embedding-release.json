@@ -1,0 +1,72 @@
+{
+  "checked_at": "2026-10-07T05:28:26.583Z",
+  "results": [
+    {
+      "transport": "live_private_fleet_binding",
+      "model": "google/embeddinggemma-2",
+      "provider": "modal",
+      "status": 200,
+      "total_ms": 35306,
+      "vectors": [
+        {
+          "index": 0,
+          "dimensions": 256,
+          "norm": 1.000000047793037
+        },
+        {
+          "index": 1,
+          "dimensions": 256,
+          "norm": 1.000000005121644
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 30,
+        "total_tokens": 30
+      }
+    },
+    {
+      "transport": "live_private_fleet_binding",
+      "model": "BAAI/bge-small-en-v1.5",
+      "provider": "modal",
+      "status": 200,
+      "total_ms": 93155,
+      "vectors": [
+        {
+          "index": 0,
+          "dimensions": 384,
+          "norm": 0.9999999676547687
+        },
+        {
+          "index": 1,
+          "dimensions": 384,
+          "norm": 1.0000000358157528
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 32,
+        "total_tokens": 32
+      }
+    }
+  ],
+  "qualified_source_sha": "75c8979b562135ce05a40072ce077243baaf1ae2",
+  "ci_run": "https://github.com/sass-maker/free-ai/actions/runs/37575992567",
+  "deployment_run": "https://github.com/sass-maker/free-ai/actions/runs/37576123813",
+  "worker_version": "0015e128-87b2-4c85-bcc5-008e833abd22",
+  "deployment_id": "20f4c655-cd0a-4f35-a544-2cb9bfbf26eb",
+  "traffic_percentage": 100,
+  "public_checks": {
+    "catalog_status": 200,
+    "api_documentation_status_after_redirect": 200,
+    "anonymous_embeddings_status": 401
+  },
+  "public_bearer_inference": "not exercised: existing gateway key unavailable locally; live private binding uses existing gateway authentication internally",
+  "runtime_regression": "compiled Workers smoke covers protected Modal request; redirect manual rejects non-success without following redirects",
+  "verification_proxy_diagnostics": "remote proxy emitted internal-error diagnostics; both model requests returned 200 and passed assertions",
+  "local_validation": {
+    "vitest_tests": 495,
+    "dependency_security_tests": 27,
+    "quality_gate": "passed",
+    "compiled_workers_binding_smoke": "passed"
+  },
+  "modal_backend_source_digest": "67fef780ef6fc734c28960ed169c6c2a629303b7194065d4867f9ad31b975777"
+}

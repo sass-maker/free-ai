@@ -1,6 +1,6 @@
 import type { FailureClass } from '../types';
 
-function getStatus(error: unknown): number | undefined {
+export function getUpstreamStatus(error: unknown): number | undefined {
   if (!error || typeof error !== 'object') {
     return undefined;
   }
@@ -41,7 +41,7 @@ const INPUT_ERROR_STATUSES = new Set([400, 422]);
 const AUTH_ERROR_STATUSES = new Set([401, 403]);
 
 export function classifyError(error: unknown): FailureClass {
-  const status = getStatus(error);
+  const status = getUpstreamStatus(error);
   const message = getMessage(error).toLowerCase();
 
   if (SAFETY_KEYWORDS.some((keyword) => message.includes(keyword))) {
@@ -51,6 +51,10 @@ export function classifyError(error: unknown): FailureClass {
   if (RETRIABLE_STATUSES.has(status ?? -1) || (status !== undefined && status >= 500)) {
     return 'usage_retriable';
   }
+
+  // Groq uses 400 for invalid generated JSON. It is provider output, not
+  // malformed caller input; allow normal fallback within the existing cap.
+  if (isMalformedProviderOutput(error)) return 'provider_fatal';
 
   if (INPUT_ERROR_STATUSES.has(status ?? -1)) {
     return 'input_nonretriable';
@@ -81,13 +85,18 @@ export class MalformedProviderOutputError extends Error {
 
 export function isMalformedProviderOutput(error: unknown): boolean {
   // A SyntaxError here is the SDK failing to JSON.parse the upstream body.
-  return error instanceof MalformedProviderOutputError || error instanceof SyntaxError;
+  return (
+    error instanceof MalformedProviderOutputError ||
+    error instanceof SyntaxError ||
+    (getUpstreamStatus(error) === 400 &&
+      (error as { code?: unknown })?.code === 'json_validate_failed')
+  );
 }
 
 /** These statuses concern the gateway's upstream account, not the caller's credentials. */
 export function isProviderAccountFailure(error: unknown): boolean {
-  const status = getStatus(error);
-  return status === 401 || status === 402;
+  const status = getUpstreamStatus(error);
+  return status === 401 || status === 402 || status === 403;
 }
 
 /** Unavailable upstream accounts/models and malformed output may fall back; content refusals may not. */
@@ -98,7 +107,8 @@ export function canFallbackFromProviderFailure(
   return (
     failureClass === 'provider_fatal' &&
     (isProviderAccountFailure(error) ||
-      getStatus(error) === 404 ||
+      getUpstreamStatus(error) === 404 ||
+      getUpstreamStatus(error) === 410 ||
       isMalformedProviderOutput(error))
   );
 }

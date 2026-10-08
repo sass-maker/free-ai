@@ -34,6 +34,7 @@ export async function healthRecord(
     success: boolean;
     latencyMs: number;
     failureClass?: FailureClass;
+    keyRetryPending?: boolean;
     now: number;
   }
 ): Promise<void> {

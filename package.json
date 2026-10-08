@@ -50,7 +50,8 @@
     "quality:cycles": "knip --cycles --no-config-hints",
     "quality:dependencies": "node scripts/check-code-health.mjs dependencies",
     "quality:suppressions": "node scripts/check-code-health.mjs suppressions",
-    "quality": "pnpm run audit:cloudflare-costs && pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run quality:unused && pnpm run quality:complexity && pnpm run quality:duplication && pnpm run quality:cycles && pnpm run quality:dependencies && pnpm run quality:suppressions"
+    "quality": "pnpm run audit:cloudflare-costs && pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run quality:unused && pnpm run quality:complexity && pnpm run quality:duplication && pnpm run quality:cycles && pnpm run test:dependency-security && pnpm run quality:dependencies && pnpm run quality:suppressions",
+    "test:dependency-security": "node --test scripts/http-cache-security.test.mjs"
   },
   "dependencies": {
     "@hono/zod-openapi": "1.5.1",
@@ -89,12 +90,18 @@
       "nanoid@>=3.0.0 <4.0.0": "3.3.18",
       "path-to-regexp@>=6.0.0 <7.0.0": "6.3.0",
       "postcss@>=8.0.0 <9.0.0": "8.5.23",
-      "sharp@>=0.34.0 <0.36.0": "0.35.4",
+      "sharp@>=0.34.0 <0.36.0": "0.35.5",
+      "proxy-addr@>=2.0.0 <2.0.8": "2.0.8",
+      "source-map-js@>=1.0.0 <1.2.2": "1.2.2",
       "svgo@>=4.0.0 <5.0.0": "4.1.0",
       "undici@>=7.0.0 <8.0.0": "7.29.1",
       "brace-expansion@>=5.0.0 <6.0.0": "5.0.11",
       "devalue@>=5.0.0 <6.0.0": "5.9.3",
-      "ws@>=8.0.0 <9.0.0": "8.21.0"
+      "ws@>=8.0.0 <9.0.0": "8.21.0",
+      "http-cache-semantics": "4.3.0"
+    },
+    "patchedDependencies": {
+      "http-cache-semantics@4.3.0": "patches/http-cache-semantics@4.3.0.patch"
     }
   },
   "packageManager": "pnpm@10.33.2"

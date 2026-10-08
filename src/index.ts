@@ -33,11 +33,17 @@ import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './provid
 import {
   canFallbackFromProviderFailure,
   classifyError,
+  getUpstreamStatus,
   isProviderAccountFailure,
   isRetriableFailure,
   MalformedProviderOutputError,
 } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
+import {
+  GeminiKeyPool,
+  logUpstreamAccepted,
+  logUpstreamFailure,
+} from './router/gemini-key-recovery';
 import { registerGatewayAuthMiddleware } from './middleware/gateway-auth';
 import {
   EMBEDDING_CANDIDATES,
@@ -180,9 +186,28 @@ const toolChoiceSchema = z.union([
   z.object({ type: z.literal('function'), function: z.object({ name: z.string() }) }),
 ]);
 
-const responseFormatSchema = z.object({
-  type: z.enum(['text', 'json_object']),
-});
+const responseFormatSchema = z.union([
+  z.object({ type: z.enum(['text', 'json_object']) }),
+  z.object({
+    type: z.literal('json_schema'),
+    json_schema: z.object({
+      name: z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[a-zA-Z0-9_-]+$/),
+      strict: z.literal(true),
+      schema: z
+        .object({
+          type: z.literal('object'),
+          properties: z.record(z.string(), z.unknown()),
+          required: z.array(z.string()),
+          additionalProperties: z.literal(false),
+        })
+        .passthrough(),
+    }),
+  }),
+]);
 
 const chatRequestSchema = z
   .object({
@@ -199,6 +224,10 @@ const chatRequestSchema = z
     tool_choice: toolChoiceSchema.optional(),
     response_format: responseFormatSchema.optional(),
   })
+  .refine(
+    (body) => body.response_format?.type !== 'json_schema' || (!body.stream && !body.tools?.length),
+    { message: 'Schema output requires non-streaming chat without tools.' }
+  )
   .openapi('ChatCompletionRequest');
 
 const responsesRequestSchema = z
@@ -614,6 +643,7 @@ const replayResponseSchema = z
       .object({
         message: z.string(),
         type: z.string(),
+        upstream_status: z.number().int().min(100).max(599).nullable(),
       })
       .optional(),
   })
@@ -1186,6 +1216,7 @@ interface ChatRetryState {
   streamResponse: Response | null;
   lastErrorClass: string;
   lastErrorMessage: string;
+  lastUpstreamStatus?: number;
   lastAttemptedProvider: TextProvider | undefined;
   lastAttemptedModel: string | undefined;
   routingFallbackHops: FallbackHop[];
@@ -1224,12 +1255,14 @@ function handleChatProviderSuccess(
     latency_ms: latencyMs,
   });
 
-  healthRecord(c.env, {
-    key,
-    success: true,
-    latencyMs,
-    now: Date.now(),
-  });
+  c.executionCtx.waitUntil(
+    healthRecord(c.env, {
+      key,
+      success: true,
+      latencyMs,
+      now: Date.now(),
+    })
+  );
 
   state.chosenMeta = buildGatewayMeta({
     provider: candidate.provider,
@@ -1276,12 +1309,14 @@ function handleChatProviderError(
   ctx: ChatRetryContext,
   candidate: ModelCandidate,
   error: unknown,
-  startedAt: number
+  startedAt: number,
+  keyRetryPending = false
 ): void {
   const { c, state } = ctx;
   const failureClass = classifyError(error);
   state.lastErrorClass = failureClass;
   state.lastErrorMessage = getErrorMessage(error);
+  state.lastUpstreamStatus = getUpstreamStatus(error);
 
   state.routingFallbackHops.push({
     provider: candidate.provider,
@@ -1290,16 +1325,21 @@ function handleChatProviderError(
     latency_ms: Date.now() - startedAt,
   });
 
-  healthRecord(c.env, {
-    key: getModelKey(candidate.provider, candidate.model),
-    success: false,
-    latencyMs: Date.now() - startedAt,
-    failureClass,
-    now: Date.now(),
-  });
+  c.executionCtx.waitUntil(
+    healthRecord(c.env, {
+      key: getModelKey(candidate.provider, candidate.model),
+      success: false,
+      latencyMs: Date.now() - startedAt,
+      failureClass,
+      keyRetryPending,
+      now: Date.now(),
+    })
+  );
 
   if (
-    (!isRetriableFailure(failureClass) && !canFallbackFromProviderFailure(error, failureClass)) ||
+    (!keyRetryPending &&
+      !isRetriableFailure(failureClass) &&
+      !canFallbackFromProviderFailure(error, failureClass)) ||
     state.attemptCounter >= 2
   ) {
     throw new AbortError(state.lastErrorMessage);
@@ -1319,11 +1359,17 @@ function createChatRetryCallback(
   const ctx: ChatRetryContext = { c, normalized, requestId, projectId, state };
   let nextCandidate = 0;
   const unavailableProviders = new Set<TextProvider>();
+  const geminiKeys = new GeminiKeyPool(
+    c.env.GEMINI_API_KEY,
+    Boolean(c.req.header('x-gateway-force-model'))
+  );
+  let keyRetryCandidate: ModelCandidate | undefined;
   return async () => {
     while (selected[nextCandidate] && unavailableProviders.has(selected[nextCandidate].provider)) {
       nextCandidate += 1;
     }
-    const candidate = selected[nextCandidate++];
+    const candidate = keyRetryCandidate ?? selected[nextCandidate++];
+    keyRetryCandidate = undefined;
     if (!candidate || state.attemptCounter >= 2) {
       throw new AbortError('No more candidates');
     }
@@ -1332,6 +1378,13 @@ function createChatRetryCallback(
     state.lastAttemptedProvider = candidate.provider;
     state.lastAttemptedModel = candidate.model;
     const startedAt = Date.now();
+    const keyChoice = geminiKeys.select(candidate.provider);
+    const attemptMeta = {
+      provider: candidate.provider,
+      model: candidate.model,
+      attempt: state.attemptCounter,
+      ...keyChoice.metadata,
+    };
 
     try {
       const caller = providerCallers[candidate.provider];
@@ -1346,6 +1399,8 @@ function createChatRetryCallback(
         messages: normalized.messages,
         temperature: normalized.temperature,
         max_tokens: normalized.max_tokens,
+        reasoning_effort: normalized.reasoning_effort,
+        apiKey: keyChoice.apiKey,
         stream: normalized.stream,
         tools: normalized.tools,
         tool_choice: normalized.tool_choice,
@@ -1355,12 +1410,16 @@ function createChatRetryCallback(
 
       c.req.raw.signal.throwIfAborted();
       handleChatProviderSuccess(ctx, candidate, providerResult, startedAt);
+      if (keyChoice.apiKey) logUpstreamAccepted(attemptMeta, normalized.stream);
     } catch (error) {
       if (c.req.raw.signal.aborted) {
         throw new AbortError('Request aborted');
       }
-      if (isProviderAccountFailure(error)) unavailableProviders.add(candidate.provider);
-      handleChatProviderError(ctx, candidate, error, startedAt);
+      const keyRetryPending = geminiKeys.canRetry(keyChoice, state.attemptCounter, error);
+      if (keyRetryPending) keyRetryCandidate = candidate;
+      else if (isProviderAccountFailure(error)) unavailableProviders.add(candidate.provider);
+      logUpstreamFailure(attemptMeta, error, keyRetryPending);
+      handleChatProviderError(ctx, candidate, error, startedAt, keyRetryPending);
     }
   };
 }
@@ -1492,6 +1551,8 @@ function handleChatResult(
       error: {
         message: `All providers failed: ${state.lastErrorMessage}`,
         type: state.lastErrorClass,
+        upstream_status: state.lastUpstreamStatus,
+        attempts: state.attemptCounter,
       },
     },
     status
@@ -1831,6 +1892,22 @@ function buildNormalizedChatRequest(
   };
 }
 
+function getReplayUpstreamStatus(error: unknown): number | null {
+  const status = getUpstreamStatus(error);
+  if (Number.isInteger(status) && status !== undefined && status >= 100 && status <= 599) {
+    return status;
+  }
+
+  if (!error || typeof error !== 'object') return null;
+  const statusCode = (error as { statusCode?: unknown }).statusCode;
+  return typeof statusCode === 'number' &&
+    Number.isInteger(statusCode) &&
+    statusCode >= 100 &&
+    statusCode <= 599
+    ? statusCode
+    : null;
+}
+
 async function executeReplayCall(
   c: Context,
   candidate: ModelCandidate,
@@ -1856,6 +1933,7 @@ async function executeReplayCall(
       messages: normalized.messages,
       temperature: normalized.temperature,
       max_tokens: normalized.max_tokens,
+      reasoning_effort: normalized.reasoning_effort,
       stream: false,
       tools: normalized.tools,
       tool_choice: normalized.tool_choice,
@@ -1882,7 +1960,11 @@ async function executeReplayCall(
         model: candidate.model,
         latency_ms: Date.now() - startedAt,
         selected: selectedPayload,
-        error: { message: getErrorMessage(error), type: classifyError(error) },
+        error: {
+          message: 'Provider replay failed',
+          type: classifyError(error),
+          upstream_status: getReplayUpstreamStatus(error),
+        },
       },
       502
     ) as never;
@@ -2623,17 +2705,17 @@ async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
     tool_calling: false,
     json_mode: false,
     vision: false,
-    context_window: 0,
+    context_window: candidate.contextWindow ?? 0,
     max_output_tokens: 0,
     supports_streaming: false,
     cooldown_until: 0,
-    success_rate: 1,
+    success_rate: candidate.provider === 'modal' ? 0.5 : 1,
     headroom: embeddingCandidateEnabled(env, candidate) ? 1 : 0,
     evaluation_weight: 1,
     evaluation_sample_count: 0,
     evaluated_at: null,
     enabled: embeddingCandidateEnabled(env, candidate),
-    automatic_routing: embeddingCandidateEnabled(env, candidate),
+    automatic_routing: candidate.provider !== 'modal' && embeddingCandidateEnabled(env, candidate),
     dimensions: candidate.dimensions,
     supports_dimensions: candidate.supportsDimensions ?? false,
     aliases: candidate.aliases ?? [],

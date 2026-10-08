@@ -14,7 +14,7 @@ export type TextProvider =
   | 'modelscope'
   | 'siliconflow';
 
-export type EmbeddingProvider = 'workers_ai' | 'gemini' | 'voyage_ai';
+export type EmbeddingProvider = 'workers_ai' | 'gemini' | 'voyage_ai' | 'modal';
 
 export type ImageProvider = 'together' | 'workers_ai' | 'pollinations' | 'gemini' | 'nvidia';
 
@@ -153,6 +153,9 @@ export interface AttemptRecord {
   latencyMs: number;
   success: boolean;
   failureClass?: FailureClass;
+  // Keep the failed attempt visible, but wait for the alternate key before
+  // penalizing availability of the entire pinned model.
+  keyRetryPending?: boolean;
 }
 
 export interface GatewayMeta {
@@ -175,9 +178,12 @@ export interface Tool {
   function: ToolFunction;
 }
 
-export interface ResponseFormat {
-  type: 'text' | 'json_object';
-}
+export type ResponseFormat =
+  | { type: 'text' | 'json_object' }
+  | {
+      type: 'json_schema';
+      json_schema: { name: string; strict: true; schema: Record<string, unknown> };
+    };
 
 export interface NormalizedChatRequest {
   model: string;
@@ -213,6 +219,8 @@ export interface Env {
   GROQ_API_KEY?: string;
   GEMINI_API_KEY?: string;
   VOYAGE_API_KEY?: string;
+  MODAL_PROXY_KEY?: string;
+  MODAL_PROXY_SECRET?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_API_TOKEN?: string;
   CLOUDFLARE_WORKERS_AI_API_KEY?: string;

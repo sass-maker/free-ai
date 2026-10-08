@@ -2,10 +2,12 @@ import type {
   ChatMessage,
   EmbeddingProvider,
   Env,
+  ReasoningEffort,
   ResponseFormat,
   TextProvider,
   Tool,
 } from '../types';
+import type { ModalEmbeddingTask } from './modal-embeddings';
 
 export interface ProviderCallInput {
   env: Env;
@@ -14,6 +16,9 @@ export interface ProviderCallInput {
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
+  reasoning_effort?: ReasoningEffort;
+  // Internal, request-scoped key selection. Never include this in metadata.
+  apiKey?: string;
   stream: boolean;
   signal?: AbortSignal;
   tools?: Tool[];
@@ -70,6 +75,8 @@ export interface ProviderEmbeddingInput {
   input: string[];
   encoding_format?: 'float';
   dimensions?: number;
+  task?: ModalEmbeddingTask;
+  signal?: AbortSignal;
 }
 
 export interface ProviderEmbeddingResult {
