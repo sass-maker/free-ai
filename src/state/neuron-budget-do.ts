@@ -27,6 +27,11 @@ interface VectorizeState {
 
 const STORAGE_KEY = 'budget';
 const VECTORIZE_STORAGE_KEY = 'vectorize-budget';
+const VECTORIZE_GROWTH_KEY = 'vectorize-storage-budget';
+/** Gross stored dimensions: at $0.05/100M, at most $0.10 per full month. */
+const VECTORIZE_STORED_CAP = 200_000_000;
+/** Oct 8 account inventory: 28,764,928 dimensions, rounded up conservatively. */
+const VERIFIED_STORAGE_BASELINES: Readonly<Record<string, number>> = { '2026-10': 30_000_000 };
 /** Daily Neuron cap. 500 buffer below the 10k/day free-tier quota. */
 const DAILY_NEURON_CAP = 9500;
 /** Reserve today's prior unguarded usage before shared consumers are enabled. */
@@ -71,7 +76,11 @@ function secondsUntilUtcMonth(now: number): number {
   return Math.max(1, Math.ceil((next.getTime() - now) / 1000));
 }
 
-function readVectorizeState(value: unknown, monthKey: string): VectorizeState | null {
+function readVectorizeState(
+  value: unknown,
+  monthKey: string,
+  cap = MONTHLY_VECTORIZE_CAP
+): VectorizeState | null {
   if (!value || typeof value !== 'object') return null;
   const state = value as Partial<VectorizeState>;
   if (
@@ -79,7 +88,7 @@ function readVectorizeState(value: unknown, monthKey: string): VectorizeState | 
     state.baselineVerified !== true ||
     !Number.isSafeInteger(state.used) ||
     (state.used as number) < 0 ||
-    (state.used as number) > MONTHLY_VECTORIZE_CAP
+    (state.used as number) > cap
   )
     return null;
   return state as VectorizeState;
@@ -133,6 +142,106 @@ export class NeuronBudgetDO {
       used,
       dailyBaselineApplied: true,
     };
+  }
+
+  private async queryState(
+    txn: DurableObjectTransaction,
+    monthKey: string
+  ): Promise<VectorizeState | null> {
+    const stored = await txn.get<unknown>(VECTORIZE_STORAGE_KEY);
+    let state = readVectorizeState(stored, monthKey);
+    const baseline = VERIFIED_VECTORIZE_BASELINES[monthKey];
+    if (
+      !state &&
+      (stored === undefined || isPreviousVectorizePeriod(stored, monthKey)) &&
+      Number.isSafeInteger(baseline)
+    ) {
+      state = { monthKey, used: baseline, baselineVerified: true };
+    } else if (state && Number.isSafeInteger(baseline) && baseline > state.used) {
+      state = { ...state, used: baseline };
+    }
+    if (state) await txn.put(VECTORIZE_STORAGE_KEY, state);
+    return state;
+  }
+
+  private async storageState(
+    txn: DurableObjectTransaction,
+    monthKey: string
+  ): Promise<VectorizeState | null> {
+    const baseline = VERIFIED_STORAGE_BASELINES[monthKey];
+    if (!Number.isSafeInteger(baseline)) return null;
+    const stored = await txn.get<unknown>(VECTORIZE_GROWTH_KEY);
+    const state =
+      stored === undefined
+        ? { monthKey, used: baseline, baselineVerified: true as const }
+        : readVectorizeState(stored, monthKey, VECTORIZE_STORED_CAP);
+    return state ? { ...state, used: Math.max(state.used, baseline) } : null;
+  }
+
+  private async reserveVectorize(
+    request: Request,
+    now: number,
+    storageGrowth: boolean
+  ): Promise<Response> {
+    if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+    let body: { dimensions?: unknown } | null = null;
+    try {
+      body = (await request.json()) as { dimensions?: unknown };
+    } catch {
+      return json({ error: 'Invalid Vectorize reservation' }, 400);
+    }
+    const dimensions = body?.dimensions;
+    if (
+      typeof dimensions !== 'number' ||
+      !Number.isSafeInteger(dimensions) ||
+      dimensions < 1 ||
+      dimensions > MONTHLY_VECTORIZE_CAP
+    ) {
+      return json({ error: 'Invalid Vectorize reservation' }, 400);
+    }
+    const monthKey = utcMonthKey(now);
+    return this.ctx.storage.transaction(async (txn) => {
+      const state = await this.queryState(txn, monthKey);
+      if (!state) return json({ error: 'Verified monthly Vectorize baseline unavailable' }, 503);
+      // Stored vectors also add corpus dimensions to queried usage. Both
+      // ledgers commit together; retries and upserts never reclaim credit.
+      const storage = storageGrowth ? await this.storageState(txn, monthKey) : null;
+      if (storageGrowth && !storage)
+        return json({ error: 'Verified storage baseline unavailable' }, 503);
+      if (
+        state.used + dimensions > MONTHLY_VECTORIZE_CAP ||
+        (storage && storage.used + dimensions > VECTORIZE_STORED_CAP)
+      ) {
+        return json({
+          allowed: false,
+          used: state.used,
+          remaining: MONTHLY_VECTORIZE_CAP - state.used,
+          retryAfter: secondsUntilUtcMonth(now),
+          monthKey,
+          baselineVerified: true,
+        });
+      }
+      const updated = { ...state, used: state.used + dimensions };
+      await txn.put(VECTORIZE_STORAGE_KEY, updated);
+      const storedUsed = storage ? storage.used + dimensions : null;
+      if (storedUsed !== null)
+        await txn.put(VECTORIZE_GROWTH_KEY, { ...storage, used: storedUsed });
+      return json({
+        allowed: true,
+        used: updated.used,
+        remaining: MONTHLY_VECTORIZE_CAP - updated.used,
+        retryAfter: 0,
+        monthKey,
+        baselineVerified: true,
+        ...(storedUsed !== null
+          ? {
+              storedUsed,
+              storedRemaining: VECTORIZE_STORED_CAP - storedUsed,
+              storedCap: VECTORIZE_STORED_CAP,
+            }
+          : {}),
+      });
+    });
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -200,69 +309,8 @@ export class NeuronBudgetDO {
       });
     }
 
-    if (path === '/try-debit-vectorize') {
-      if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
-      let body: { dimensions?: unknown } | null = null;
-      try {
-        body = (await request.json()) as { dimensions?: unknown };
-      } catch {
-        return json({ error: 'Invalid Vectorize reservation' }, 400);
-      }
-      const dimensions = body?.dimensions;
-      if (
-        typeof dimensions !== 'number' ||
-        !Number.isSafeInteger(dimensions) ||
-        dimensions < 1 ||
-        dimensions > MONTHLY_VECTORIZE_CAP
-      ) {
-        return json({ error: 'Invalid Vectorize reservation' }, 400);
-      }
-      const monthKey = utcMonthKey(now);
-      return this.ctx.storage.transaction(async (txn) => {
-        const stored = await txn.get<unknown>(VECTORIZE_STORAGE_KEY);
-        let state = readVectorizeState(stored, monthKey);
-        const verifiedBaseline = VERIFIED_VECTORIZE_BASELINES[monthKey];
-        if (
-          !state &&
-          (stored === undefined || isPreviousVectorizePeriod(stored, monthKey)) &&
-          Number.isSafeInteger(verifiedBaseline) &&
-          verifiedBaseline >= 0 &&
-          verifiedBaseline <= MONTHLY_VECTORIZE_CAP
-        ) {
-          state = { monthKey, used: verifiedBaseline, baselineVerified: true };
-          await txn.put(VECTORIZE_STORAGE_KEY, state);
-        } else if (
-          state &&
-          Number.isSafeInteger(verifiedBaseline) &&
-          verifiedBaseline > state.used &&
-          verifiedBaseline <= MONTHLY_VECTORIZE_CAP
-        ) {
-          state = { ...state, used: verifiedBaseline };
-          await txn.put(VECTORIZE_STORAGE_KEY, state);
-        }
-        if (!state) return json({ error: 'Verified monthly Vectorize baseline unavailable' }, 503);
-        const remaining = Math.max(0, MONTHLY_VECTORIZE_CAP - state.used);
-        if (state.used + dimensions > MONTHLY_VECTORIZE_CAP) {
-          return json({
-            allowed: false,
-            used: state.used,
-            remaining,
-            retryAfter: secondsUntilUtcMonth(now),
-            monthKey,
-            baselineVerified: true,
-          });
-        }
-        const updated = { ...state, used: state.used + dimensions };
-        await txn.put(VECTORIZE_STORAGE_KEY, updated);
-        return json({
-          allowed: true,
-          used: updated.used,
-          remaining: MONTHLY_VECTORIZE_CAP - updated.used,
-          retryAfter: 0,
-          monthKey,
-          baselineVerified: true,
-        });
-      });
+    if (path === '/try-debit-vectorize' || path === '/try-debit-vectorize-storage') {
+      return this.reserveVectorize(request, now, path === '/try-debit-vectorize-storage');
     }
 
     return json({ error: 'Not found' }, 404);
