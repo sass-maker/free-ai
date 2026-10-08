@@ -2,6 +2,7 @@ import type {
   ChatMessage,
   EmbeddingProvider,
   Env,
+  ReasoningEffort,
   ResponseFormat,
   TextProvider,
   Tool,
@@ -14,6 +15,9 @@ export interface ProviderCallInput {
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
+  reasoning_effort?: ReasoningEffort;
+  // Internal, request-scoped key selection. Never include this in metadata.
+  apiKey?: string;
   stream: boolean;
   signal?: AbortSignal;
   tools?: Tool[];

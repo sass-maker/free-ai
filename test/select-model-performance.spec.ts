@@ -46,7 +46,7 @@ function digest(value: unknown): string {
 
 describe('model selection performance', () => {
   it('model selection scales across the supported registry size', () => {
-    expect(registry).toHaveLength(50);
+    expect(registry).toHaveLength(51);
     const metrics: string[] = [];
     const observedHashes: Record<number, string> = {};
 

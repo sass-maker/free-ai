@@ -430,7 +430,15 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
       </script>
     </section>
 
-    <footer class="footer">
+    <fleet-footer-extension product-name="Free AI" art-src="https://sassmaker.com/footer-art/free-ai.webp">
+<saas-maker-newsletter-capture slot="capture"
+      catalog-id="free-ai"
+      product-name="Free AI"
+      kind="newsletter"
+      source="footer"
+      privacy-url="https://ai-gateway.sassmaker.com/privacy"
+    ></saas-maker-newsletter-capture>
+<footer slot="navigation" data-fleet-footer-navigation class="footer">
       <div>
         <div class="footer-brand">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -467,14 +475,9 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
         </div>
       </div>
     </footer>
+</fleet-footer-extension>
     <script is:inline type="module" src="https://sassmaker.com/newsletter-capture.js"></script>
-    <saas-maker-newsletter-capture
-      catalog-id="free-ai"
-      product-name="Free AI"
-      kind="newsletter"
-      source="footer"
-      privacy-url="https://ai-gateway.sassmaker.com/privacy"
-    ></saas-maker-newsletter-capture>
+    
     <script
       is:inline
       src="https://sassmaker.com/project-strip.js"
