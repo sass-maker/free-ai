@@ -101,6 +101,15 @@ describe('classifyError', () => {
     expect(failure).toBe('provider_fatal');
   });
 
+  it('allows bounded fallback when an upstream model is gone', () => {
+    const gone = { status: 410, message: 'Model is gone' };
+    expect(classifyError(gone)).toBe('provider_fatal');
+    expect(isRetriableFailure(classifyError(gone))).toBe(false);
+    expect(canFallbackFromProviderFailure(gone, classifyError(gone))).toBe(true);
+    const refusal = { ...gone, message: 'content filter refusal' };
+    expect(canFallbackFromProviderFailure(refusal, classifyError(refusal))).toBe(false);
+  });
+
   it('marks 422 as input_nonretriable', () => {
     const failure = classifyError({ status: 422, message: 'validation error' });
     expect(failure).toBe('input_nonretriable');

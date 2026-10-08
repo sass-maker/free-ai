@@ -108,6 +108,7 @@ export function canFallbackFromProviderFailure(
     failureClass === 'provider_fatal' &&
     (isProviderAccountFailure(error) ||
       getUpstreamStatus(error) === 404 ||
+      getUpstreamStatus(error) === 410 ||
       isMalformedProviderOutput(error))
   );
 }
