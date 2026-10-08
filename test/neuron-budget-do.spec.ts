@@ -70,6 +70,93 @@ function debit(neurons: unknown): Request {
 }
 
 describe('NeuronBudgetDO', () => {
+  it('atomically charges concurrent storage and query reservations without over-admission', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-08T12:00:00Z'));
+    try {
+      const { state, values } = makeState();
+      const budget = new NeuronBudgetDO(state);
+      const responses = await Promise.all([
+        budget.fetch(
+          post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 6_000_000 }))
+        ),
+        budget.fetch(post('/try-debit-vectorize', JSON.stringify({ dimensions: 6_000_000 }))),
+      ]);
+      const bodies = await Promise.all(
+        responses.map((r) => r.json() as Promise<{ allowed: boolean }>)
+      );
+      expect(bodies.filter((r) => r.allowed)).toHaveLength(1);
+      expect(values.get('vectorize-budget')).toMatchObject({ used: 41_000_000 });
+      expect(values.get('vectorize-storage-budget')).toMatchObject({ used: 36_000_000 });
+      // A restarted object retains charges; retries are conservative new debits.
+      const restarted = new NeuronBudgetDO(state);
+      const retry = await restarted.fetch(
+        post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))
+      );
+      await expect(retry.json()).resolves.toMatchObject({
+        allowed: true,
+        used: 41_000_768,
+        storedUsed: 36_000_768,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not debit queried usage when stored capacity is exhausted or corrupt', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-08T12:00:00Z'));
+    try {
+      const { state, values } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-10',
+        used: 36_000_000,
+        baselineVerified: true,
+      });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-10',
+        used: 200_000_000,
+        baselineVerified: true,
+      });
+      const budget = new NeuronBudgetDO(state);
+      const denied = await budget.fetch(
+        post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))
+      );
+      await expect(denied.json()).resolves.toMatchObject({ allowed: false });
+      expect(values.get('vectorize-budget')).toMatchObject({ used: 36_000_000 });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-10',
+        used: Number.NaN,
+        baselineVerified: true,
+      });
+      const corrupt = await budget.fetch(
+        post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))
+      );
+      expect(corrupt.status).toBe(503);
+      expect(values.get('vectorize-budget')).toMatchObject({ used: 36_000_000 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('blocks storage growth in the next month without resetting the persistent ledger', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-08T12:00:00Z'));
+    try {
+      const { state, values } = makeState();
+      const budget = new NeuronBudgetDO(state);
+      await budget.fetch(post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 })));
+      const previous = values.get('vectorize-storage-budget');
+      vi.setSystemTime(new Date('2026-11-01T00:00:00Z'));
+      const response = await budget.fetch(
+        post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))
+      );
+      expect(response.status).toBe(503);
+      expect(values.get('vectorize-storage-budget')).toBe(previous);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('atomically admits only reservations that fit from a cold daily budget', async () => {
     const { state } = makeState();
     const budget = new NeuronBudgetDO(state);
