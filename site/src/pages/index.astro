@@ -433,8 +433,15 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
     <fleet-footer-extension
       data-fleet-footer-project="free-ai"
       product-name="Free AI"
+      signature-name="Free AI"
       theme="dark"
+      surface="landing"
       art-src="https://sassmaker.com/footer-art/free-ai.webp"
+      art-alt="Free AI: A night rail junction routes one glowing request cube toward several lit provider stations, while a barred tunnel marks an unavailable route and a lever switches traffic to the open line."
+      art-width="2172"
+      art-height="724"
+      art-position="50% 50%"
+      art-credit="Original illustration for Free AI"
       font-base="https://sassmaker.com/fonts/fleet-footer-precise-v1/"
     >
       <saas-maker-newsletter-capture
@@ -443,7 +450,10 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
         product-name="Free AI"
         kind="newsletter"
         source="footer"
-        privacy-url="https://ai-gateway.sassmaker.com/privacy"
+        privacy-url="https://sassmaker.com/privacy"
+        theme="dark"
+        layout="compact"
+        integrated
       ></saas-maker-newsletter-capture>
       <footer slot="navigation" data-fleet-footer-navigation class="footer">
         <div>
@@ -502,7 +512,12 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 1rem;
       }
-      fleet-footer-extension .footer-col { min-width: 0; }
+      fleet-footer-extension .footer-col {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        align-items: flex-start;
+      }
       fleet-footer-extension .footer-col a { overflow-wrap: anywhere; }
       @media (max-width: 600px) {
         fleet-footer-extension .footer-links {
@@ -511,11 +526,12 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
         }
       }
     </style>
-    <script is:inline type="module" src="https://sassmaker.com/newsletter-capture.js"></script>
+    <script is:inline type="module" src="https://sassmaker.com/newsletter-capture.js?v=precise-b0adaa67"></script>
     <script
       is:inline
       src="https://sassmaker.com/project-strip.js?v=precise-b0adaa67"
       data-project="free-ai"
+      data-layout="studio"
       data-host-only="true"
       data-theme="dark"
       defer
@@ -525,8 +541,10 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
       src="https://sassmaker.com/ai-chat-footer.js?v=precise-b0adaa67"
       data-name="Free AI"
       data-project="free-ai"
+      data-layout="question"
       data-host-only="true"
       data-theme="dark"
+      data-capture="false"
       defer
     ></script>
     <script is:inline>
