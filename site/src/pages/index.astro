@@ -430,61 +430,121 @@ console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class=
       </script>
     </section>
 
-    <footer class="footer">
-      <div>
-        <div class="footer-brand">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" fill="rgba(14,165,233,0.15)"/>
-            <path d="M2 17l10 5 10-5" opacity="0.5"/>
-            <path d="M2 12l10 5 10-5" opacity="0.75"/>
-          </svg>
-          sass-maker / AI Gateway
-        </div>
-        <div class="footer-copy">Stop paying OpenAI for "hello world" prompts.</div>
-      </div>
-      <div class="footer-links">
-        <div class="footer-col">
-          <h4>Product</h4>
-          <a href="/getting-started/">Documentation</a>
-          <a href="/faq/">FAQ</a>
-          <a href="/dashboard">Dashboard</a>
-          <a href={`${gw}/health`} target="_blank">Health Status</a>
-        </div>
-        <div class="footer-col">
-          <h4>API</h4>
-          <a href={`${gw}/openapi.json`} target="_blank">OpenAPI Spec</a>
-          <a href={`${gw}/v1/models`} target="_blank">Models</a>
-          <a href="/chat-completions/">Chat Completions</a>
-        </div>
-        <div class="footer-col">
-          <h4>Resources</h4>
-          <a href="/authentication/">Authentication</a>
-          <a href="/error-handling/">Error Handling</a>
-          <a href="/rate-limiting/">Rate Limits</a>
-          <a href="/changelog/">Changelog</a>
-          <a href="https://github.com/sass-maker/free-ai/issues">Roadmap</a>
-          <RepositoryLink />
-        </div>
-      </div>
-    </footer>
-    <script is:inline type="module" src="https://sassmaker.com/newsletter-capture.js"></script>
-    <saas-maker-newsletter-capture
-      catalog-id="free-ai"
+    <fleet-footer-extension
+      data-fleet-footer-project="free-ai"
       product-name="Free AI"
-      kind="newsletter"
-      source="footer"
-      privacy-url="https://ai-gateway.sassmaker.com/privacy"
-    ></saas-maker-newsletter-capture>
+      signature-name="Free AI"
+      theme="dark"
+      surface="landing"
+      art-src="https://sassmaker.com/footer-art/free-ai.webp"
+      art-alt="Free AI: A night rail junction routes one glowing request cube toward several lit provider stations, while a barred tunnel marks an unavailable route and a lever switches traffic to the open line."
+      art-width="2172"
+      art-height="724"
+      art-position="50% 50%"
+      art-credit="Original illustration for Free AI"
+      font-base="https://sassmaker.com/fonts/fleet-footer-precise-v1/"
+    >
+      <saas-maker-newsletter-capture
+        slot="capture"
+        catalog-id="free-ai"
+        product-name="Free AI"
+        kind="newsletter"
+        source="footer"
+        privacy-url="https://sassmaker.com/privacy"
+        theme="dark"
+        layout="compact"
+        integrated
+      ></saas-maker-newsletter-capture>
+      <footer slot="navigation" data-fleet-footer-navigation class="footer">
+        <div>
+          <div class="footer-brand">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" fill="rgba(14,165,233,0.15)"/>
+              <path d="M2 17l10 5 10-5" opacity="0.5"/>
+              <path d="M2 12l10 5 10-5" opacity="0.75"/>
+            </svg>
+            sass-maker / AI Gateway
+          </div>
+          <div class="footer-copy">Stop paying OpenAI for "hello world" prompts.</div>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <h4>Product</h4>
+            <a href="/getting-started/">Documentation</a>
+            <a href="/faq/">FAQ</a>
+            <a href="/dashboard">Dashboard</a>
+            <a href={`${gw}/health`} target="_blank">Health Status</a>
+          </div>
+          <div class="footer-col">
+            <h4>API</h4>
+            <a href={`${gw}/openapi.json`} target="_blank">OpenAPI Spec</a>
+            <a href={`${gw}/v1/models`} target="_blank">Models</a>
+            <a href="/chat-completions/">Chat Completions</a>
+          </div>
+          <div class="footer-col">
+            <h4>Resources</h4>
+            <a href="/authentication/">Authentication</a>
+            <a href="/error-handling/">Error Handling</a>
+            <a href="/rate-limiting/">Rate Limits</a>
+            <a href="/changelog/">Changelog</a>
+            <a href="https://github.com/sass-maker/free-ai/issues">Roadmap</a>
+            <RepositoryLink />
+          </div>
+        </div>
+      </footer>
+    </fleet-footer-extension>
+    <style is:inline>
+      fleet-footer-extension .footer.footer {
+        display: grid;
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1rem;
+        align-items: start;
+        justify-content: initial;
+      }
+      fleet-footer-extension .footer-links {
+        display: grid;
+        width: 100%;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+      }
+      fleet-footer-extension .footer-col {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      fleet-footer-extension .footer-col a { overflow-wrap: anywhere; }
+      @media (max-width: 600px) {
+        fleet-footer-extension .footer-links {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 1rem;
+        }
+      }
+    </style>
+    <script is:inline type="module" src="https://sassmaker.com/newsletter-capture.js?v=precise-b0adaa67"></script>
     <script
       is:inline
-      src="https://sassmaker.com/project-strip.js"
+      src="https://sassmaker.com/project-strip.js?v=precise-b0adaa67"
       data-project="free-ai"
+      data-layout="studio"
+      data-host-only="true"
+      data-theme="dark"
       defer
     ></script>
     <script
       is:inline
-      src="https://sassmaker.com/ai-chat-footer.js"
+      src="https://sassmaker.com/ai-chat-footer.js?v=precise-b0adaa67"
       data-name="Free AI"
+      data-project="free-ai"
+      data-layout="question"
+      data-host-only="true"
+      data-theme="dark"
+      data-capture="false"
       defer
     ></script>
     <script is:inline>
