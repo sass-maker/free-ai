@@ -9,7 +9,11 @@ vi.mock('../src/config', async (original) => ({
   getModelRegistry: () => mocks.registry,
 }));
 
-function candidate(model: string, provider: 'gemini' | 'groq', vision = false): ModelCandidate {
+function candidate(
+  model: string,
+  provider: 'gemini' | 'groq' | 'nvidia',
+  vision = false
+): ModelCandidate {
   return {
     id: model,
     model,
@@ -60,6 +64,7 @@ function env(
   return makeTestEnv({
     GEMINI_API_KEY: geminiKeys,
     GROQ_API_KEY: 'synthetic-groq',
+    NVIDIA_API_KEY: 'synthetic-nvidia',
   }).env;
 }
 
@@ -135,6 +140,26 @@ describe('automatic cross-provider fallback through the real SDK', () => {
     expect(logged).not.toContain('synthetic-one');
     expect(logged).not.toContain('Return caption JSON');
     expect(JSON.stringify(body)).not.toContain('synthetic-');
+  });
+
+  it('recovers a gone NVIDIA model through a compatible provider within two attempts', async () => {
+    mocks.registry = [candidate('nvidia-gone', 'nvidia'), candidate('groq-alternate', 'groq')];
+    const calls: Request[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(new Request(input, init));
+      return calls.length === 1 ? new Response(null, { status: 410 }) : success();
+    });
+    const response = await app.fetch(request(), env(), makeCtx());
+    expect(response.status).toBe(200);
+    expect(calls.map((sent) => new URL(sent.url).hostname)).toEqual([
+      'integrate.api.nvidia.com',
+      'api.groq.com',
+    ]);
+    expect(await response.json()).toMatchObject({
+      model: 'groq-alternate',
+      degraded: true,
+      x_gateway: { attempts: 2, provider: 'groq' },
+    });
   });
 
   it('records successful automatic key slots without logging credentials or captions', async () => {
