@@ -983,7 +983,11 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    // Qualified 2026-10-09: chat, streaming, tool calls, vision and reasoning
+    // levels work, but 10 of 17 calls returned 503 "high demand" and successful
+    // calls took 1.8-20 s (some over the 15 s provider timeout). Keep it a low
+    // fallback, not offered for tool calls, until availability improves.
+    priority: 0.5,
     capabilities: {
       toolCalling: false,
       jsonMode: true,
@@ -1006,8 +1010,10 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // Groq
   'groq:openai/gpt-oss-120b': { requestsPerDay: 200 },
   'groq:openai/gpt-oss-20b': { requestsPerDay: 500 },
-  // Gemini
-  'gemini:gemini-3.5-flash': { requestsPerDay: 500 },
+  // Gemini. Free-tier RPD is per Google project, not per key: on 2026-10-09
+  // gemini-3.5-flash returned 429 GenerateRequestsPerDayPerProjectPerModel-FreeTier
+  // with quotaValue 20 on every pooled key.
+  'gemini:gemini-3.5-flash': { requestsPerDay: 20 },
   'gemini:gemini-3.5-flash-lite': { requestsPerDay: 1500 },
   // OpenRouter (free models, rate-limited upstream)
 
@@ -1519,7 +1525,6 @@ const DEFAULT_MODALITY_LIMITS: Record<string, ProviderLimitConfig> = {
   'groq:whisper-large-v3-turbo': { requestsPerDay: 1000 },
   'groq:whisper-large-v3': { requestsPerDay: 500 },
   'workers_ai:@cf/openai/whisper': { requestsPerDay: 1000 },
-  'gemini:gemini-3.5-flash': { requestsPerDay: 500 },
 };
 
 // Merge modality limits into DEFAULT_LIMITS at module load.

@@ -183,6 +183,7 @@ describe('automatic cross-provider fallback through the real SDK', () => {
       attempt: 1,
       key_slot: 1,
       key_pool_size: 5,
+      colo: null,
       stream_handshake: false,
     });
     expect(JSON.stringify(entries)).not.toContain('synthetic-one');
