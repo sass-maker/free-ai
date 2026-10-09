@@ -35,6 +35,7 @@ import {
   classifyError,
   getUpstreamStatus,
   isProviderUnavailableForRequest,
+  isMalformedProviderOutput,
   isUpstreamRegionFailure,
   isRetriableFailure,
   MalformedProviderOutputError,
@@ -782,33 +783,70 @@ function buildChatRoundRobinKey(params: {
   return `chat:${params.endpoint}:${params.min_reasoning_level ?? 'auto'}:${params.stream ? 'stream' : 'nonstream'}:${providerSet}`;
 }
 
+const chatTextChunkSchema = z.object({ type: z.literal('text'), text: z.string() });
+const chatFunctionSchema = z
+  .object({
+    name: z.string().min(1),
+    arguments: z
+      .union([z.string(), z.record(z.string(), z.unknown())])
+      .transform((value) => (typeof value === 'string' ? value : JSON.stringify(value))),
+  })
+  .passthrough();
+
 const chatCompletionChoiceSchema = z
   .object({
     finish_reason: z.string().nullish(),
     message: z
       .object({
-        content: z.string().nullish(),
+        content: z
+          .union([
+            z.string(),
+            z
+              .array(
+                z.union([
+                  chatTextChunkSchema,
+                  // Non-text chunks (thinking, references) carry no assistant text.
+                  z.object({ type: z.string() }).passthrough(),
+                ])
+              )
+              .transform((chunks) =>
+                chunks
+                  .map((chunk) =>
+                    'text' in chunk && typeof chunk.text === 'string' ? chunk.text : ''
+                  )
+                  .join('')
+              ),
+          ])
+          .nullish(),
         refusal: z.string().nullish(),
         tool_calls: z
           .array(
-            z.object({
-              id: z.string().min(1),
-              type: z.literal('function'),
-              function: z.object({ name: z.string().min(1), arguments: z.string() }),
-            })
+            z
+              .object({
+                id: z
+                  .string()
+                  .nullish()
+                  .transform((id) => (id && id !== 'null' ? id : `call_${crypto.randomUUID()}`)),
+                type: z.literal('function').optional().default('function'),
+                function: chatFunctionSchema,
+              })
+              .passthrough()
           )
-          .optional(),
-        function_call: z.object({ name: z.string().min(1), arguments: z.string() }).optional(),
+          .nullish()
+          .transform((calls) => calls ?? undefined),
+        function_call: chatFunctionSchema.optional(),
       })
+      .passthrough()
       .nullish(),
   })
+  .passthrough()
   .refine(({ finish_reason, message }) => {
     // A refusal is a final outcome, including when the provider omits its message.
     const finishReason = finish_reason?.toLowerCase() ?? '';
     return (
       finishReason.includes('content_filter') ||
       finishReason.includes('safety') ||
-      typeof message?.content === 'string' ||
+      Boolean(message?.content?.trim()) ||
       Boolean(message?.refusal) ||
       Boolean(message?.tool_calls?.length) ||
       Boolean(message?.function_call)
@@ -1299,7 +1337,12 @@ function handleChatProviderSuccess(
 
   // Non-stream completions were validated before the success hop was recorded.
   state.finalResponse = buildChatFinalResponse(
-    completion as Record<string, unknown>,
+    {
+      ...completion,
+      choices: ((completion as Record<string, unknown>).choices as unknown[]).map((choice) =>
+        chatCompletionChoiceSchema.parse(choice)
+      ),
+    },
     candidate,
     requestId,
     state.chosenMeta,
@@ -1337,6 +1380,7 @@ function handleChatProviderError(
         success: false,
         latencyMs: Date.now() - startedAt,
         failureClass,
+        malformed: isMalformedProviderOutput(error),
         keyRetryPending,
         now: Date.now(),
       })
@@ -1476,6 +1520,9 @@ function createChatRetryCallback(
         throw new AbortError('Request aborted');
       }
       const keyRetryPending = geminiKeys.canRetry(keyChoice, state.attemptCounter, error);
+      if (!pinned && isMalformedProviderOutput(error)) {
+        unavailableProviders.add(candidate.provider);
+      }
       const inputFallbackPending = skipProviderAfterFailure(
         error,
         candidate,
