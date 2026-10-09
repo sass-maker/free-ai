@@ -284,12 +284,6 @@ describe('selectCandidates', () => {
         provider: 'zai',
         model: 'glm-4.7-flash',
       },
-      {
-        ...registry[0]!,
-        id: 'nvidia-maverick-manual',
-        provider: 'nvidia',
-        model: 'meta/llama-4-maverick-17b-128e-instruct',
-      },
     ];
 
     const automatic = selectCandidates(candidates, new Map(), {
@@ -299,12 +293,12 @@ describe('selectCandidates', () => {
     const explicit = selectCandidates(candidates, new Map(), {
       stream: false,
       now: Date.now(),
-      modelOverride: 'nvidia-maverick-manual',
+      modelOverride: 'zai-manual',
     });
 
     expect(automatic.map((candidate) => candidate.id)).toEqual(['a']);
-    expect(explicit.map((candidate) => candidate.id)).toEqual(['nvidia-maverick-manual']);
-    expect(candidates.map(isAutomaticRoutingEligible)).toEqual([true, false, false, false]);
+    expect(explicit.map((candidate) => candidate.id)).toEqual(['zai-manual']);
+    expect(candidates.map(isAutomaticRoutingEligible)).toEqual([true, false, false]);
   });
 
   it('keeps Workers AI behind non-Cloudflare providers for automatic routing', () => {

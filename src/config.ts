@@ -293,7 +293,9 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'gpt-oss-120b',
     reasoning: 'high',
     supportsStreaming: true,
-    enabled: true,
+    // 2026-10: every request returns HTTP 402. Cerebras now requires a payment
+    // method before API access is active. Re-enable once billing is added.
+    enabled: false,
     priority: 0.77,
     capabilities: {
       toolCalling: true,
@@ -355,58 +357,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
   },
 
   // ── NVIDIA NIM (free tier, needs NVIDIA_API_KEY) ───────────────────
+  // 2026-10: NVIDIA retired the Llama 3.3/4, DeepSeek R1/V3 and Qwen endpoints
+  // (HTTP 404/410). Replacements below were verified live with a chat
+  // completion (and a tool call where toolCalling is true) before enabling.
   {
-    id: 'nvidia-llama-70b',
+    id: 'nvidia-nemotron-3-super-120b',
     provider: 'nvidia',
-    model: 'meta/llama-3.3-70b-instruct',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.73,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'nvidia-deepseek-r1',
-    provider: 'nvidia',
-    model: 'deepseek-ai/deepseek-r1',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.72,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'nvidia-qwen-32b',
-    provider: 'nvidia',
-    model: 'qwen/qwen3-32b',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.71,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'nvidia-nemotron-super-49b',
-    provider: 'nvidia',
-    model: 'nvidia/llama-3.3-nemotron-super-49b-v1',
+    model: 'nvidia/nemotron-3-super-120b-a12b',
     reasoning: 'high',
     supportsStreaming: true,
     enabled: true,
@@ -420,9 +377,9 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'nvidia-nemotron-70b',
+    id: 'nvidia-nemotron-3-ultra-550b',
     provider: 'nvidia',
-    model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+    model: 'nvidia/nemotron-3-ultra-550b-a55b',
     reasoning: 'high',
     supportsStreaming: true,
     enabled: true,
@@ -436,29 +393,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'nvidia-llama4-maverick',
+    id: 'nvidia-glm-5-3',
     provider: 'nvidia',
-    model: 'meta/llama-4-maverick-17b-128e-instruct',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.72,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: true,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'nvidia-deepseek-v3',
-    provider: 'nvidia',
-    model: 'deepseek-ai/deepseek-v3',
+    model: 'z-ai/glm-5.3',
     reasoning: 'high',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.71,
+    priority: 0.72,
     capabilities: {
       toolCalling: true,
       jsonMode: true,
@@ -468,13 +409,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'nvidia-deepseek-r1-distill-70b',
+    id: 'nvidia-kimi-k3',
     provider: 'nvidia',
-    model: 'deepseek-ai/deepseek-r1-distill-llama-70b',
+    model: 'moonshotai/kimi-k3',
     reasoning: 'high',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.69,
+    priority: 0.71,
     capabilities: {
       toolCalling: false,
       jsonMode: true,
@@ -484,18 +425,34 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'nvidia-qwen-coder-32b',
+    id: 'nvidia-nemotron-3-5-lightning-30b',
     provider: 'nvidia',
-    model: 'qwen/qwen2.5-coder-32b-instruct',
-    reasoning: 'high',
+    model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+    reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.68,
+    priority: 0.69,
     capabilities: {
       toolCalling: true,
       jsonMode: true,
       vision: false,
-      contextWindow: 32768,
+      contextWindow: 131072,
+      maxOutputTokens: 8192,
+    },
+  },
+  {
+    id: 'nvidia-gpt-oss-20b',
+    provider: 'nvidia',
+    model: 'openai/gpt-oss-20b',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.68,
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 131072,
       maxOutputTokens: 8192,
     },
   },
@@ -591,7 +548,9 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'mistral-large-latest',
     reasoning: 'high',
     supportsStreaming: true,
-    enabled: true,
+    // 2026-10: the org is on Mistral's Free plan, which returns HTTP 403 for
+    // mistral-large-latest while the smaller models still answer.
+    enabled: false,
     priority: 0.85,
     capabilities: {
       toolCalling: true,
@@ -945,22 +904,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'openrouter-inclusionai-ling-3-0-flash-sante-free',
-    provider: 'openrouter',
-    model: 'inclusionai/ling-3.0-flash-sante:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
     id: 'cerebras-qwen-3-8-27b',
     provider: 'cerebras',
     model: 'qwen-3.8-27b',
@@ -1073,15 +1016,12 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'sambanova:DeepSeek-V3-0324': { requestsPerDay: 300 },
   'sambanova:Qwen3-32B': { requestsPerDay: 500 },
   // NVIDIA NIM (free tier, ~40 RPM)
-  'nvidia:meta/llama-3.3-70b-instruct': { requestsPerDay: 500 },
-  'nvidia:deepseek-ai/deepseek-r1': { requestsPerDay: 300 },
-  'nvidia:qwen/qwen3-32b': { requestsPerDay: 500 },
-  'nvidia:nvidia/llama-3.3-nemotron-super-49b-v1': { requestsPerDay: 500 },
-  'nvidia:nvidia/llama-3.1-nemotron-70b-instruct': { requestsPerDay: 500 },
-  'nvidia:meta/llama-4-maverick-17b-128e-instruct': { requestsPerDay: 500 },
-  'nvidia:deepseek-ai/deepseek-v3': { requestsPerDay: 300 },
-  'nvidia:deepseek-ai/deepseek-r1-distill-llama-70b': { requestsPerDay: 300 },
-  'nvidia:qwen/qwen2.5-coder-32b-instruct': { requestsPerDay: 500 },
+  'nvidia:nvidia/nemotron-3-super-120b-a12b': { requestsPerDay: 500 },
+  'nvidia:nvidia/nemotron-3-ultra-550b-a55b': { requestsPerDay: 300 },
+  'nvidia:z-ai/glm-5.3': { requestsPerDay: 300 },
+  'nvidia:moonshotai/kimi-k3': { requestsPerDay: 300 },
+  'nvidia:nvidia/nemotron-3.5-lightning-30b-a3b': { requestsPerDay: 500 },
+  'nvidia:openai/gpt-oss-20b': { requestsPerDay: 500 },
   // GitHub Models (free tier ~50 req/day per high-tier, 150/day low-tier)
   // Pollinations (no key required, IP-rate-limited upstream)
   'pollinations:openai': { requestsPerDay: 300 },
@@ -1124,7 +1064,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:inclusionai/ling-3.0-flash-vl:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nex-agi/nex-n2.5-mini:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nex-agi/nex-n2.5-pro:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:inclusionai/ling-3.0-flash-sante:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:inclusionai/ling-3.0-flash-fin:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'cerebras:qwen-3.8-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
@@ -1162,9 +1101,7 @@ const AUTOMATIC_ROUTING_QUARANTINED_PROVIDERS: ReadonlySet<TextProvider> = new S
   'github_models',
   'zai',
 ]);
-const AUTOMATIC_ROUTING_QUARANTINED_MODELS = new Set([
-  'nvidia:meta/llama-4-maverick-17b-128e-instruct',
-]);
+const AUTOMATIC_ROUTING_QUARANTINED_MODELS = new Set<string>([]);
 
 export function isAutomaticRoutingEligible(candidate: ModelCandidate): boolean {
   return (
