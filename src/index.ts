@@ -28,7 +28,7 @@ import {
   getBenchmarkOptimizerFixture,
 } from './benchmark/cost-optimizer';
 import { providerCallers, sttProviderCallers } from './providers';
-import type { ProviderCallResult } from './providers/types';
+import type { ProviderCallInput, ProviderCallResult } from './providers/types';
 import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './providers/quota';
 import {
   canFallbackFromProviderFailure,
@@ -1212,6 +1212,7 @@ function buildChatFinalResponse(
 
 interface ChatRetryState {
   attemptCounter: number;
+  maxAttempts: number;
   chosenMeta: GatewayMeta | undefined;
   finalResponse: Record<string, unknown> | null;
   streamResponse: Response | null;
@@ -1311,7 +1312,8 @@ function handleChatProviderError(
   candidate: ModelCandidate,
   error: unknown,
   startedAt: number,
-  keyRetryPending = false
+  keyRetryPending = false,
+  inputFallbackPending = false
 ): void {
   const { c, state } = ctx;
   const failureClass = classifyError(error);
@@ -1343,9 +1345,10 @@ function handleChatProviderError(
 
   if (
     (!keyRetryPending &&
+      !inputFallbackPending &&
       !isRetriableFailure(failureClass) &&
       !canFallbackFromProviderFailure(error, failureClass)) ||
-    state.attemptCounter >= 2
+    state.attemptCounter >= state.maxAttempts
   ) {
     throw new AbortError(state.lastErrorMessage);
   }
@@ -1356,6 +1359,61 @@ function handleChatProviderError(
 function requestColo(request: Request): string | null {
   const colo = (request as Request & { cf?: { colo?: unknown } }).cf?.colo;
   return typeof colo === 'string' && /^[A-Z]{3}$/.test(colo) ? colo : null;
+}
+
+function shouldRetryChat(state: ChatRetryState): () => boolean {
+  return function withinAttemptBudget() {
+    return state.attemptCounter < state.maxAttempts;
+  };
+}
+
+function chatProviderInput(
+  c: Context,
+  candidate: ModelCandidate,
+  normalized: NormalizedChatRequest,
+  apiKey: string | undefined
+): ProviderCallInput {
+  return {
+    env: c.env,
+    provider: candidate.provider,
+    model: candidate.model,
+    messages: normalized.messages,
+    temperature: normalized.temperature,
+    max_tokens: normalized.max_tokens,
+    reasoning_effort: normalized.reasoning_effort,
+    apiKey,
+    stream: normalized.stream,
+    tools: normalized.tools,
+    tool_choice: normalized.tool_choice,
+    response_format: normalized.response_format,
+    signal: c.req.raw.signal,
+  };
+}
+
+/** Marks the failed provider unavailable; returns true when an input error can fail over. Key retries keep the provider; pinned requests never fail over on input errors. */
+function skipProviderAfterFailure(
+  error: unknown,
+  candidate: ModelCandidate,
+  remaining: ModelCandidate[],
+  unavailable: Set<TextProvider>,
+  pinned: boolean,
+  keyRetryPending: boolean
+): boolean {
+  if (keyRetryPending) return false;
+  const inputFailure = !pinned && classifyError(error) === 'input_nonretriable';
+  const fallback = inputFailure && hasAlternateProvider(remaining, candidate, unavailable);
+  if (isProviderUnavailableForRequest(error) || inputFailure) unavailable.add(candidate.provider);
+  return fallback;
+}
+
+function hasAlternateProvider(
+  remaining: ModelCandidate[],
+  current: ModelCandidate,
+  unavailable: Set<TextProvider>
+): boolean {
+  return remaining.some(
+    (next) => next.provider !== current.provider && !unavailable.has(next.provider)
+  );
 }
 
 function createChatRetryCallback(
@@ -1369,6 +1427,9 @@ function createChatRetryCallback(
   const ctx: ChatRetryContext = { c, normalized, requestId, projectId, state };
   let nextCandidate = 0;
   const unavailableProviders = new Set<TextProvider>();
+  const pinned = Boolean(
+    c.req.header('x-gateway-force-model') || c.req.header('x-gateway-force-provider')
+  );
   const geminiKeys = new GeminiKeyPool(
     c.env.GEMINI_API_KEY,
     Boolean(c.req.header('x-gateway-force-model'))
@@ -1380,7 +1441,7 @@ function createChatRetryCallback(
     }
     const candidate = keyRetryCandidate ?? selected[nextCandidate++];
     keyRetryCandidate = undefined;
-    if (!candidate || state.attemptCounter >= 2) {
+    if (!candidate || state.attemptCounter >= state.maxAttempts) {
       throw new AbortError('No more candidates');
     }
 
@@ -1403,21 +1464,9 @@ function createChatRetryCallback(
         throw new Error(`No caller for provider ${candidate.provider}`);
       }
 
-      const providerResult = await caller({
-        env: c.env,
-        provider: candidate.provider,
-        model: candidate.model,
-        messages: normalized.messages,
-        temperature: normalized.temperature,
-        max_tokens: normalized.max_tokens,
-        reasoning_effort: normalized.reasoning_effort,
-        apiKey: keyChoice.apiKey,
-        stream: normalized.stream,
-        tools: normalized.tools,
-        tool_choice: normalized.tool_choice,
-        response_format: normalized.response_format,
-        signal: c.req.raw.signal,
-      });
+      const providerResult = await caller(
+        chatProviderInput(c, candidate, normalized, keyChoice.apiKey)
+      );
 
       c.req.raw.signal.throwIfAborted();
       handleChatProviderSuccess(ctx, candidate, providerResult, startedAt);
@@ -1427,10 +1476,28 @@ function createChatRetryCallback(
         throw new AbortError('Request aborted');
       }
       const keyRetryPending = geminiKeys.canRetry(keyChoice, state.attemptCounter, error);
-      if (keyRetryPending) keyRetryCandidate = candidate;
-      else if (isProviderUnavailableForRequest(error)) unavailableProviders.add(candidate.provider);
+      const inputFallbackPending = skipProviderAfterFailure(
+        error,
+        candidate,
+        selected.slice(nextCandidate),
+        unavailableProviders,
+        pinned,
+        keyRetryPending
+      );
+      if (keyRetryPending) {
+        // Only recovery from the first attempt earns a separate key attempt.
+        state.maxAttempts = 3;
+        keyRetryCandidate = candidate;
+      }
       logUpstreamFailure(attemptMeta, error, keyRetryPending);
-      handleChatProviderError(ctx, candidate, error, startedAt, keyRetryPending);
+      handleChatProviderError(
+        ctx,
+        candidate,
+        error,
+        startedAt,
+        keyRetryPending,
+        inputFallbackPending
+      );
     }
   };
 }
@@ -1791,6 +1858,7 @@ app.openapi(chatRoute, async (c) => {
 
   const state: ChatRetryState = {
     attemptCounter: 0,
+    maxAttempts: 2,
     chosenMeta: undefined,
     finalResponse: null,
     streamResponse: null,
@@ -1803,7 +1871,8 @@ app.openapi(chatRoute, async (c) => {
 
   await pRetry(createChatRetryCallback(c, selected, normalized, requestId, projectId, state), {
     signal: c.req.raw.signal,
-    retries: 1,
+    retries: 2,
+    shouldRetry: shouldRetryChat(state),
     minTimeout: 500,
     maxTimeout: 5000,
     factor: 2,

@@ -119,10 +119,13 @@ dependency change, verify:
 An upstream permission-denied response concerns the provider account, while a
 known content-filter refusal must remain terminal. The correction treats
 401, 402 and 403 as account failures for ordinary automatic routing, skips that
-provider for the remaining attempt when no alternate Gemini key remains, and
-preserves the existing two-attempt cap. With a multi-key Gemini pool, an access
-denial first tries a distinct key for the automatically selected model. The
-denied key is excluded for the rest of that request; this is not a persistent
+provider for the remaining attempt when no alternate Gemini key remains. Chat
+requests allow two attempts, or at most three when the first failure triggers a
+distinct Gemini key retry; that key recovery leaves one provider fallback attempt.
+Unpinned upstream 400/422 input errors also skip the provider when another provider
+remains; pinned requests and exhausted input-error fallbacks still return 400.
+With a multi-key Gemini pool, an access denial first tries a distinct key for the
+automatically selected model. The denied key is excluded for the rest of that request; this is not a persistent
 cross-request quarantine. Safety refusals still stop immediately.
 Explicitly forced providers stay confined to their selected registry. This
 403 automatic-fallback correction is covered by app-level and real-SDK tests.

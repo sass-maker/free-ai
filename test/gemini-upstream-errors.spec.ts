@@ -187,18 +187,16 @@ describe('Gemini upstream 400 handling', () => {
     expect(h.logs.join('')).not.toContain('synthetic-1');
   });
 
-  it('returns caller 400s with the upstream message and keeps model health intact', async () => {
+  it('falls back from input 400s without recording failed model health', async () => {
     const h = harness(() =>
       geminiError(400, 'INVALID_ARGUMENT', 'Requests ending with a model turn are not supported.')
     );
     const response = await h.send();
-    expect(response.status).toBe(400);
-    expect(hosts(h.calls)).toEqual(['generativelanguage.googleapis.com']);
-    const body = (await response.json()) as { error: { message: string; type: string } };
-    expect(body.error.type).toBe('input_nonretriable');
-    expect(body.error.message).toContain('Requests ending with a model turn are not supported.');
-    expect(body.error.message).not.toContain('no body');
-    expect(h.healthRecords).toEqual([]);
+    expect(response.status).toBe(200);
+    expect(hosts(h.calls)).toEqual(['generativelanguage.googleapis.com', 'api.groq.com']);
+    expect(await response.json()).toMatchObject({ x_gateway: { provider: 'groq', attempts: 2 } });
+    expect(h.healthRecords).not.toContainEqual(expect.objectContaining({ success: false }));
+    expect(h.logs.join('')).not.toContain('Requests ending');
     expect(h.logs.join('')).toContain('"upstream_error_status":"INVALID_ARGUMENT"');
   });
 });
