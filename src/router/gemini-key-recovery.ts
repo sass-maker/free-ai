@@ -3,9 +3,12 @@ import { parseApiKeys, pickApiKey } from '../providers/api-key';
 import type { TextProvider } from '../types';
 import {
   classifyError,
+  getUpstreamErrorStatus,
   getUpstreamStatus,
   isProviderAccountFailure,
   isRetriableFailure,
+  isUpstreamKeyRejected,
+  isUpstreamRegionFailure,
 } from './classify-error';
 
 interface KeyChoice {
@@ -55,6 +58,8 @@ interface AttemptMeta {
   attempt: number;
   key_slot: number | null;
   key_pool_size: number | null;
+  /** Cloudflare colo that served the request; upstream egress follows it. */
+  colo?: string | null;
 }
 
 const SAFE_ERROR_CODES = new Set([
@@ -72,6 +77,13 @@ function upstreamErrorCode(error: unknown): string | null {
   if (!error || typeof error !== 'object') return null;
   const code = (error as { code?: unknown }).code;
   return typeof code === 'string' && SAFE_ERROR_CODES.has(code) ? code : null;
+}
+
+/** Coarse, prompt-free reason for provider 400s that are not caller errors. */
+function upstreamErrorReason(error: unknown): string | null {
+  if (isUpstreamRegionFailure(error)) return 'unsupported_location';
+  if (isUpstreamKeyRejected(error)) return 'api_key_rejected';
+  return null;
 }
 
 function upstreamFailureKind(error: unknown): string {
@@ -99,6 +111,9 @@ export function logUpstreamFailure(
       ...meta,
       upstream_status: getUpstreamStatus(error) ?? null,
       upstream_error_code: upstreamErrorCode(error),
+      // Google's canonical status enum only (e.g. INVALID_ARGUMENT); never the message.
+      upstream_error_status: getUpstreamErrorStatus(error) ?? null,
+      upstream_error_reason: upstreamErrorReason(error),
       upstream_failure_kind: upstreamFailureKind(error),
       failure_class: classifyError(error),
       key_retry_pending: keyRetryPending,

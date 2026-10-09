@@ -14,6 +14,7 @@ interface OpenAICompatibleConfig<TProvider extends TextProvider | EmbeddingProvi
   baseURL: string;
   apiKey: string;
   defaultHeaders?: Record<string, string>;
+  fetch?: typeof fetch;
 }
 
 function createClient<TProvider extends TextProvider | EmbeddingProvider>(
@@ -23,6 +24,7 @@ function createClient<TProvider extends TextProvider | EmbeddingProvider>(
     apiKey: config.apiKey,
     baseURL: config.baseURL,
     defaultHeaders: config.defaultHeaders,
+    ...(config.fetch && { fetch: config.fetch }),
     timeout: 15_000,
     // The gateway owns retries for both chat and embeddings.
     maxRetries: 0,

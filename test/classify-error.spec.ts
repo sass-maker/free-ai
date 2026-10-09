@@ -4,8 +4,12 @@ import { describe, expect, it } from 'vitest';
 import {
   canFallbackFromProviderFailure,
   classifyError,
+  getUpstreamErrorStatus,
+  isProviderAccountFailure,
   isMalformedProviderOutput,
   isRetriableFailure,
+  isUpstreamKeyRejected,
+  isUpstreamRegionFailure,
   MalformedProviderOutputError,
 } from '../src/router/classify-error';
 
@@ -39,6 +43,39 @@ describe('classifyError', () => {
     expect(classifyError({ ...output, message: 'content filter refusal' })).toBe('safety_refusal');
     expect(classifyError({ ...output, status: 403 })).toBe('provider_fatal');
     expect(isMalformedProviderOutput({ ...output, status: 403 })).toBe(false);
+  });
+
+  it('separates Gemini egress and key 400s from caller input errors', () => {
+    const region = {
+      status: 400,
+      error: {
+        status: 'FAILED_PRECONDITION',
+        message: 'User location is not supported for the API use.',
+      },
+    };
+    expect(classifyError(region)).toBe('provider_fatal');
+    expect(isUpstreamRegionFailure(region)).toBe(true);
+    expect(isProviderAccountFailure(region)).toBe(false);
+    expect(canFallbackFromProviderFailure(region, classifyError(region))).toBe(true);
+
+    const key = {
+      status: 400,
+      message: '400 API key not valid. Please pass a valid API key.',
+      error: { status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] },
+    };
+    expect(classifyError(key)).toBe('provider_fatal');
+    expect(isUpstreamKeyRejected(key)).toBe(true);
+    expect(isProviderAccountFailure(key)).toBe(true);
+
+    const caller = {
+      status: 400,
+      error: { status: 'INVALID_ARGUMENT', message: 'bad turn order' },
+    };
+    expect(classifyError(caller)).toBe('input_nonretriable');
+    expect(getUpstreamErrorStatus(caller)).toBe('INVALID_ARGUMENT');
+    expect(
+      getUpstreamErrorStatus({ error: { status: 'not a status; prompt text' } })
+    ).toBeUndefined();
   });
 
   it('marks 500 as usage_retriable', () => {

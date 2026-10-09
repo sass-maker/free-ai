@@ -34,7 +34,8 @@ import {
   canFallbackFromProviderFailure,
   classifyError,
   getUpstreamStatus,
-  isProviderAccountFailure,
+  isProviderUnavailableForRequest,
+  isUpstreamRegionFailure,
   isRetriableFailure,
   MalformedProviderOutputError,
 } from './router/classify-error';
@@ -1325,16 +1326,20 @@ function handleChatProviderError(
     latency_ms: Date.now() - startedAt,
   });
 
-  c.executionCtx.waitUntil(
-    healthRecord(c.env, {
-      key: getModelKey(candidate.provider, candidate.model),
-      success: false,
-      latencyMs: Date.now() - startedAt,
-      failureClass,
-      keyRetryPending,
-      now: Date.now(),
-    })
-  );
+  // Caller input errors and colo-bound egress rejections say nothing about the
+  // model's health; recording them would demote a working model for everyone.
+  if (failureClass !== 'input_nonretriable' && !isUpstreamRegionFailure(error)) {
+    c.executionCtx.waitUntil(
+      healthRecord(c.env, {
+        key: getModelKey(candidate.provider, candidate.model),
+        success: false,
+        latencyMs: Date.now() - startedAt,
+        failureClass,
+        keyRetryPending,
+        now: Date.now(),
+      })
+    );
+  }
 
   if (
     (!keyRetryPending &&
@@ -1346,6 +1351,11 @@ function handleChatProviderError(
   }
 
   throw error instanceof Error ? error : new Error(state.lastErrorMessage);
+}
+
+function requestColo(request: Request): string | null {
+  const colo = (request as Request & { cf?: { colo?: unknown } }).cf?.colo;
+  return typeof colo === 'string' && /^[A-Z]{3}$/.test(colo) ? colo : null;
 }
 
 function createChatRetryCallback(
@@ -1384,6 +1394,7 @@ function createChatRetryCallback(
       model: candidate.model,
       attempt: state.attemptCounter,
       ...keyChoice.metadata,
+      colo: requestColo(c.req.raw),
     };
 
     try {
@@ -1417,7 +1428,7 @@ function createChatRetryCallback(
       }
       const keyRetryPending = geminiKeys.canRetry(keyChoice, state.attemptCounter, error);
       if (keyRetryPending) keyRetryCandidate = candidate;
-      else if (isProviderAccountFailure(error)) unavailableProviders.add(candidate.provider);
+      else if (isProviderUnavailableForRequest(error)) unavailableProviders.add(candidate.provider);
       logUpstreamFailure(attemptMeta, error, keyRetryPending);
       handleChatProviderError(ctx, candidate, error, startedAt, keyRetryPending);
     }
