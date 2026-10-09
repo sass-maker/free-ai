@@ -10,7 +10,7 @@ interface HealthDoEnv {
 }
 
 interface ModelState {
-  history: AttemptRecord[];
+  history: Array<AttemptRecord & { malformed?: boolean }>;
   cooldownUntil: number;
   dayKey: string;
   dailyUsed: number;
@@ -45,6 +45,7 @@ const HISTORY_LIMIT = 100;
 const SHORT_WINDOW = 10;
 const SHORT_FAILURE_THRESHOLD = 7;
 const COOL_DOWN_MS = 120_000;
+const MALFORMED_COOLDOWN_MS = 60_000;
 const RETRIABLE_BASE_COOLDOWN_MS = 45_000;
 const SNAPSHOT_DEBOUNCE_MS = 30_000;
 
@@ -335,6 +336,7 @@ export class HealthStateDO {
         latencyMs: number;
         failureClass?: FailureClass;
         keyRetryPending?: boolean;
+        malformed?: boolean;
         now: number;
       };
 
@@ -347,6 +349,7 @@ export class HealthStateDO {
         latencyMs: body.latencyMs,
         failureClass: body.failureClass,
         keyRetryPending: body.keyRetryPending,
+        malformed: body.malformed,
       });
 
       if (modelState.history.length > HISTORY_LIMIT) {
@@ -367,6 +370,17 @@ export class HealthStateDO {
         modelState.cooldownUntil = Math.max(
           modelState.cooldownUntil,
           body.now + RETRIABLE_BASE_COOLDOWN_MS
+        );
+      }
+
+      if (
+        !body.success &&
+        body.malformed &&
+        recent.filter((attempt) => !attempt.success && attempt.malformed).length >= 2
+      ) {
+        modelState.cooldownUntil = Math.max(
+          modelState.cooldownUntil,
+          body.now + MALFORMED_COOLDOWN_MS
         );
       }
 

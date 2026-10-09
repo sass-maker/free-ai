@@ -119,7 +119,7 @@ describe('automatic schema output', () => {
   it('falls back from generated JSON validation within two attempts but never retries caller errors', async () => {
     mocks.registry = [
       candidate('groq', 'openai/gpt-oss-120b'),
-      candidate('groq', 'openai/gpt-oss-20b'),
+      { ...candidate('gemini', 'gemini-3.5-flash-lite'), priority: 0 },
     ];
     let calls = 0;
     const fetcher = vi.fn(async () =>
@@ -134,6 +134,7 @@ describe('automatic schema output', () => {
     const response = await app.fetch(request(), env(), makeCtx());
     expect(response.status).toBe(200);
     expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(await response.json()).toMatchObject({ x_gateway: { attempts: 2, provider: 'gemini' } });
     fetcher
       .mockReset()
       .mockImplementation(async () =>
@@ -142,6 +143,7 @@ describe('automatic schema output', () => {
           { status: 400 }
         )
       );
+    mocks.registry = [candidate('groq', 'openai/gpt-oss-120b')];
     const invalid = await app.fetch(request(), env(), makeCtx());
     expect(invalid.status).toBe(400);
     expect(fetcher).toHaveBeenCalledTimes(1);

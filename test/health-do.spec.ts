@@ -21,6 +21,65 @@ function makeState() {
 }
 
 describe('HealthStateDO', () => {
+  it('cools only the model with two malformed outputs in the recent window', async () => {
+    const state = makeState();
+    let health = new HealthStateDO(state, {});
+    const now = Date.now();
+    const record = async (key: string, malformed = true, success = false) =>
+      health.fetch(
+        new Request('https://internal.local/record', {
+          method: 'POST',
+          body: JSON.stringify({
+            key,
+            success,
+            malformed,
+            failureClass: 'provider_fatal',
+            latencyMs: 10,
+            now,
+          }),
+        })
+      );
+    const lookup = async (time = now) => {
+      const res = await health.fetch(
+        new Request('https://internal.local/lookup', {
+          method: 'POST',
+          body: JSON.stringify({ keys: ['mistral:a', 'mistral:b'], limits: {}, now: time }),
+        })
+      );
+      return ((await res.json()) as { snapshots: Array<{ cooldownUntil: number }> }).snapshots;
+    };
+    await record('mistral:a');
+    await record('mistral:b', false);
+    expect((await lookup()).map((s) => s.cooldownUntil)).toEqual([0, 0]);
+    await record('mistral:a', false, true);
+    await record('mistral:a');
+    expect((await lookup()).map((s) => s.cooldownUntil)).toEqual([now + 60_000, 0]);
+    health = new HealthStateDO(state, {});
+    expect((await lookup())[0].cooldownUntil).toBe(now + 60_000);
+    expect((await lookup(now + 60_001))[0].cooldownUntil).toBeLessThan(now + 60_001);
+  });
+
+  it('does not count malformed failures outside the short history window', async () => {
+    const health = new HealthStateDO(makeState(), {});
+    for (let i = 0; i < 12; i += 1) {
+      await health.fetch(
+        new Request('https://internal.local/record', {
+          method: 'POST',
+          body: JSON.stringify({
+            key: 'mistral:a',
+            success: i > 0 && i < 11,
+            malformed: i === 0 || i === 11,
+            latencyMs: 10,
+            now: Date.now(),
+          }),
+        })
+      );
+    }
+    const res = await health.fetch(new Request('https://internal.local/snapshot'));
+    const body = (await res.json()) as { snapshots: Array<{ cooldownUntil: number }> };
+    expect(body.snapshots[0].cooldownUntil).toBe(0);
+  });
+
   it('keeps failed key attempts visible without cooling a model recovered by another key', async () => {
     const health = new HealthStateDO(makeState(), {});
     const now = Date.now();

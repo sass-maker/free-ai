@@ -104,7 +104,11 @@ describe('chat provider reliability contract', () => {
   });
 
   it('falls back to the next candidate when a provider resolves malformed output', async () => {
-    mocks.registry = [candidate('malformed-a'), candidate('healthy-b')];
+    mocks.registry = [
+      candidate('malformed-a'),
+      candidate('same-provider'),
+      candidate('healthy-b', 'cohere'),
+    ];
     mocks.call.mockReset();
     mocks.call
       .mockResolvedValueOnce({
@@ -113,7 +117,7 @@ describe('chat provider reliability contract', () => {
         stream: false,
         completion: {},
       })
-      .mockResolvedValueOnce(okCompletion('groq', 'healthy-b'));
+      .mockResolvedValueOnce(okCompletion('cohere', 'healthy-b'));
 
     const { env } = makeTestEnv({ GROQ_API_KEY: 'g' });
     const res = await app.fetch(chatRequest(), env, makeCtx());
@@ -126,6 +130,10 @@ describe('chat provider reliability contract', () => {
     };
     expect(body.x_gateway.attempts).toBe(2);
     expect(body.x_gateway.model).toBe('healthy-b');
+    expect(mocks.call.mock.calls.map(([input]) => input.model)).toEqual([
+      'malformed-a',
+      'healthy-b',
+    ]);
     expect(body.degraded).toBe(true);
     expect(body.choices[0].message.content).toBe('ok from healthy-b');
   });
@@ -137,9 +145,22 @@ describe('chat provider reliability contract', () => {
     ['null choice', { choices: [null] }],
     ['missing message content', { choices: [{ message: { role: 'assistant' } }] }],
     ['numeric content', { choices: [{ message: { content: 42 } }] }],
+    ['empty string', { choices: [{ message: { content: '' } }] }],
+    ['empty chunks', { choices: [{ message: { content: [] } }] }],
+    ['garbage chunks', { choices: [{ message: { content: [{ type: 'text', text: 42 }] } }] }],
+    [
+      'thinking only',
+      {
+        choices: [
+          {
+            message: { content: [{ type: 'thinking', thinking: [{ type: 'text', text: 'hmm' }] }] },
+          },
+        ],
+      },
+    ],
     ['invalid tool call', { choices: [{ message: { tool_calls: [{}] } }] }],
   ])('does not return a synthetic 200 when the completion is %s', async (_label, completion) => {
-    mocks.registry = [candidate('malformed-a'), candidate('malformed-b')];
+    mocks.registry = [candidate('malformed-a'), candidate('malformed-b', 'cohere')];
     mocks.call.mockReset();
     mocks.call.mockImplementation(async ({ provider, model }) => ({
       provider,
@@ -198,12 +219,111 @@ describe('chat provider reliability contract', () => {
     expect(mocks.call).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ['null tool calls', { content: 'hello', tool_calls: null }, { content: 'hello' }],
+    [
+      'text chunks',
+      {
+        content: [
+          { type: 'text', text: 'hello ' },
+          { type: 'thinking', thinking: [{ type: 'text', text: 'private reasoning' }] },
+          { type: 'text', text: 'world' },
+        ],
+        tool_calls: null,
+      },
+      { content: 'hello world' },
+    ],
+    [
+      'object arguments',
+      {
+        content: null,
+        tool_calls: [
+          { function: { name: 'lookup', arguments: { query: 'hello' } } },
+          { id: null, function: { name: 'lookup', arguments: {} } },
+          { id: 'null', type: 'function', function: { name: 'lookup', arguments: '{}' } },
+        ],
+      },
+      {
+        content: null,
+        tool_calls: [
+          {
+            id: expect.stringMatching(/^call_/),
+            type: 'function',
+            function: { name: 'lookup', arguments: '{"query":"hello"}' },
+          },
+          {
+            id: expect.stringMatching(/^call_/),
+            type: 'function',
+            function: { name: 'lookup', arguments: '{}' },
+          },
+          {
+            id: expect.stringMatching(/^call_/),
+            type: 'function',
+            function: { name: 'lookup', arguments: '{}' },
+          },
+        ],
+      },
+    ],
+  ])('normalizes Mistral-compatible %s to OpenAI output', async (_label, message, expected) => {
+    mocks.registry = [candidate('valid-a')];
+    mocks.call.mockResolvedValueOnce({
+      provider: 'groq',
+      model: 'valid-a',
+      stream: false,
+      completion: {
+        choices: [{ index: 0, message: { role: 'assistant', ...message }, finish_reason: 'stop' }],
+      },
+    });
+    const { env } = makeTestEnv({ GROQ_API_KEY: 'g' });
+    const res = await app.fetch(chatRequest(), env, makeCtx());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { choices: Array<{ message: unknown }> };
+    expect(body.choices[0].message).toEqual({ role: 'assistant', ...expected });
+    expect(mocks.call).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['x-gateway-force-provider', 'x-gateway-force-model'])(
+    'keeps malformed retries pinned by %s',
+    async (header) => {
+      mocks.registry = [
+        candidate('pinned-a'),
+        candidate('pinned-b'),
+        candidate('other-provider', 'cohere'),
+      ];
+      mocks.call.mockResolvedValueOnce({
+        provider: 'groq',
+        model: 'pinned-a',
+        stream: false,
+        completion: {},
+      });
+      const request = chatRequest();
+      request.headers.set(header, header === 'x-gateway-force-provider' ? 'groq' : 'pinned-a');
+      const { env } = makeTestEnv({ GROQ_API_KEY: 'g' });
+      const res = await app.fetch(request, env, makeCtx());
+      expect(mocks.call.mock.calls.every(([input]) => input.provider === 'groq')).toBe(true);
+      if (header === 'x-gateway-force-provider') {
+        expect(res.status).toBe(200);
+        expect(mocks.call.mock.calls.map(([input]) => input.model)).toEqual([
+          'pinned-a',
+          'pinned-b',
+        ]);
+      } else {
+        expect(res.status).toBe(502);
+        expect(mocks.call).toHaveBeenCalledTimes(1);
+      }
+    }
+  );
+
   it('falls back when the upstream body cannot be parsed (SyntaxError)', async () => {
-    mocks.registry = [candidate('unparseable'), candidate('healthy-b')];
+    mocks.registry = [
+      candidate('unparseable'),
+      candidate('same-provider'),
+      candidate('healthy-b', 'cohere'),
+    ];
     mocks.call.mockReset();
     mocks.call
       .mockRejectedValueOnce(new SyntaxError('Unexpected token < in JSON'))
-      .mockResolvedValueOnce(okCompletion('groq', 'healthy-b'));
+      .mockResolvedValueOnce(okCompletion('cohere', 'healthy-b'));
 
     const { env } = makeTestEnv({ GROQ_API_KEY: 'g' });
     const res = await app.fetch(chatRequest(), env, makeCtx());
