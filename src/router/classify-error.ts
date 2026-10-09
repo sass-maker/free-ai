@@ -95,12 +95,9 @@ export function classifyError(error: unknown): FailureClass {
     return 'usage_retriable';
   }
 
-  // Groq uses 400 for invalid generated JSON. It is provider output, not
-  // malformed caller input; allow normal fallback within the existing cap.
-  if (isMalformedProviderOutput(error)) return 'provider_fatal';
-
-  // Upstream account/egress rejections reuse 400 but are not caller errors.
-  if (isUpstreamRegionFailure(error) || isUpstreamKeyRejected(error)) return 'provider_fatal';
+  // Groq uses 400 for invalid generated JSON, and Gemini uses 400 for egress
+  // location and key rejections. None of these are malformed caller input.
+  if (isProviderSideBadRequest(error)) return 'provider_fatal';
 
   if (INPUT_ERROR_STATUSES.has(status ?? -1)) {
     return 'input_nonretriable';
@@ -115,6 +112,14 @@ export function classifyError(error: unknown): FailureClass {
   }
 
   return 'provider_fatal';
+}
+
+function isProviderSideBadRequest(error: unknown): boolean {
+  return (
+    isMalformedProviderOutput(error) ||
+    isUpstreamRegionFailure(error) ||
+    isUpstreamKeyRejected(error)
+  );
 }
 
 export function isRetriableFailure(failureClass: FailureClass): boolean {
