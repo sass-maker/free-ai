@@ -246,22 +246,134 @@ describe('automatic cross-provider fallback through the real SDK', () => {
     });
   });
 
-  it('stops after two denied keys without starting a third provider attempt', async () => {
+  it.each([400, 403])(
+    'falls back on attempt three after key recovery then upstream %i',
+    async (status) => {
+      const calls: Request[] = [];
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push(new Request(input, init));
+        if (calls.length === 1) return new Response(null, { status: 403 });
+        if (calls.length === 2) return new Response(null, { status });
+        return success();
+      });
+      const response = await app.fetch(request(), env(), makeCtx());
+      expect(response.status).toBe(200);
+      expect(calls.map((sent) => new URL(sent.url).hostname)).toEqual([
+        'generativelanguage.googleapis.com',
+        'generativelanguage.googleapis.com',
+        'api.groq.com',
+      ]);
+      expect(calls[0].headers.get('authorization')).not.toBe(calls[1].headers.get('authorization'));
+      expect(await response.json()).toMatchObject({ x_gateway: { provider: 'groq', attempts: 3 } });
+    }
+  );
+
+  it('stops after three attempts even when more providers and keys remain', async () => {
+    mocks.registry.push(candidate('nvidia-third', 'nvidia'));
+    const upstream = vi.fn(async () => new Response(null, { status: 403 }));
+    vi.stubGlobal('fetch', upstream);
+    const response = await app.fetch(request(), env(), makeCtx());
+    expect(response.status).toBe(502);
+    expect(upstream).toHaveBeenCalledTimes(3);
+    expect(await response.json()).toMatchObject({ error: { upstream_status: 403, attempts: 3 } });
+  });
+
+  it('does not grant key recovery when Gemini is the second provider attempted', async () => {
+    mocks.registry = [
+      candidate('nvidia-first', 'nvidia'),
+      candidate('gemini-second', 'gemini'),
+      candidate('groq-third', 'groq'),
+    ];
+    const upstream = vi.fn(async () => new Response(null, { status: 403 }));
+    vi.stubGlobal('fetch', upstream);
+    const response = await app.fetch(request(), env(), makeCtx());
+    expect(response.status).toBe(502);
+    expect(upstream).toHaveBeenCalledTimes(2);
+    expect(await response.json()).toMatchObject({ error: { upstream_status: 403, attempts: 2 } });
+  });
+
+  it.each([400, 422])('skips sibling models after upstream input error %i', async (status) => {
     const calls: Request[] = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       calls.push(new Request(input, init));
-      return new Response(null, { status: 403 });
+      return calls.length === 1 ? new Response(null, { status }) : success();
     });
     const response = await app.fetch(request(), env(), makeCtx());
-    expect(response.status).toBe(502);
-    expect(calls).toHaveLength(2);
+    expect(response.status).toBe(200);
     expect(calls.map((sent) => new URL(sent.url).hostname)).toEqual([
       'generativelanguage.googleapis.com',
-      'generativelanguage.googleapis.com',
+      'api.groq.com',
     ]);
-    expect(calls[0].headers.get('authorization')).not.toBe(calls[1].headers.get('authorization'));
-    expect(await response.json()).toMatchObject({ error: { upstream_status: 403, attempts: 2 } });
+    expect(await response.json()).toMatchObject({ x_gateway: { provider: 'groq', attempts: 2 } });
   });
+
+  it.each([400, 422])('returns input error after both providers reject with %i', async (status) => {
+    mocks.registry.push(candidate('nvidia-third', 'nvidia'));
+    const upstream = vi.fn(async () => new Response(null, { status }));
+    vi.stubGlobal('fetch', upstream);
+    const response = await app.fetch(request(), env(), makeCtx());
+    expect(response.status).toBe(400);
+    expect(upstream).toHaveBeenCalledTimes(2);
+    expect(await response.json()).toMatchObject({
+      error: { type: 'input_nonretriable', upstream_status: status, attempts: 2 },
+    });
+  });
+
+  it('does not retry input errors when only the same provider remains', async () => {
+    mocks.registry = [candidate('gemini-first', 'gemini'), candidate('gemini-sibling', 'gemini')];
+    const upstream = vi.fn(async () => new Response(null, { status: 400 }));
+    vi.stubGlobal('fetch', upstream);
+    const response = await app.fetch(request(), env(), makeCtx());
+    expect(response.status).toBe(400);
+    expect(upstream).toHaveBeenCalledTimes(1);
+    expect(await response.json()).toMatchObject({
+      error: { type: 'input_nonretriable', attempts: 1 },
+    });
+  });
+
+  it.each(['x-gateway-force-model', 'x-gateway-force-provider'])(
+    'keeps input errors terminal when pinned with %s',
+    async (header) => {
+      const upstream = vi.fn(async () => new Response(null, { status: 400 }));
+      vi.stubGlobal('fetch', upstream);
+      const pinnedRequest = request();
+      pinnedRequest.headers.set(header, header.endsWith('model') ? 'gemini-first' : 'gemini');
+      const response = await app.fetch(pinnedRequest, env(), makeCtx());
+      expect(response.status).toBe(400);
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(await response.json()).toMatchObject({
+        error: { type: 'input_nonretriable', upstream_status: 400, attempts: 1 },
+      });
+    }
+  );
+
+  it.each([false, true])(
+    'recovers streaming input failure with key retry: %s',
+    async (keyRetry) => {
+      const calls: Request[] = [];
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push(new Request(input, init));
+        if (keyRetry && calls.length === 1) return new Response(null, { status: 403 });
+        if (calls.length === (keyRetry ? 2 : 1)) return new Response(null, { status: 400 });
+        return new Response(
+          'data: ' +
+            JSON.stringify({
+              model: 'groq-alternate',
+              choices: [{ index: 0, delta: { content: 'Recovered' } }],
+            }) +
+            '\n\ndata: [DONE]\n\n',
+          { headers: { 'content-type': 'text/event-stream' } }
+        );
+      });
+      const response = await app.fetch(request(undefined, false, true), env(), makeCtx());
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-gateway-attempts')).toBe(keyRetry ? '3' : '2');
+      expect(response.headers.get('x-gateway-model')).toBe('groq-alternate');
+      expect(await response.text()).toContain('Recovered');
+      expect(new URL(calls.at(-1)?.url ?? '').hostname).toBe('api.groq.com');
+      expect(calls).toHaveLength(keyRetry ? 3 : 2);
+    }
+  );
 
   it('recovers an automatic streaming handshake with a distinct key', async () => {
     const auth: Array<string | null> = [];

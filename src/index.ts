@@ -1212,6 +1212,7 @@ function buildChatFinalResponse(
 
 interface ChatRetryState {
   attemptCounter: number;
+  maxAttempts: number;
   chosenMeta: GatewayMeta | undefined;
   finalResponse: Record<string, unknown> | null;
   streamResponse: Response | null;
@@ -1311,7 +1312,8 @@ function handleChatProviderError(
   candidate: ModelCandidate,
   error: unknown,
   startedAt: number,
-  keyRetryPending = false
+  keyRetryPending = false,
+  inputFallbackPending = false
 ): void {
   const { c, state } = ctx;
   const failureClass = classifyError(error);
@@ -1343,9 +1345,10 @@ function handleChatProviderError(
 
   if (
     (!keyRetryPending &&
+      !inputFallbackPending &&
       !isRetriableFailure(failureClass) &&
       !canFallbackFromProviderFailure(error, failureClass)) ||
-    state.attemptCounter >= 2
+    state.attemptCounter >= state.maxAttempts
   ) {
     throw new AbortError(state.lastErrorMessage);
   }
@@ -1369,6 +1372,9 @@ function createChatRetryCallback(
   const ctx: ChatRetryContext = { c, normalized, requestId, projectId, state };
   let nextCandidate = 0;
   const unavailableProviders = new Set<TextProvider>();
+  const pinned = Boolean(
+    c.req.header('x-gateway-force-model') || c.req.header('x-gateway-force-provider')
+  );
   const geminiKeys = new GeminiKeyPool(
     c.env.GEMINI_API_KEY,
     Boolean(c.req.header('x-gateway-force-model'))
@@ -1380,7 +1386,7 @@ function createChatRetryCallback(
     }
     const candidate = keyRetryCandidate ?? selected[nextCandidate++];
     keyRetryCandidate = undefined;
-    if (!candidate || state.attemptCounter >= 2) {
+    if (!candidate || state.attemptCounter >= state.maxAttempts) {
       throw new AbortError('No more candidates');
     }
 
@@ -1427,10 +1433,32 @@ function createChatRetryCallback(
         throw new AbortError('Request aborted');
       }
       const keyRetryPending = geminiKeys.canRetry(keyChoice, state.attemptCounter, error);
-      if (keyRetryPending) keyRetryCandidate = candidate;
-      else if (isProviderUnavailableForRequest(error)) unavailableProviders.add(candidate.provider);
+      const inputFailure = classifyError(error) === 'input_nonretriable';
+      const inputFallbackPending =
+        !pinned &&
+        inputFailure &&
+        selected
+          .slice(nextCandidate)
+          .some(
+            (next) =>
+              next.provider !== candidate.provider && !unavailableProviders.has(next.provider)
+          );
+      if (keyRetryPending) {
+        // Only recovery from the first attempt earns a separate key attempt.
+        state.maxAttempts = 3;
+        keyRetryCandidate = candidate;
+      } else if (isProviderUnavailableForRequest(error) || (!pinned && inputFailure)) {
+        unavailableProviders.add(candidate.provider);
+      }
       logUpstreamFailure(attemptMeta, error, keyRetryPending);
-      handleChatProviderError(ctx, candidate, error, startedAt, keyRetryPending);
+      handleChatProviderError(
+        ctx,
+        candidate,
+        error,
+        startedAt,
+        keyRetryPending,
+        inputFallbackPending
+      );
     }
   };
 }
@@ -1791,6 +1819,7 @@ app.openapi(chatRoute, async (c) => {
 
   const state: ChatRetryState = {
     attemptCounter: 0,
+    maxAttempts: 2,
     chosenMeta: undefined,
     finalResponse: null,
     streamResponse: null,
@@ -1803,7 +1832,8 @@ app.openapi(chatRoute, async (c) => {
 
   await pRetry(createChatRetryCallback(c, selected, normalized, requestId, projectId, state), {
     signal: c.req.raw.signal,
-    retries: 1,
+    retries: 2,
+    shouldRetry: () => state.attemptCounter < state.maxAttempts,
     minTimeout: 500,
     maxTimeout: 5000,
     factor: 2,

@@ -43,7 +43,8 @@ export class GeminiKeyPool {
   }
 
   canRetry(choice: KeyChoice, attempts: number, error: unknown): boolean {
-    if (!choice.apiKey || attempts >= 2 || this.used.size >= this.keys.length) return false;
+    // One distinct-key recovery, only after the first upstream attempt.
+    if (!choice.apiKey || attempts !== 1 || this.used.size >= this.keys.length) return false;
     const failureClass = classifyError(error);
     return (
       (this.pinned && isRetriableFailure(failureClass)) ||

@@ -199,12 +199,16 @@ describe('chat automatic health rotation', () => {
   });
 
   it.each([400, 422])(
-    'does not treat upstream %i as account fallback permission',
+    'returns input error after cross-provider fallback for upstream %i',
     async (status) => {
       mocks.registry = [candidate('first'), candidate('alternate', 'cohere')];
       mocks.call.mockRejectedValue(Object.assign(new Error('request rejected'), { status }));
-      await request(0, []);
-      expect(mocks.call).toHaveBeenCalledTimes(1);
+      const response = await request(0, []);
+      expect(response.status).toBe(400);
+      expect(mocks.call).toHaveBeenCalledTimes(2);
+      expect(await response.json()).toMatchObject({
+        error: { type: 'input_nonretriable', upstream_status: status, attempts: 2 },
+      });
     }
   );
 
