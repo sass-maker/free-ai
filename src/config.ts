@@ -566,7 +566,10 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'mistral-medium-latest',
     reasoning: 'high',
     supportsStreaming: true,
-    enabled: true,
+    // 2026-10: on the Free plan this model answers every request with HTTP
+    // 429 (quota) while codestral and ministral still serve. Re-enable after
+    // the plan changes or the quota recovers.
+    enabled: false,
     priority: 0.82,
     capabilities: {
       toolCalling: true,
@@ -582,7 +585,10 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'mistral-small-latest',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true,
+    // 2026-10: on the Free plan this model answers every request with HTTP
+    // 429 (quota) while codestral and ministral still serve. Re-enable after
+    // the plan changes or the quota recovers.
+    enabled: false,
     priority: 0.78,
     capabilities: {
       toolCalling: true,
