@@ -64,6 +64,7 @@ describe('Operator browser UI routes', () => {
   it('identifies enabled models that are manual-only', async () => {
     const res = await fetchRouteWithEnv('/v1/models', {
       NVIDIA_API_KEY: 'nvidia-test-key',
+      ZAI_API_KEY: 'zai-test-key',
     });
 
     expect(res.status).toBe(200);
@@ -71,11 +72,11 @@ describe('Operator browser UI routes', () => {
       data: Array<{ id: string; enabled: boolean; automatic_routing: boolean }>;
     };
 
-    expect(body.data.find((model) => model.id === 'nvidia-llama4-maverick')).toMatchObject({
+    expect(body.data.find((model) => model.id === 'zai-glm-4-7-flash')).toMatchObject({
       enabled: true,
       automatic_routing: false,
     });
-    expect(body.data.find((model) => model.id === 'nvidia-nemotron-70b')).toMatchObject({
+    expect(body.data.find((model) => model.id === 'nvidia-nemotron-3-super-120b')).toMatchObject({
       enabled: true,
       automatic_routing: true,
     });

@@ -136,7 +136,7 @@ describe('GET /v1/routing/status', () => {
   it('reports manual-only models without presenting them as automatic fallbacks', async () => {
     const { env } = makeTestEnv({
       GROQ_API_KEY: 'groq-test-key',
-      NVIDIA_API_KEY: 'nvidia-test-key',
+      ZAI_API_KEY: 'zai-test-key',
     });
 
     const res = await app.fetch(
@@ -148,15 +148,15 @@ describe('GET /v1/routing/status', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       summary: { manual_only_models: number };
-      fallback_order: Array<{ id: string }>;
+      fallback_order: Array<{ id: string; provider: string }>;
       providers: Record<string, { configured_models: number; manual_only_models: number }>;
     };
 
-    expect(body.summary.manual_only_models).toBe(1);
-    expect(body.fallback_order.some((item) => item.id === 'nvidia-llama4-maverick')).toBe(false);
-    expect(body.providers.nvidia).toMatchObject({
+    expect(body.summary.manual_only_models).toBe(3);
+    expect(body.fallback_order.some((item) => item.provider === 'zai')).toBe(false);
+    expect(body.providers.zai).toMatchObject({
       configured_models: expect.any(Number),
-      manual_only_models: 1,
+      manual_only_models: 3,
     });
   });
 });

@@ -136,9 +136,10 @@ const CATALOG_SPECS = [
   },
   {
     provider: 'zai',
-    secret: 'ZAI_API_KEY',
-    url: () => 'https://api.z.ai/api/paas/v4/models',
-    headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+    // https://api.z.ai/api/paas/v4/models lists only the paid GLM models. The
+    // free Flash models the registry routes to (glm-4.x-flash) still serve
+    // completions but never appear there, so the catalog would mark them stale.
+    unsupported: 'the Z.ai model list omits the free Flash models the registry uses',
   },
   {
     provider: 'modelscope',
