@@ -805,14 +805,17 @@ const DEFAULT_MODELS: ModelCandidate[] = [
   // ── Z.ai / Zhipu GLM (free Flash models, OpenAI-compatible) ──────────
   // GLM-4.7-Flash and GLM-4.5-Flash are free; GLM-4.6V-Flash is a free
   // vision model. Previously only reachable via Cerebras/OpenRouter.
+  // Keep glm-4.5-flash first: the weekly replay smoke probes the first enabled
+  // model per provider, and glm-4.7-flash often returns 429 code 1305
+  // (upstream overload) while glm-4.5-flash answers.
   {
-    id: 'zai-glm-4-7-flash',
+    id: 'zai-glm-4-5-flash',
     provider: 'zai',
-    model: 'glm-4.7-flash',
+    model: 'glm-4.5-flash',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.84,
+    priority: 0.8,
     capabilities: {
       toolCalling: true,
       jsonMode: true,
@@ -822,13 +825,13 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'zai-glm-4-5-flash',
+    id: 'zai-glm-4-7-flash',
     provider: 'zai',
-    model: 'glm-4.5-flash',
+    model: 'glm-4.7-flash',
     reasoning: 'medium',
     supportsStreaming: true,
     enabled: true,
-    priority: 0.8,
+    priority: 0.84,
     capabilities: {
       toolCalling: true,
       jsonMode: true,
