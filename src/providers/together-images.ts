@@ -1,5 +1,5 @@
 import type { Env } from '../types';
-import { parseSize } from './image-utils';
+import { imageHttpError, parseSize } from './image-utils';
 
 export interface TogetherImageInput {
   env: Env;
@@ -43,8 +43,7 @@ export async function callTogetherImages(input: TogetherImageInput): Promise<Tog
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Together image error (${response.status}): ${text}`);
+    throw await imageHttpError('Together', response);
   }
 
   const json = (await response.json()) as {

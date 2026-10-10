@@ -3,7 +3,15 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { getImageRegistry, hasImageProviderKey } from '../config';
 import { CostBudget } from '../lib/cost-budget';
 import { imageProviderCallers } from '../providers';
-import { classifyError, isRetriableFailure } from '../router/classify-error';
+import {
+  canFallbackFromProviderFailure,
+  classifyError,
+  getUpstreamStatus,
+  isProviderAccountFailure,
+  isProviderUnavailableForRequest,
+  isRetriableFailure,
+} from '../router/classify-error';
+import { healthLookup, healthRecord } from '../state/client';
 import type { Env, ImageModelCandidate, Provider } from '../types';
 import { createRequestId, getErrorMessage } from '../utils/request';
 import { sortFallbackLast } from './provider-order';
@@ -146,12 +154,18 @@ function imageErrorStatus(errorClass: string): 400 | 429 | 502 {
   return 502;
 }
 
-function buildImageErrorBody(lastError: string, lastErrorClass: string, costBudget: CostBudget) {
+function buildImageErrorBody(
+  lastError: string,
+  lastErrorClass: string,
+  costBudget: CostBudget,
+  attemptErrors: Array<{ provider: string; status: number | null }>
+) {
   return {
     error: {
       message: `All image providers failed: ${lastError}`,
       type: lastErrorClass,
       cost_budget: costBudget.state(),
+      attempts: attemptErrors,
     },
   } as never;
 }
@@ -175,24 +189,56 @@ export function registerImageGenerationRoute(
       return context.json(noImageProviderError(), 503);
     }
 
-    const sorted = sortFallbackLast(
-      registry,
-      !forcedProvider && body.model.toLowerCase() === 'auto'
+    const auto = body.model.toLowerCase() === 'auto';
+    const now = Date.now();
+    // Separate image-provider health from chat model health and account cooldowns.
+    const healthKey = (provider: string) => `${provider}:images`;
+    const health = await healthLookup(
+      context.env,
+      [...new Set(registry.map((candidate) => healthKey(candidate.provider)))],
+      {},
+      now
     );
+    let sorted = sortFallbackLast(registry, !forcedProvider && auto);
+    if (auto) {
+      const seen = new Set<string>();
+      sorted = sorted.filter((candidate) => {
+        if ((health.get(healthKey(candidate.provider))?.cooldownUntil ?? 0) > now) return false;
+        if (seen.has(candidate.provider)) return false;
+        seen.add(candidate.provider);
+        return true;
+      });
+      sorted.sort((a, b) => {
+        if (!forcedProvider) {
+          const fallbackDiff =
+            Number(a.provider === 'workers_ai') - Number(b.provider === 'workers_ai');
+          if (fallbackDiff) return fallbackDiff;
+        }
+        const healthDiff =
+          (health.get(healthKey(b.provider))?.successRate ?? 1) -
+          (health.get(healthKey(a.provider))?.successRate ?? 1);
+        return healthDiff || b.priority - a.priority;
+      });
+    }
+    if (sorted.length === 0) return context.json(noImageProviderError(), 503);
     let lastError = 'Unknown error';
     let attempts = 0;
     let chosenProvider: string | undefined;
     let chosenModel: string | undefined;
     let lastErrorClass = 'provider_fatal';
-    const costBudget = new CostBudget({ maxAttempts: 3, maxTotalTimeoutMs: 180_000 });
+    const costBudget = new CostBudget({ maxAttempts: 5, maxTotalTimeoutMs: 300_000 });
+    const attemptErrors: Array<{ provider: string; status: number | null }> = [];
+    const unavailable = new Set<string>();
 
-    for (const candidate of sorted.slice(0, 3)) {
+    for (const candidate of sorted.slice(0, 5)) {
+      if (unavailable.has(candidate.provider)) continue;
       if (!costBudget.canAttempt()) break;
 
       attempts += 1;
       chosenProvider = candidate.provider;
       chosenModel = candidate.model;
       costBudget.recordAttempt(60_000);
+      const startedAt = Date.now();
 
       try {
         const caller = imageProviderCallers[candidate.provider];
@@ -204,6 +250,14 @@ export function registerImageGenerationRoute(
           size: body.size,
           response_format: body.response_format,
         });
+        context.executionCtx.waitUntil(
+          healthRecord(context.env, {
+            key: healthKey(candidate.provider),
+            success: true,
+            latencyMs: Date.now() - startedAt,
+            now: Date.now(),
+          })
+        );
 
         context.executionCtx.waitUntil(
           recordAnalytics({
@@ -225,7 +279,29 @@ export function registerImageGenerationRoute(
         lastError = getErrorMessage(error);
         const failureClass = classifyError(error);
         lastErrorClass = failureClass;
-        if (!isRetriableFailure(failureClass)) {
+        attemptErrors.push({
+          provider: candidate.provider,
+          status: getUpstreamStatus(error) ?? null,
+        });
+        if (isProviderUnavailableForRequest(error)) unavailable.add(candidate.provider);
+        if (failureClass !== 'input_nonretriable' && failureClass !== 'safety_refusal') {
+          // Await writes so the next request observes account failures immediately.
+          await healthRecord(context.env, {
+            key: healthKey(candidate.provider),
+            success: false,
+            latencyMs: Date.now() - startedAt,
+            failureClass,
+            unavailableUntil: isProviderAccountFailure(error)
+              ? Date.now() + 24 * 60 * 60 * 1000
+              : undefined,
+            now: Date.now(),
+          });
+        }
+        if (
+          !isRetriableFailure(failureClass) &&
+          !canFallbackFromProviderFailure(error, failureClass) &&
+          !(auto && failureClass === 'provider_fatal')
+        ) {
           break;
         }
       }
@@ -242,7 +318,7 @@ export function registerImageGenerationRoute(
     );
 
     return context.json(
-      buildImageErrorBody(lastError, lastErrorClass, costBudget),
+      buildImageErrorBody(lastError, lastErrorClass, costBudget, attemptErrors),
       imageErrorStatus(lastErrorClass)
     );
   });

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import app from '../src/index';
+import { callTogetherImages } from '../src/providers/together-images';
+import { imageHttpError } from '../src/providers/image-utils';
 import { makeCtx, makeTestEnv } from './helpers/env';
 
 // Mock provider callers BEFORE importing the app so the app captures our stubs.
@@ -57,6 +59,181 @@ describe('POST /v1/images/generations', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  function imageRequest(model = 'auto') {
+    return new Request('https://gateway.test/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer test-gateway-key',
+        'x-gateway-project-id': 'test-proj',
+      },
+      body: JSON.stringify({ model, prompt: 'a small cat', response_format: 'b64_json' }),
+    });
+  }
+
+  it.each([401, 402, 403])(
+    'fails over on Together %s and persists an image-only 24h cooldown',
+    async (status) => {
+      const snapshots: Array<{ key: string; cooldownUntil: number; successRate: number }> = [];
+      const { env } = makeTestEnv({
+        TOGETHER_API_KEY: 'k',
+        GEMINI_API_KEY: 'g',
+        healthSnapshots: snapshots,
+      });
+      const originalGet = env.HEALTH_DO.get.bind(env.HEALTH_DO);
+      const records: Array<Record<string, unknown>> = [];
+      vi.spyOn(env.HEALTH_DO, 'get').mockImplementation((id) => {
+        const stub = originalGet(id);
+        const originalFetch = stub.fetch.bind(stub);
+        stub.fetch = vi.fn(async (url, init) => {
+          if (String(url).endsWith('/record')) {
+            const record = JSON.parse(String(init?.body));
+            records.push(record);
+            if (record.unavailableUntil)
+              snapshots.push({
+                key: record.key,
+                cooldownUntil: record.unavailableUntil,
+                successRate: 0,
+              });
+          }
+          return originalFetch(url, init);
+        });
+        return stub;
+      });
+      togetherImageMock.mockRejectedValue(
+        Object.assign(new Error('third_party_data_sharing_blocked'), { status })
+      );
+      geminiImageMock.mockResolvedValue({ created: 1, data: [{ b64_json: 'image' }] });
+      const before = Date.now();
+      const first = await app.fetch(imageRequest(), env, makeCtx());
+      expect(first.status).toBe(200);
+      expect(await first.json()).toMatchObject({
+        degraded: true,
+        x_gateway: { provider: 'gemini', attempts: 2 },
+      });
+      expect(first.headers.get('x-degraded-mode')).toBe('true');
+      expect(togetherImageMock).toHaveBeenCalledOnce();
+      expect(snapshots[0].key).toBe('together:images');
+      expect(snapshots[0].cooldownUntil).toBeGreaterThanOrEqual(before + 86_400_000);
+      expect(snapshots[0].cooldownUntil).toBeLessThanOrEqual(Date.now() + 86_400_000);
+      expect(JSON.stringify(records)).not.toContain('third_party_data_sharing_blocked');
+
+      const next = await app.fetch(imageRequest(), env, makeCtx());
+      expect(next.status).toBe(200);
+      expect(await next.json()).toMatchObject({ degraded: false, x_gateway: { attempts: 1 } });
+      expect(togetherImageMock).toHaveBeenCalledOnce();
+
+      togetherImageMock.mockResolvedValueOnce({ created: 1, data: [{ b64_json: 'image' }] });
+      const explicitModel = togetherImageMock.mock.calls[0][0].model;
+      const explicit = await app.fetch(imageRequest(explicitModel), env, makeCtx());
+      expect(explicit.status).toBe(200);
+      expect(togetherImageMock).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it('covers all five providers once and returns each upstream status on exhaustion', async () => {
+    const { env } = makeTestEnv({
+      TOGETHER_API_KEY: 'k',
+      GEMINI_API_KEY: 'g',
+      NVIDIA_API_KEY: 'n',
+      WORKERS_AI_ENABLED: 'true',
+    });
+    (env as unknown as { AI: unknown }).AI = { run: vi.fn() };
+    for (const mock of [
+      togetherImageMock,
+      geminiImageMock,
+      nvidiaImageMock,
+      pollinationsImageMock,
+      workersAiImageMock,
+    ]) {
+      mock.mockRejectedValue(
+        Object.assign(new Error('upstream account unavailable'), { status: 403 })
+      );
+    }
+    const res = await app.fetch(imageRequest(), env, makeCtx());
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({
+      error: {
+        type: 'provider_fatal',
+        cost_budget: { attempts: 5, totalTimeoutMs: 300_000 },
+        attempts: [
+          { provider: 'together', status: 403 },
+          { provider: 'gemini', status: 403 },
+          { provider: 'nvidia', status: 403 },
+          { provider: 'pollinations', status: 403 },
+          { provider: 'workers_ai', status: 403 },
+        ],
+      },
+    });
+    for (const mock of [
+      togetherImageMock,
+      geminiImageMock,
+      nvidiaImageMock,
+      pollinationsImageMock,
+      workersAiImageMock,
+    ])
+      expect(mock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [400, 'invalid size', 400, 'input_nonretriable'],
+    [403, 'safety refusal', 502, 'safety_refusal'],
+  ])('stops on upstream %s %s', async (status, message, expectedStatus, type) => {
+    const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k', GEMINI_API_KEY: 'g' });
+    togetherImageMock.mockRejectedValue(Object.assign(new Error(message as string), { status }));
+    const res = await app.fetch(imageRequest(), env, makeCtx());
+    expect(res.status).toBe(expectedStatus);
+    expect(await res.json()).toMatchObject({ error: { type, cost_budget: { attempts: 1 } } });
+    expect(geminiImageMock).not.toHaveBeenCalled();
+  });
+
+  it('orders auto providers by health before priority', async () => {
+    const { env } = makeTestEnv({
+      TOGETHER_API_KEY: 'k',
+      GEMINI_API_KEY: 'g',
+      healthSnapshots: [
+        { key: 'together:images', successRate: 0.2, cooldownUntil: 0 },
+        { key: 'gemini:images', successRate: 1, cooldownUntil: 0 },
+      ],
+    });
+    geminiImageMock.mockResolvedValue({ created: 1, data: [{ b64_json: 'image' }] });
+    expect((await app.fetch(imageRequest(), env, makeCtx())).status).toBe(200);
+    expect(togetherImageMock).not.toHaveBeenCalled();
+  });
+
+  it('Together adapter preserves HTTP status and only safe diagnostic detail', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 'third_party_data_sharing_blocked',
+            message: 'requires third-party data sharing to be enabled for your organization',
+            secret: 'private-provider-key',
+          },
+        }),
+        { status: 403 }
+      )
+    );
+    const { env } = makeTestEnv({ TOGETHER_API_KEY: 'private-provider-key' });
+    await expect(callTogetherImages({ env, model: 'flux', prompt: 'cat' })).rejects.toMatchObject({
+      status: 403,
+      message:
+        'Together image error (403): third_party_data_sharing_blocked, requires third-party data sharing',
+    });
+  });
+
+  it('preserves safe Gemini region diagnostics', async () => {
+    const error = await imageHttpError(
+      'Gemini',
+      new Response(
+        JSON.stringify({ error: { status: 'FAILED_PRECONDITION', message: 'private' } }),
+        { status: 400 }
+      )
+    );
+    expect(error).toMatchObject({ status: 400, error: { status: 'FAILED_PRECONDITION' } });
+    expect(error.message).not.toContain('private');
   });
 
   it('returns 200 with the provider response on happy path (Together)', async () => {

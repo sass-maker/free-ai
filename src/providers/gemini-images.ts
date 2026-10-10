@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { pickApiKey } from './api-key';
+import { imageHttpError } from './image-utils';
 
 export interface GeminiImageInput {
   env: Env;
@@ -68,8 +69,7 @@ export async function callGeminiImages(input: GeminiImageInput): Promise<GeminiI
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Gemini image error (${response.status}): ${text}`);
+    throw await imageHttpError('Gemini', response);
   }
 
   const json = (await response.json()) as {
