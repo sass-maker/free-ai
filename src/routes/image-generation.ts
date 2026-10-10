@@ -148,6 +148,10 @@ function buildImageSuccessBody(
   } as never;
 }
 
+function imageSuccessHeaders(provider: string, degraded: boolean): Record<string, string> {
+  return { 'x-gateway-provider': provider, ...(degraded ? { 'x-degraded-mode': 'true' } : {}) };
+}
+
 function imageErrorStatus(errorClass: string): 400 | 429 | 502 {
   if (errorClass === 'input_nonretriable') return 400;
   if (errorClass === 'usage_retriable') return 429;
@@ -191,6 +195,9 @@ function orderImageCandidates(
   });
   return usable.sort((a, b) => {
     if (!forced) {
+      const pollinationsDiff =
+        Number(a.provider === 'pollinations') - Number(b.provider === 'pollinations');
+      if (pollinationsDiff) return pollinationsDiff;
       const fallbackDiff =
         Number(a.provider === 'workers_ai') - Number(b.provider === 'workers_ai');
       if (fallbackDiff) return fallbackDiff;
@@ -332,6 +339,7 @@ export function registerImageGenerationRoute(
           n: body.n,
           size: body.size,
           response_format: body.response_format,
+          verify: auto && !forcedProvider,
         });
         context.executionCtx.waitUntil(
           recordImageSuccess(context.env, recordAnalytics, projectId, candidate, startedAt)
@@ -341,7 +349,7 @@ export function registerImageGenerationRoute(
         return context.json(
           buildImageSuccessBody(result, candidate, attempts, requestId, projectId, degraded),
           200,
-          degraded ? { 'x-degraded-mode': 'true' } : undefined
+          imageSuccessHeaders(candidate.provider, degraded)
         );
       } catch (error) {
         const failure = await handleImageFailure(

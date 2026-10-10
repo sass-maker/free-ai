@@ -79,6 +79,7 @@ export interface UnifiedImageInput {
   n?: number;
   size?: string;
   response_format?: 'url' | 'b64_json';
+  verify?: boolean;
 }
 
 export interface UnifiedImageOutput {
