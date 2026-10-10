@@ -620,3 +620,24 @@ describe('default registry catalog metadata', () => {
     expect(highTierWithoutNativeReasoning.length).toBeGreaterThan(0);
   });
 });
+
+it('penalizes persistent failure evidence in the score after enough attempts', () => {
+  const failing = snapshot('groq:model-a', 0.1, 1);
+  const healthy = snapshot('gemini:model-b', 0.9, 7000);
+  expect(computeScore('auto', registry[0], failing, undefined)).toBeLessThan(
+    computeScore('auto', registry[1], healthy, undefined)
+  );
+  expect(computeScore('auto', registry[0], { ...failing, attempts: 1 }, undefined)).toBeGreaterThan(
+    computeScore('auto', registry[0], failing, undefined)
+  );
+  expect(
+    selectCandidates(
+      registry,
+      new Map([
+        ['groq:model-a', failing],
+        ['gemini:model-b', healthy],
+      ]),
+      { stream: false, now: Date.now() }
+    ).map((c) => c.id)
+  ).toEqual(['b', 'a', 'c']);
+});

@@ -134,7 +134,9 @@ export function computeScore(
     fit * 0.05 +
     candidate.priority * 0.02;
 
-  return score * evalWeight;
+  // Enough failed observations should outweigh latency, priority and evaluation bonuses.
+  const reliabilityWeight = state && state.attempts >= 10 && successRate < 0.3 ? 0.25 : 1;
+  return score * evalWeight * reliabilityWeight;
 }
 
 interface SelectOptions {
@@ -210,6 +212,7 @@ function candidateMatchesCapabilities(
 
 function isCandidateInCooldown(state: ModelStateSnapshot | undefined, now: number): boolean {
   if (!state) return false;
+  if ((state.exhaustedUntil ?? 0) > now) return true;
   if (state.cooldownUntil > now) return true;
   if (state.headroom <= 0) return true;
   return false;

@@ -42,7 +42,7 @@ export function getUpstreamErrorStatus(error: unknown): string | undefined {
 }
 
 function getUpstreamErrorDetail(error: unknown): string {
-  if (!error || typeof error !== 'object') return '';
+  if (!error || typeof error !== 'object') return getMessage(error).toLowerCase();
   const body = (error as { error?: unknown }).error;
   try {
     return `${getMessage(error)} ${body === undefined ? '' : JSON.stringify(body)}`.toLowerCase();
@@ -117,6 +117,7 @@ export function classifyError(error: unknown): FailureClass {
 function isProviderSideBadRequest(error: unknown): boolean {
   return (
     isMalformedProviderOutput(error) ||
+    isEmptyUpstreamBadRequest(error) ||
     isUpstreamRegionFailure(error) ||
     isUpstreamKeyRejected(error)
   );
@@ -152,7 +153,11 @@ export function isProviderAccountFailure(error: unknown): boolean {
 
 /** No further attempt on this provider can succeed within the current request. */
 export function isProviderUnavailableForRequest(error: unknown): boolean {
-  return isProviderAccountFailure(error) || isUpstreamRegionFailure(error);
+  return (
+    isProviderAccountFailure(error) ||
+    isUpstreamRegionFailure(error) ||
+    isEmptyUpstreamBadRequest(error)
+  );
 }
 
 /** Unavailable upstream accounts/models and malformed output may fall back; content refusals may not. */
@@ -167,4 +172,55 @@ export function canFallbackFromProviderFailure(
       getUpstreamStatus(error) === 410 ||
       isMalformedProviderOutput(error))
   );
+}
+
+/** Daily quotas must outlive the short throttle cooldown. Never retain upstream bodies. */
+export function dailyQuotaReset(
+  error: unknown,
+  provider: string,
+  now: number
+):
+  | {
+      until: number;
+      providerWide: boolean;
+    }
+  | undefined {
+  if (getUpstreamStatus(error) !== 429) return undefined;
+  const detail = getUpstreamErrorDetail(error);
+  const headers = (error as { headers?: Headers | Record<string, string> }).headers;
+  const retryAfter =
+    headers instanceof Headers ? headers.get('retry-after') : headers?.['retry-after'];
+  let retryAt: number | undefined;
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    const parsed = Number.isFinite(seconds) ? now + seconds * 1000 : Date.parse(retryAfter);
+    if (Number.isFinite(parsed) && parsed > now) retryAt = parsed;
+  }
+  const duration = detail.match(
+    /try again in\s*(?:(\d+(?:\.\d+)?)h)?\s*(?:(\d+(?:\.\d+)?)m)?\s*(?:(\d+(?:\.\d+)?)s)?/
+  );
+  if (!retryAt && duration) {
+    const ms =
+      (Number(duration[1] ?? 0) * 3600 + Number(duration[2] ?? 0) * 60 + Number(duration[3] ?? 0)) *
+      1000;
+    if (ms > 0) retryAt = now + ms;
+  }
+  const daily = /per[ _-]?day|\b[tr]pd\b|daily|per_day/.test(detail);
+  if (!daily && !(retryAt && retryAt - now > 600_000)) return undefined;
+  return {
+    until:
+      retryAt ??
+      Date.UTC(
+        new Date(now).getUTCFullYear(),
+        new Date(now).getUTCMonth(),
+        new Date(now).getUTCDate() + 1
+      ),
+    providerWide:
+      provider === 'groq' && /\borg(?:anization)?(?:[ -]wide|[ -]level)?\b/.test(detail),
+  };
+}
+
+/** An empty SDK 400 body cannot establish a caller error. Cool it briefly, then probe again. */
+function isEmptyUpstreamBadRequest(error: unknown): boolean {
+  return getUpstreamStatus(error) === 400 && getMessage(error).toLowerCase().includes('no body');
 }

@@ -100,6 +100,44 @@ describe('chat automatic health rotation', () => {
       },
     }));
   });
+  it.each(['tokens per day (TPD)', 'requests per day (RPD)'])(
+    'fails over Groq daily %s without spending an attempt on a peer',
+    async (quota) => {
+      mocks.registry = [
+        candidate('first'),
+        candidate('same-provider'),
+        candidate('alternate', 'cohere'),
+      ];
+      mocks.call.mockRejectedValueOnce(
+        Object.assign(new Error(`Organization rate limit on ${quota}. Try again in 30m0s`), {
+          status: 429,
+        })
+      );
+      const response = await request(0, []);
+      expect(response.status).toBe(200);
+      expect(mocks.call.mock.calls.map(([input]) => input.model)).toEqual(['first', 'alternate']);
+    }
+  );
+  it('skips exhausted snapshots before making any upstream attempt', async () => {
+    mocks.registry = [candidate('first'), candidate('alternate', 'cohere')];
+    const response = await request(0, [
+      { ...health('first'), exhaustedUntil: Date.now() + 3600000 },
+    ]);
+    expect(response.status).toBe(200);
+    expect(mocks.call.mock.calls.map(([input]) => input.model)).toEqual(['alternate']);
+  });
+  it('fails over empty upstream 400 responses', async () => {
+    mocks.registry = [
+      candidate('first'),
+      candidate('same-provider'),
+      candidate('alternate', 'cohere'),
+    ];
+    mocks.call.mockRejectedValueOnce(
+      Object.assign(new Error('400 status code (no body)'), { status: 400 })
+    );
+    expect((await request(0, [])).status).toBe(200);
+    expect(mocks.call.mock.calls.map(([input]) => input.model)).toEqual(['first', 'alternate']);
+  });
   it('does not rotate low-success models ahead of healthy peers', async () => {
     mocks.registry = [candidate('healthy-a'), candidate('healthy-b'), candidate('failing')];
     const response = await request(2, [
