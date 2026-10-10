@@ -96,6 +96,71 @@ describe('automatic cross-provider fallback through the real SDK', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([
+    { error: { status: 'FAILED_PRECONDITION', message: 'location is not supported' } },
+    {
+      error: {
+        status: 'INVALID_ARGUMENT',
+        message: 'API key not valid',
+        details: [{ reason: 'API_KEY_INVALID' }],
+      },
+    },
+    { error: { status: 'INVALID_ARGUMENT', message: 'Gemini rejects this parameter' } },
+    null,
+  ])('recovers Gemini 400 variants through the SDK: %j', async (body) => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const sent = new Request(input, init);
+      calls.push(new URL(sent.url).hostname);
+      return calls.length === 1
+        ? body
+          ? Response.json([body], { status: 400 })
+          : new Response(null, { status: 400 })
+        : success();
+    });
+    const response = await app.fetch(request(), env('single-synthetic-key'), makeCtx());
+    expect(response.status).toBe(200);
+    expect(calls).toEqual(['generativelanguage.googleapis.com', 'api.groq.com']);
+  });
+  it('remembers Gemini RESOURCE_EXHAUSTED per-day details through array unwrapping', async () => {
+    const records: unknown[] = [];
+    const testEnv = env('single-synthetic-key');
+    const stub = testEnv.HEALTH_DO.get(testEnv.HEALTH_DO.idFromName('global-health'));
+    testEnv.HEALTH_DO = {
+      ...testEnv.HEALTH_DO,
+      get: () => ({
+        fetch: async (url: string, init?: RequestInit) => {
+          if (new URL(url).pathname === '/record') records.push(JSON.parse(String(init?.body)));
+          return stub.fetch(url, init);
+        },
+      }),
+    } as unknown as DurableObjectNamespace;
+    let calls = 0;
+    vi.stubGlobal('fetch', async () =>
+      ++calls === 1
+        ? Response.json(
+            [
+              {
+                error: {
+                  status: 'RESOURCE_EXHAUSTED',
+                  details: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }],
+                },
+              },
+            ],
+            { status: 429 }
+          )
+        : success()
+    );
+    expect((await app.fetch(request(), testEnv, makeCtx())).status).toBe(200);
+    expect(calls).toBe(2);
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        key: 'gemini:gemini-first',
+        exhaustedUntil: expect.any(Number),
+        providerWide: false,
+      })
+    );
+  });
   it.each(['empty', 'nonstandard-json'])('recovers a 403 with a %s error body', async (shape) => {
     const calls: Request[] = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -309,7 +374,9 @@ describe('automatic cross-provider fallback through the real SDK', () => {
 
   it.each([400, 422])('returns input error after both providers reject with %i', async (status) => {
     mocks.registry.push(candidate('nvidia-third', 'nvidia'));
-    const upstream = vi.fn(async () => new Response(null, { status }));
+    const upstream = vi.fn(async () =>
+      Response.json({ error: { message: 'Invalid prompt format' } }, { status })
+    );
     vi.stubGlobal('fetch', upstream);
     const response = await app.fetch(request(), env(), makeCtx());
     expect(response.status).toBe(400);
@@ -321,7 +388,9 @@ describe('automatic cross-provider fallback through the real SDK', () => {
 
   it('does not retry input errors when only the same provider remains', async () => {
     mocks.registry = [candidate('gemini-first', 'gemini'), candidate('gemini-sibling', 'gemini')];
-    const upstream = vi.fn(async () => new Response(null, { status: 400 }));
+    const upstream = vi.fn(async () =>
+      Response.json({ error: { message: 'Invalid prompt format' } }, { status: 400 })
+    );
     vi.stubGlobal('fetch', upstream);
     const response = await app.fetch(request(), env(), makeCtx());
     expect(response.status).toBe(400);
@@ -334,7 +403,9 @@ describe('automatic cross-provider fallback through the real SDK', () => {
   it.each(['x-gateway-force-model', 'x-gateway-force-provider'])(
     'keeps input errors terminal when pinned with %s',
     async (header) => {
-      const upstream = vi.fn(async () => new Response(null, { status: 400 }));
+      const upstream = vi.fn(async () =>
+        Response.json({ error: { message: 'Invalid prompt format' } }, { status: 400 })
+      );
       vi.stubGlobal('fetch', upstream);
       const pinnedRequest = request();
       pinnedRequest.headers.set(header, header.endsWith('model') ? 'gemini-first' : 'gemini');

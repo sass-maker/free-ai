@@ -86,6 +86,43 @@ describe('GET /v1/routing/status', () => {
     expect(body.providers[healthyCandidate.provider]?.best_model).toBeTruthy();
   });
 
+  it('reports persisted daily exhaustion after routable candidates', async () => {
+    const { env: base } = makeTestEnv({ GROQ_API_KEY: 'synthetic' });
+    const groq = getModelRegistry(base).find((c) => c.provider === 'groq');
+    if (!groq) throw new Error('Expected a Groq candidate');
+    const { env } = makeTestEnv({
+      GROQ_API_KEY: 'synthetic',
+      healthSnapshots: [
+        {
+          key: getModelKey(groq.provider, groq.model),
+          attempts: 10,
+          successRate: 1,
+          avgLatencyMs: 100,
+          p90LatencyMs: 100,
+          p99LatencyMs: 100,
+          cooldownUntil: Date.now() + 3600000,
+          exhaustedUntil: Date.now() + 3600000,
+          headroom: 0,
+          dailyUsed: 0,
+          dailyLimit: 200,
+          shortRetriableFailures: 1,
+        },
+      ],
+    });
+    const response = await app.fetch(
+      new Request('https://gateway.test/v1/routing/status'),
+      env,
+      makeCtx()
+    );
+    const body = (await response.json()) as {
+      fallback_order: Array<{ id: string; status: string; reasons: string[] }>;
+    };
+    expect(body.fallback_order[0].id).not.toBe(groq.id);
+    expect(body.fallback_order.find((c) => c.id === groq.id)).toMatchObject({
+      status: 'exhausted',
+      reasons: expect.arrayContaining(['daily_headroom_exhausted']),
+    });
+  });
   it('ranks quota-exhausted providers after routable models', async () => {
     vi.stubGlobal(
       'fetch',

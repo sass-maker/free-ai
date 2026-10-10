@@ -33,6 +33,8 @@ import { getProviderQuotaStatuses, providerQuotaAllowsCandidate } from './provid
 import {
   canFallbackFromProviderFailure,
   classifyError,
+  dailyQuotaReset,
+  isProviderAccountFailure,
   getUpstreamStatus,
   isProviderUnavailableForRequest,
   isMalformedProviderOutput,
@@ -1350,16 +1352,17 @@ function handleChatProviderSuccess(
   );
 }
 
-function handleChatProviderError(
+async function handleChatProviderError(
   ctx: ChatRetryContext,
   candidate: ModelCandidate,
   error: unknown,
   startedAt: number,
   keyRetryPending = false,
   inputFallbackPending = false
-): void {
+): Promise<void> {
   const { c, state } = ctx;
   const failureClass = classifyError(error);
+  const quotaReset = dailyQuotaReset(error, candidate.provider, Date.now());
   state.lastErrorClass = failureClass;
   state.lastErrorMessage = getErrorMessage(error);
   state.lastUpstreamStatus = getUpstreamStatus(error);
@@ -1374,17 +1377,22 @@ function handleChatProviderError(
   // Caller input errors and colo-bound egress rejections say nothing about the
   // model's health; recording them would demote a working model for everyone.
   if (failureClass !== 'input_nonretriable' && !isUpstreamRegionFailure(error)) {
-    c.executionCtx.waitUntil(
-      healthRecord(c.env, {
-        key: getModelKey(candidate.provider, candidate.model),
-        success: false,
-        latencyMs: Date.now() - startedAt,
-        failureClass,
-        malformed: isMalformedProviderOutput(error),
-        keyRetryPending,
-        now: Date.now(),
-      })
-    );
+    const recording = healthRecord(c.env, {
+      key: getModelKey(candidate.provider, candidate.model),
+      success: false,
+      latencyMs: Date.now() - startedAt,
+      failureClass,
+      malformed: isMalformedProviderOutput(error),
+      exhaustedUntil: quotaReset?.until,
+      providerWide: quotaReset?.providerWide,
+      // Empty-body 400s only skip the provider for this request: one malformed
+      // caller request must not cool a shared model for everyone.
+      unavailableUntil: isProviderAccountFailure(error) ? Date.now() + 120_000 : undefined,
+      keyRetryPending,
+      now: Date.now(),
+    });
+    if (quotaReset && !keyRetryPending) await recording;
+    else c.executionCtx.waitUntil(recording);
   }
 
   if (
@@ -1446,7 +1454,12 @@ function skipProviderAfterFailure(
   if (keyRetryPending) return false;
   const inputFailure = !pinned && classifyError(error) === 'input_nonretriable';
   const fallback = inputFailure && hasAlternateProvider(remaining, candidate, unavailable);
-  if (isProviderUnavailableForRequest(error) || inputFailure) unavailable.add(candidate.provider);
+  if (
+    isProviderUnavailableForRequest(error) ||
+    inputFailure ||
+    dailyQuotaReset(error, candidate.provider, Date.now())
+  )
+    unavailable.add(candidate.provider);
   return fallback;
 }
 
@@ -1537,7 +1550,7 @@ function createChatRetryCallback(
         keyRetryCandidate = candidate;
       }
       logUpstreamFailure(attemptMeta, error, keyRetryPending);
-      handleChatProviderError(
+      await handleChatProviderError(
         ctx,
         candidate,
         error,
@@ -2911,12 +2924,10 @@ function routingModelStatus(
   snapshot: ModelStateSnapshot | undefined,
   now: number
 ): 'available' | 'degraded' | 'cooldown' | 'exhausted' {
-  if (snapshot && snapshot.cooldownUntil > now) {
-    return 'cooldown';
-  }
-  if (snapshot && snapshot.headroom <= 0) {
+  if (snapshot && (snapshot.headroom <= 0 || (snapshot.exhaustedUntil ?? 0) > now)) {
     return 'exhausted';
   }
+  if (snapshot && snapshot.cooldownUntil > now) return 'cooldown';
   if (
     snapshot &&
     (snapshot.successRate < 0.75 ||

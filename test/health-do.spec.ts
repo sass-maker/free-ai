@@ -21,6 +21,55 @@ function makeState() {
 }
 
 describe('HealthStateDO', () => {
+  it.each([false, true])(
+    'persists quota exhaustion across eviction (provider-wide: %s)',
+    async (providerWide) => {
+      const state = makeState();
+      let health = new HealthStateDO(state, {});
+      const now = Date.UTC(2026, 9, 10, 23, 59);
+      const until = now + 180000;
+      await health.fetch(
+        new Request('https://internal.local/record', {
+          method: 'POST',
+          body: JSON.stringify({
+            key: 'groq:a',
+            success: false,
+            latencyMs: 10,
+            failureClass: 'usage_retriable',
+            exhaustedUntil: until,
+            providerWide,
+            now,
+          }),
+        })
+      );
+      health = new HealthStateDO(state, {});
+      const lookup = async (time: number) => {
+        const response = await health.fetch(
+          new Request('https://internal.local/lookup', {
+            method: 'POST',
+            body: JSON.stringify({
+              keys: ['groq:a', 'groq:new-model', 'cohere:a'],
+              limits: {},
+              now: time,
+            }),
+          })
+        );
+        return (
+          (await response.json()) as {
+            snapshots: Array<{ headroom: number; exhaustedUntil: number }>;
+          }
+        ).snapshots;
+      };
+      // Crossing UTC midnight must not erase a provider-supplied later reset.
+      expect((await lookup(now + 90000)).map((s) => s.headroom)).toEqual([
+        0,
+        providerWide ? 0 : 1,
+        1,
+      ]);
+      expect((await lookup(until + 1)).map((s) => s.headroom)).toEqual([1, 1, 1]);
+    }
+  );
+
   it('cools only the model with two malformed outputs in the recent window', async () => {
     const state = makeState();
     let health = new HealthStateDO(state, {});

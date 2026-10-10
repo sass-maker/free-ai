@@ -134,6 +134,7 @@ export interface ModelStateSnapshot {
   p90LatencyMs: number;
   p99LatencyMs: number;
   cooldownUntil: number;
+  exhaustedUntil?: number;
   headroom: number;
   dailyUsed: number;
   dailyLimit: number | null;

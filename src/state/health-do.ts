@@ -12,6 +12,7 @@ interface HealthDoEnv {
 interface ModelState {
   history: Array<AttemptRecord & { malformed?: boolean }>;
   cooldownUntil: number;
+  exhaustedUntil?: number;
   dayKey: string;
   dailyUsed: number;
 }
@@ -73,7 +74,8 @@ function toSnapshot(
   key: string,
   state: ModelState,
   limitConfig: ProviderLimitConfig | undefined,
-  now: number
+  now: number,
+  providerState?: ModelState
 ): ModelStateSnapshot {
   const attempts = state.history.length;
   const successful = state.history.filter((item) => item.success).length;
@@ -90,7 +92,13 @@ function toSnapshot(
   ).length;
 
   const dailyLimit = limitConfig?.requestsPerDay ?? null;
-  const headroom = dailyLimit === null ? 1 : Math.max(0, 1 - state.dailyUsed / dailyLimit);
+  const exhaustedUntil = Math.max(state.exhaustedUntil ?? 0, providerState?.exhaustedUntil ?? 0);
+  const headroom =
+    exhaustedUntil > now
+      ? 0
+      : dailyLimit === null
+        ? 1
+        : Math.max(0, 1 - state.dailyUsed / dailyLimit);
 
   return {
     key,
@@ -99,10 +107,8 @@ function toSnapshot(
     avgLatencyMs,
     p90LatencyMs,
     p99LatencyMs,
-    cooldownUntil: Math.max(
-      state.cooldownUntil,
-      now > state.cooldownUntil ? 0 : state.cooldownUntil
-    ),
+    cooldownUntil: Math.max(state.cooldownUntil, exhaustedUntil),
+    exhaustedUntil,
     headroom,
     dailyUsed: state.dailyUsed,
     dailyLimit,
@@ -337,6 +343,9 @@ export class HealthStateDO {
         failureClass?: FailureClass;
         keyRetryPending?: boolean;
         malformed?: boolean;
+        exhaustedUntil?: number;
+        providerWide?: boolean;
+        unavailableUntil?: number;
         now: number;
       };
 
@@ -388,6 +397,22 @@ export class HealthStateDO {
         modelState.cooldownUntil = Math.max(modelState.cooldownUntil, body.now + COOL_DOWN_MS);
       }
 
+      if (!body.success && !body.keyRetryPending) {
+        modelState.exhaustedUntil = Math.max(
+          modelState.exhaustedUntil ?? 0,
+          body.exhaustedUntil ?? 0
+        );
+        modelState.cooldownUntil = Math.max(modelState.cooldownUntil, body.unavailableUntil ?? 0);
+        if (body.providerWide && body.exhaustedUntil) {
+          const providerKey = `${body.key.split(':')[0]}:*`;
+          const providerState = (await this.loadModel(providerKey)) ?? emptyModelState(body.now);
+          providerState.exhaustedUntil = Math.max(
+            providerState.exhaustedUntil ?? 0,
+            body.exhaustedUntil
+          );
+          await this.saveModel(providerKey, providerState);
+        }
+      }
       await this.saveModel(body.key, modelState);
       this.scheduleSnapshot();
 
@@ -410,7 +435,15 @@ export class HealthStateDO {
         } else {
           this.cache.set(key, modelState);
         }
-        snapshots.push(toSnapshot(key, modelState, body.limits[key], body.now));
+        snapshots.push(
+          toSnapshot(
+            key,
+            modelState,
+            body.limits[key],
+            body.now,
+            this.cache.get(`${key.split(':')[0]}:*`)
+          )
+        );
       }
 
       return json({ snapshots });
@@ -419,16 +452,27 @@ export class HealthStateDO {
     if (path === '/snapshot') {
       const now = Date.now();
       await this.ensureCacheLoaded();
-      const snapshots = Array.from(this.cache.entries()).map(([key, modelState]) =>
-        toSnapshot(key, modelState, undefined, now)
-      );
+      const snapshots = Array.from(this.cache.entries())
+        .filter(([key]) => !key.endsWith(':*'))
+        .map(([key, modelState]) => {
+          return toSnapshot(
+            key,
+            modelState,
+            undefined,
+            now,
+            this.cache.get(`${key.split(':')[0]}:*`)
+          );
+        });
       return json({ snapshots });
     }
 
     if (path === '/providers/stats') {
       const now = Date.now();
       await this.ensureCacheLoaded();
-      const stats = aggregateProviderStats(this.cache, now);
+      const stats = aggregateProviderStats(
+        new Map([...this.cache].filter(([key]) => !key.endsWith(':*'))),
+        now
+      );
       return json({ stats });
     }
 

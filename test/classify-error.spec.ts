@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canFallbackFromProviderFailure,
   classifyError,
+  dailyQuotaReset,
   getUpstreamErrorStatus,
   isProviderAccountFailure,
   isMalformedProviderOutput,
@@ -181,5 +182,65 @@ describe('malformed provider output', () => {
 
     const retriable = Object.assign(new Error('server error'), { status: 500 });
     expect(canFallbackFromProviderFailure(retriable, classifyError(retriable))).toBe(false);
+  });
+});
+
+describe('daily quota resets', () => {
+  const now = Date.UTC(2026, 9, 10, 12);
+  it.each(['tokens per day (TPD)', 'requests per day (RPD)'])(
+    'remembers Groq %s and an explicit organization scope',
+    (quota) => {
+      const error = Object.assign(
+        new Error(`Rate limit reached for organization on ${quota}. Please try again in 23m12.5s`),
+        { status: 429 }
+      );
+      expect(dailyQuotaReset(error, 'groq', now)).toEqual({
+        until: now + 1392500,
+        providerWide: true,
+      });
+    }
+  );
+  it('uses midnight for a Gemini daily quotaId and keeps unknown scope model-local', () => {
+    const error = {
+      status: 429,
+      error: {
+        status: 'RESOURCE_EXHAUSTED',
+        details: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }],
+      },
+    };
+    expect(dailyQuotaReset(error, 'gemini', now)).toEqual({
+      until: Date.UTC(2026, 9, 11),
+      providerWide: false,
+    });
+  });
+  it('reads numeric and HTTP-date retry-after and treats long throttles as exhaustion', () => {
+    for (const headers of [
+      new Headers({ 'retry-after': '3600' }),
+      { 'retry-after': new Date(now + 3600000).toUTCString() },
+    ]) {
+      expect(dailyQuotaReset({ status: 429, headers }, 'groq', now)?.until).toBe(now + 3600000);
+    }
+  });
+  it('leaves per-minute and non-429 failures on existing handling', () => {
+    expect(
+      dailyQuotaReset(
+        {
+          status: 429,
+          error: { quotaId: 'TokensPerMinute' },
+          headers: new Headers({ 'retry-after': '30' }),
+        },
+        'gemini',
+        now
+      )
+    ).toBeUndefined();
+    expect(dailyQuotaReset({ status: 400, message: 'daily quota' }, 'groq', now)).toBeUndefined();
+    expect(
+      dailyQuotaReset({ status: 429, message: 'daily quota' }, 'groq', now)?.providerWide
+    ).toBe(false);
+  });
+  it('fails over empty upstream 400s without calling them caller errors', () => {
+    const error = Object.assign(new Error('400 status code (no body)'), { status: 400 });
+    expect(classifyError(error)).toBe('provider_fatal');
+    expect(canFallbackFromProviderFailure(error, classifyError(error))).toBe(true);
   });
 });
