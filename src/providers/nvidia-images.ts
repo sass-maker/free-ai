@@ -1,5 +1,5 @@
 import type { Env } from '../types';
-import { parseSize } from './image-utils';
+import { imageHttpError, parseSize } from './image-utils';
 
 export interface NvidiaImageInput {
   env: Env;
@@ -46,8 +46,7 @@ export async function callNvidiaImages(input: NvidiaImageInput): Promise<NvidiaI
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`NVIDIA image error (${response.status}): ${text}`);
+    throw await imageHttpError('NVIDIA', response);
   }
 
   const json = (await response.json()) as {

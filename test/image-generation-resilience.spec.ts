@@ -52,11 +52,7 @@ describe('image generation resilience', () => {
   });
 
   it('falls back to nvidia when gemini returns 5xx and sets degraded label', async () => {
-    // Use GEMINI + NVIDIA (no Together) so the top 3 candidates are:
-    //   1. imagen-4 (gemini, 0.86)
-    //   2. gemini-flash-image (gemini, 0.82)
-    //   3. nvidia-flux-schnell (nvidia, 0.76)
-    // Gemini always fails with 500 (retriable), nvidia succeeds on 3rd attempt.
+    // Auto tries the best Gemini model once, then NVIDIA.
     geminiImageMock.mockRejectedValue(Object.assign(new Error('gemini 500'), { status: 500 }));
     nvidiaImageMock.mockResolvedValueOnce({
       created: 42,
@@ -84,8 +80,8 @@ describe('image generation resilience', () => {
     };
     expect(body.degraded).toBe(true);
     expect(body.x_gateway.provider).toBe('nvidia');
-    expect(body.x_gateway.attempts).toBe(3);
-    expect(geminiImageMock.mock.calls.length).toBe(2);
+    expect(body.x_gateway.attempts).toBe(2);
+    expect(geminiImageMock).toHaveBeenCalledOnce();
     expect(nvidiaImageMock).toHaveBeenCalledOnce();
   });
 
@@ -117,6 +113,9 @@ describe('image generation resilience', () => {
   it('returns 429 when all providers hit rate limits (usage_retriable)', async () => {
     geminiImageMock.mockRejectedValue(Object.assign(new Error('rate limit'), { status: 429 }));
     nvidiaImageMock.mockRejectedValue(Object.assign(new Error('rate limit'), { status: 429 }));
+    mocks.pollinationsImageMock.mockRejectedValue(
+      Object.assign(new Error('rate limit'), { status: 429 })
+    );
 
     const { env } = makeTestEnv({ GEMINI_API_KEY: 'g', NVIDIA_API_KEY: 'n' });
     const req = new Request('https://gateway.test/v1/images/generations', {
@@ -187,10 +186,13 @@ describe('image generation resilience', () => {
     expect(body.degraded).toBe(false);
   });
 
-  it('does not amplify 5xx into unbounded retry (max 3 attempts)', async () => {
-    // All providers return 500 — retriable, but the cost budget caps at 3 attempts.
+  it('does not amplify 5xx into unbounded retry (max 5 attempts)', async () => {
+    // All providers return 500 — retriable, but the cost budget caps at 5 attempts.
     geminiImageMock.mockRejectedValue(Object.assign(new Error('server error'), { status: 500 }));
     nvidiaImageMock.mockRejectedValue(Object.assign(new Error('server error'), { status: 500 }));
+    mocks.pollinationsImageMock.mockRejectedValue(
+      Object.assign(new Error('server error'), { status: 500 })
+    );
 
     const { env } = makeTestEnv({ GEMINI_API_KEY: 'g', NVIDIA_API_KEY: 'n' });
     const req = new Request('https://gateway.test/v1/images/generations', {
@@ -206,8 +208,11 @@ describe('image generation resilience', () => {
     const res = await app.fetch(req, env, makeCtx());
     // Should terminate, not hang.
     expect([429, 502]).toContain(res.status);
-    // Total attempts across all providers should be at most 3.
-    const totalCalls = geminiImageMock.mock.calls.length + nvidiaImageMock.mock.calls.length;
-    expect(totalCalls).toBeLessThanOrEqual(3);
+    // Only the three configured providers are attempted, once each.
+    const totalCalls =
+      geminiImageMock.mock.calls.length +
+      nvidiaImageMock.mock.calls.length +
+      mocks.pollinationsImageMock.mock.calls.length;
+    expect(totalCalls).toBe(3);
   });
 });

@@ -1,5 +1,5 @@
 import type { Env } from '../types';
-import { arrayBufferToBase64, parseSize } from './image-utils';
+import { arrayBufferToBase64, imageHttpError, parseSize } from './image-utils';
 
 export interface PollinationsImageInput {
   env: Env;
@@ -40,7 +40,7 @@ export async function callPollinationsImages(
 
   const response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
   if (!response.ok) {
-    throw new Error(`Pollinations image error (${response.status})`);
+    throw await imageHttpError('Pollinations', response);
   }
 
   const buf = await response.arrayBuffer();
