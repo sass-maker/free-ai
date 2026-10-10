@@ -12,7 +12,7 @@ import {
   isRetriableFailure,
 } from '../router/classify-error';
 import { healthLookup, healthRecord } from '../state/client';
-import type { Env, ImageModelCandidate, Provider } from '../types';
+import type { Env, FailureClass, ImageModelCandidate, Provider } from '../types';
 import { createRequestId, getErrorMessage } from '../utils/request';
 import { sortFallbackLast } from './provider-order';
 import {
@@ -170,6 +170,119 @@ function buildImageErrorBody(
   } as never;
 }
 
+const healthKey = (provider: string) => `${provider}:images`;
+
+// Separate image-provider health from chat model health and account cooldowns.
+function orderImageCandidates(
+  registry: ImageModelCandidate[],
+  health: Awaited<ReturnType<typeof healthLookup>>,
+  now: number,
+  auto: boolean,
+  forced: boolean
+): ImageModelCandidate[] {
+  const sorted = sortFallbackLast(registry, !forced && auto);
+  if (!auto) return sorted;
+  const seen = new Set<string>();
+  const usable = sorted.filter((candidate) => {
+    if ((health.get(healthKey(candidate.provider))?.cooldownUntil ?? 0) > now) return false;
+    if (seen.has(candidate.provider)) return false;
+    seen.add(candidate.provider);
+    return true;
+  });
+  return usable.sort((a, b) => {
+    if (!forced) {
+      const fallbackDiff =
+        Number(a.provider === 'workers_ai') - Number(b.provider === 'workers_ai');
+      if (fallbackDiff) return fallbackDiff;
+    }
+    const healthDiff =
+      (health.get(healthKey(b.provider))?.successRate ?? 1) -
+      (health.get(healthKey(a.provider))?.successRate ?? 1);
+    return healthDiff || b.priority - a.priority;
+  });
+}
+
+async function recordImageFailure(
+  env: Env,
+  provider: string,
+  error: unknown,
+  failureClass: FailureClass,
+  startedAt: number
+): Promise<void> {
+  if (failureClass === 'input_nonretriable' || failureClass === 'safety_refusal') return;
+  // Await so the next request observes account failures immediately.
+  await healthRecord(env, {
+    key: healthKey(provider),
+    success: false,
+    latencyMs: Date.now() - startedAt,
+    failureClass,
+    unavailableUntil: isProviderAccountFailure(error)
+      ? Date.now() + 24 * 60 * 60 * 1000
+      : undefined,
+    now: Date.now(),
+  });
+}
+
+function lookupImageHealth(env: Env, registry: ImageModelCandidate[], now: number) {
+  const keys = [...new Set(registry.map((candidate) => healthKey(candidate.provider)))];
+  return healthLookup(env, keys, {}, now);
+}
+
+function canContinueImageFailover(
+  error: unknown,
+  failureClass: FailureClass,
+  auto: boolean
+): boolean {
+  return (
+    isRetriableFailure(failureClass) ||
+    canFallbackFromProviderFailure(error, failureClass) ||
+    (auto && failureClass === 'provider_fatal')
+  );
+}
+
+async function recordImageSuccess(
+  env: Env,
+  recordAnalytics: RecordAnalytics,
+  projectId: string,
+  candidate: ImageModelCandidate,
+  startedAt: number
+): Promise<void> {
+  await Promise.all([
+    healthRecord(env, {
+      key: healthKey(candidate.provider),
+      success: true,
+      latencyMs: Date.now() - startedAt,
+      now: Date.now(),
+    }),
+    recordAnalytics({
+      db: env.GATEWAY_DB,
+      projectId,
+      outcome: 'ok',
+      provider: candidate.provider,
+      model: candidate.model,
+    }),
+  ]);
+}
+
+interface ImageFailures {
+  attemptErrors: Array<{ provider: string; status: number | null }>;
+  unavailable: Set<string>;
+}
+
+async function handleImageFailure(
+  env: Env,
+  provider: string,
+  error: unknown,
+  startedAt: number,
+  failures: ImageFailures
+): Promise<{ message: string; failureClass: FailureClass }> {
+  const failureClass = classifyError(error);
+  failures.attemptErrors.push({ provider, status: getUpstreamStatus(error) ?? null });
+  if (isProviderUnavailableForRequest(error)) failures.unavailable.add(provider);
+  await recordImageFailure(env, provider, error, failureClass, startedAt);
+  return { message: getErrorMessage(error), failureClass };
+}
+
 export function registerImageGenerationRoute(
   app: GatewayApp,
   recordAnalytics: RecordAnalytics
@@ -191,52 +304,22 @@ export function registerImageGenerationRoute(
 
     const auto = body.model.toLowerCase() === 'auto';
     const now = Date.now();
-    // Separate image-provider health from chat model health and account cooldowns.
-    const healthKey = (provider: string) => `${provider}:images`;
-    const health = await healthLookup(
-      context.env,
-      [...new Set(registry.map((candidate) => healthKey(candidate.provider)))],
-      {},
-      now
-    );
-    let sorted = sortFallbackLast(registry, !forcedProvider && auto);
-    if (auto) {
-      const seen = new Set<string>();
-      sorted = sorted.filter((candidate) => {
-        if ((health.get(healthKey(candidate.provider))?.cooldownUntil ?? 0) > now) return false;
-        if (seen.has(candidate.provider)) return false;
-        seen.add(candidate.provider);
-        return true;
-      });
-      sorted.sort((a, b) => {
-        if (!forcedProvider) {
-          const fallbackDiff =
-            Number(a.provider === 'workers_ai') - Number(b.provider === 'workers_ai');
-          if (fallbackDiff) return fallbackDiff;
-        }
-        const healthDiff =
-          (health.get(healthKey(b.provider))?.successRate ?? 1) -
-          (health.get(healthKey(a.provider))?.successRate ?? 1);
-        return healthDiff || b.priority - a.priority;
-      });
-    }
+    const health = await lookupImageHealth(context.env, registry, now);
+    const sorted = orderImageCandidates(registry, health, now, auto, Boolean(forcedProvider));
     if (sorted.length === 0) return context.json(noImageProviderError(), 503);
     let lastError = 'Unknown error';
     let attempts = 0;
-    let chosenProvider: string | undefined;
-    let chosenModel: string | undefined;
+    let lastCandidate: ImageModelCandidate | undefined;
     let lastErrorClass = 'provider_fatal';
     const costBudget = new CostBudget({ maxAttempts: 5, maxTotalTimeoutMs: 300_000 });
-    const attemptErrors: Array<{ provider: string; status: number | null }> = [];
-    const unavailable = new Set<string>();
+    const failures: ImageFailures = { attemptErrors: [], unavailable: new Set<string>() };
 
     for (const candidate of sorted.slice(0, 5)) {
-      if (unavailable.has(candidate.provider)) continue;
+      if (failures.unavailable.has(candidate.provider)) continue;
       if (!costBudget.canAttempt()) break;
 
       attempts += 1;
-      chosenProvider = candidate.provider;
-      chosenModel = candidate.model;
+      lastCandidate = candidate;
       costBudget.recordAttempt(60_000);
       const startedAt = Date.now();
 
@@ -251,22 +334,7 @@ export function registerImageGenerationRoute(
           response_format: body.response_format,
         });
         context.executionCtx.waitUntil(
-          healthRecord(context.env, {
-            key: healthKey(candidate.provider),
-            success: true,
-            latencyMs: Date.now() - startedAt,
-            now: Date.now(),
-          })
-        );
-
-        context.executionCtx.waitUntil(
-          recordAnalytics({
-            db: context.env.GATEWAY_DB,
-            projectId,
-            outcome: 'ok',
-            provider: candidate.provider,
-            model: candidate.model,
-          })
+          recordImageSuccess(context.env, recordAnalytics, projectId, candidate, startedAt)
         );
 
         const degraded = attempts > 1;
@@ -276,34 +344,16 @@ export function registerImageGenerationRoute(
           degraded ? { 'x-degraded-mode': 'true' } : undefined
         );
       } catch (error) {
-        lastError = getErrorMessage(error);
-        const failureClass = classifyError(error);
-        lastErrorClass = failureClass;
-        attemptErrors.push({
-          provider: candidate.provider,
-          status: getUpstreamStatus(error) ?? null,
-        });
-        if (isProviderUnavailableForRequest(error)) unavailable.add(candidate.provider);
-        if (failureClass !== 'input_nonretriable' && failureClass !== 'safety_refusal') {
-          // Await writes so the next request observes account failures immediately.
-          await healthRecord(context.env, {
-            key: healthKey(candidate.provider),
-            success: false,
-            latencyMs: Date.now() - startedAt,
-            failureClass,
-            unavailableUntil: isProviderAccountFailure(error)
-              ? Date.now() + 24 * 60 * 60 * 1000
-              : undefined,
-            now: Date.now(),
-          });
-        }
-        if (
-          !isRetriableFailure(failureClass) &&
-          !canFallbackFromProviderFailure(error, failureClass) &&
-          !(auto && failureClass === 'provider_fatal')
-        ) {
-          break;
-        }
+        const failure = await handleImageFailure(
+          context.env,
+          candidate.provider,
+          error,
+          startedAt,
+          failures
+        );
+        lastError = failure.message;
+        lastErrorClass = failure.failureClass;
+        if (!canContinueImageFailover(error, failure.failureClass, auto)) break;
       }
     }
 
@@ -312,13 +362,13 @@ export function registerImageGenerationRoute(
         db: context.env.GATEWAY_DB,
         projectId,
         outcome: 'error',
-        provider: chosenProvider as Provider | undefined,
-        model: chosenModel,
+        provider: lastCandidate?.provider as Provider | undefined,
+        model: lastCandidate?.model,
       })
     );
 
     return context.json(
-      buildImageErrorBody(lastError, lastErrorClass, costBudget, attemptErrors),
+      buildImageErrorBody(lastError, lastErrorClass, costBudget, failures.attemptErrors),
       imageErrorStatus(lastErrorClass)
     );
   });
