@@ -73,6 +73,7 @@ describe('image generation resilience', () => {
     const res = await app.fetch(req, env, makeCtx());
     expect(res.status).toBe(200);
     expect(res.headers.get('x-degraded-mode')).toBe('true');
+    expect(res.headers.get('x-gateway-provider')).toBe('nvidia');
 
     const body = (await res.json()) as {
       degraded: boolean;
@@ -182,6 +183,7 @@ describe('image generation resilience', () => {
     const res = await app.fetch(req, env, makeCtx());
     expect(res.status).toBe(200);
     expect(res.headers.get('x-degraded-mode')).toBeNull();
+    expect(res.headers.get('x-gateway-provider')).toBe('gemini');
     const body = (await res.json()) as { degraded: boolean };
     expect(body.degraded).toBe(false);
   });

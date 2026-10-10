@@ -114,6 +114,7 @@ describe('POST /v1/images/generations', () => {
         x_gateway: { provider: 'gemini', attempts: 2 },
       });
       expect(first.headers.get('x-degraded-mode')).toBe('true');
+      expect(first.headers.get('x-gateway-provider')).toBe('gemini');
       expect(togetherImageMock).toHaveBeenCalledOnce();
       expect(snapshots[0].key).toBe('together:images');
       expect(snapshots[0].cooldownUntil).toBeGreaterThanOrEqual(before + 86_400_000);
@@ -130,6 +131,7 @@ describe('POST /v1/images/generations', () => {
       const explicit = await app.fetch(imageRequest(explicitModel), env, makeCtx());
       expect(explicit.status).toBe(200);
       expect(togetherImageMock).toHaveBeenCalledTimes(2);
+      expect(togetherImageMock.mock.calls[1][0].verify).toBe(false);
     }
   );
 
@@ -162,8 +164,8 @@ describe('POST /v1/images/generations', () => {
           { provider: 'together', status: 403 },
           { provider: 'gemini', status: 403 },
           { provider: 'nvidia', status: 403 },
-          { provider: 'pollinations', status: 403 },
           { provider: 'workers_ai', status: 403 },
+          { provider: 'pollinations', status: 403 },
         ],
       },
     });
@@ -173,8 +175,10 @@ describe('POST /v1/images/generations', () => {
       nvidiaImageMock,
       pollinationsImageMock,
       workersAiImageMock,
-    ])
+    ]) {
       expect(mock).toHaveBeenCalledOnce();
+      expect(mock.mock.calls[0][0].verify).toBe(true);
+    }
   });
 
   it.each([
@@ -255,6 +259,7 @@ describe('POST /v1/images/generations', () => {
 
     const res = await app.fetch(req, env, makeCtx());
     expect(res.status).toBe(200);
+    expect(res.headers.get('x-gateway-provider')).toBe('together');
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.created).toBe(1_700_000_000);
     expect(Array.isArray(body.data)).toBe(true);
@@ -343,6 +348,101 @@ describe('POST /v1/images/generations', () => {
     const body = (await res.json()) as { x_gateway: { provider: string } };
     expect(body.x_gateway.provider).toBe('gemini');
     expect(geminiImageMock).toHaveBeenCalledOnce();
+    expect(geminiImageMock.mock.calls[0][0].verify).toBe(false);
+    expect(res.headers.get('x-gateway-provider')).toBe('gemini');
+    expect(togetherImageMock).not.toHaveBeenCalled();
+  });
+
+  it('attempts Pollinations last after other providers and Workers AI regardless of health', async () => {
+    const { env } = makeTestEnv({
+      NVIDIA_API_KEY: 'n',
+      WORKERS_AI_ENABLED: 'true',
+      healthSnapshots: [
+        { key: 'nvidia:images', successRate: 0.2, cooldownUntil: 0 },
+        { key: 'workers_ai:images', successRate: 0.1, cooldownUntil: 0 },
+        { key: 'pollinations:images', successRate: 1, cooldownUntil: 0 },
+      ],
+    });
+    (env as unknown as { AI: unknown }).AI = { run: vi.fn() };
+    nvidiaImageMock.mockRejectedValue(new Error('provider unavailable'));
+    workersAiImageMock.mockRejectedValue(new Error('provider unavailable'));
+    pollinationsImageMock.mockResolvedValue({
+      created: 1,
+      data: [{ url: 'https://img.example/pollinations.png' }],
+    });
+
+    const res = await app.fetch(imageRequest(), env, makeCtx());
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-gateway-provider')).toBe('pollinations');
+    expect(res.headers.get('x-degraded-mode')).toBe('true');
+    expect(await res.json()).toMatchObject({
+      degraded: true,
+      x_gateway: { provider: 'pollinations', attempts: 3 },
+    });
+    expect(nvidiaImageMock).toHaveBeenCalledOnce();
+    expect(workersAiImageMock).toHaveBeenCalledOnce();
+    expect(pollinationsImageMock).toHaveBeenCalledOnce();
+    expect(nvidiaImageMock.mock.invocationCallOrder[0]).toBeLessThan(
+      workersAiImageMock.mock.invocationCallOrder[0]
+    );
+    expect(workersAiImageMock.mock.invocationCallOrder[0]).toBeLessThan(
+      pollinationsImageMock.mock.invocationCallOrder[0]
+    );
+    for (const mock of [nvidiaImageMock, workersAiImageMock, pollinationsImageMock]) {
+      expect(mock.mock.calls[0][0].verify).toBe(true);
+    }
+  });
+
+  it.each([
+    [402, 'Pollinations image error (402)'],
+    [undefined, 'Pollinations returned unparseable image dimensions'],
+  ])(
+    'returns the error when Pollinations fails with status %s and no fallback remains',
+    async (status, message) => {
+      const { env } = makeTestEnv();
+      pollinationsImageMock.mockRejectedValue(Object.assign(new Error(message), { status }));
+      const res = await app.fetch(imageRequest(), env, makeCtx());
+      expect(res.status).toBe(502);
+      expect(await res.json()).toMatchObject({
+        error: {
+          type: 'provider_fatal',
+          message: `All image providers failed: ${message}`,
+          attempts: [{ provider: 'pollinations', status: status ?? null }],
+          cost_budget: { attempts: 1 },
+        },
+      });
+      expect(res.headers.get('x-gateway-provider')).toBeNull();
+      expect(pollinationsImageMock).toHaveBeenCalledOnce();
+      expect(pollinationsImageMock.mock.calls[0][0].verify).toBe(true);
+    }
+  );
+
+  it('allows forced Pollinations auto requests without verification', async () => {
+    const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k' });
+    pollinationsImageMock.mockResolvedValue({
+      created: 1,
+      data: [{ url: 'https://img.example/pollinations.png' }],
+    });
+    const req = imageRequest();
+    req.headers.set('x-gateway-force-provider', 'pollinations');
+    const res = await app.fetch(req, env, makeCtx());
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-gateway-provider')).toBe('pollinations');
+    expect(pollinationsImageMock).toHaveBeenCalledOnce();
+    expect(pollinationsImageMock.mock.calls[0][0].verify).toBe(false);
+    expect(togetherImageMock).not.toHaveBeenCalled();
+  });
+
+  it('allows explicit Pollinations models without verification', async () => {
+    const { env } = makeTestEnv({ TOGETHER_API_KEY: 'k' });
+    pollinationsImageMock.mockResolvedValue({
+      created: 1,
+      data: [{ url: 'https://img.example/pollinations.png' }],
+    });
+    const res = await app.fetch(imageRequest('pollinations-flux'), env, makeCtx());
+    expect(res.status).toBe(200);
+    expect(pollinationsImageMock).toHaveBeenCalledOnce();
+    expect(pollinationsImageMock.mock.calls[0][0]).toMatchObject({ model: 'flux', verify: false });
     expect(togetherImageMock).not.toHaveBeenCalled();
   });
 
