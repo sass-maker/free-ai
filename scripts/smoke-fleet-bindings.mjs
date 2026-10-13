@@ -169,6 +169,14 @@ test('private Fleet bindings in the compiled Workers runtime', async () => {
       }),
     });
     assert.equal(publicResponse.status, 401);
+    for (const path of ['/v1/decide', '/v1/compare']) {
+      const denied = await gateway.fetch(`https://gateway.test${path}`, {
+        method: 'POST',
+        body: JSON.stringify({ project_id: 'starboard' }),
+      });
+      assert.equal(denied.status, 401);
+    }
+    assert.equal(decisionCalls, 2, 'Unauthenticated decisions must not invoke providers');
     console.log(
       'Fleet binding runtime passed: native CLS/768, routed chat, typed decisions and frozen comparison, disabled Jev, protected Modal embeddings, unpriced zero-call denial, public 401.'
     );

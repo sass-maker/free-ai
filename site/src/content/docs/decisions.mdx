@@ -9,6 +9,9 @@ description: "Typed decisions and comparisons over one frozen input."
 `POST /v1/compare` runs selected engines on the same state and questions.
 Both require gateway authentication and a nonempty `project_id`. Private Fleet
 service bindings support these operations with the same project allowlist.
+Public callers send `Authorization: Bearer <gateway-key>` or `x-api-key`.
+Project IDs contain 1–64 letters, digits, dots, underscores, colons, or hyphens;
+if `x-gateway-project-id` is present it must match the body.
 
 ```json
 {
@@ -51,6 +54,9 @@ Each result includes `input_hash`, `engine`, `requested_model`, actual `model`
 and `provider`, `status`, `answers`, `usage`, and `latency_ms`.
 Each answer has its question `id`, `status: "answered" | "abstained"`, typed
 `value`, and a brief `reason`. Abstention requires `value: null`.
+Result status is `ok`, `error`, or `unavailable`; a successful single decision
+also includes `project_id`. Reasons contain 1–2,000 characters and question IDs
+contain 1–128 characters.
 Successful outputs must contain exactly every question ID once; values must
 match the question type, choice options, and score bounds. Invalid outputs
 return `status: "error"` without usable answers. Reasons are model-generated;

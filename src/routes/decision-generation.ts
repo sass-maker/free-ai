@@ -4,7 +4,9 @@ import { getModelRegistry } from '../config';
 import type { Env } from '../types';
 import {
   comparisonRequestSchema,
+  comparisonResponseSchema,
   decisionRequestSchema,
+  decisionResponseSchema,
   validateDecisionAnswers,
   type DecisionInput,
   type DecisionEngine,
@@ -175,7 +177,13 @@ async function execute(
   c.req.raw.signal.addEventListener('abort', abort, { once: true });
   if (c.req.raw.signal.aborted) controller.abort();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let rejectCancellation: (() => void) | undefined;
   try {
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      rejectCancellation = () => reject(new Error('request_aborted'));
+      controller.signal.addEventListener('abort', rejectCancellation, { once: true });
+      if (controller.signal.aborted) rejectCancellation();
+    });
     const pending = (async () => {
       if (controller.signal.aborted) throw new Error('request_aborted');
       const response = await dispatch(
@@ -189,10 +197,11 @@ async function execute(
     c.executionCtx.waitUntil(pending.catch(() => undefined));
     const { response, body } = await Promise.race([
       pending,
+      cancelled,
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
-          controller.abort();
           reject(new Error('deadline_exceeded'));
+          controller.abort();
         }, input.limits.deadline_ms);
       }),
     ]);
@@ -222,6 +231,7 @@ async function execute(
     };
   } finally {
     if (timer) clearTimeout(timer);
+    if (rejectCancellation) controller.signal.removeEventListener('abort', rejectCancellation);
     c.req.raw.signal.removeEventListener('abort', abort);
   }
 }
@@ -305,19 +315,31 @@ async function handle(c: DecisionContext, dispatch: Dispatch, compare: boolean):
 
 export function registerDecisionRoutes(app: GatewayApp): void {
   const dispatch: Dispatch = async (request, env, ctx) => app.fetch(request, env, ctx);
-  for (const [path, schema] of [
-    ['/v1/decide', decisionRequestSchema],
-    ['/v1/compare', comparisonRequestSchema],
+  app.openAPIRegistry.registerComponent('securitySchemes', 'DecisionBearerAuth', {
+    type: 'http',
+    scheme: 'bearer',
+  });
+  app.openAPIRegistry.registerComponent('securitySchemes', 'DecisionApiKeyAuth', {
+    type: 'apiKey',
+    in: 'header',
+    name: 'x-api-key',
+  });
+  for (const [path, schema, responseSchema] of [
+    ['/v1/decide', decisionRequestSchema, decisionResponseSchema],
+    ['/v1/compare', comparisonRequestSchema, comparisonResponseSchema],
   ] as const) {
     // Register documentation separately so the handler bounds the stream before JSON parsing.
     app.openAPIRegistry.registerPath({
       method: 'post',
       path,
-      description: 'Typed decisions on bounded frozen evidence; Jev is reserved and disabled.',
-      request: { body: { content: { 'application/json': { schema } } } },
+      description:
+        'Typed decisions on frozen evidence (32,768 UTF-8 bytes, depth 32); request and buffered gateway response limit 65,536 bytes. Final decision limit 65,536 bytes; comparison limit 270,336 bytes. Question IDs and choice options must be unique; score max must exceed min. Answered values must match question types/options/bounds, with exactly one answer per question. Abstention requires null. Cancellation and per-engine deadlines stop later attempts. Jev is reserved and disabled. See canonical /decisions documentation.',
+      security: [{ DecisionBearerAuth: [] }, { DecisionApiKeyAuth: [] }],
+      request: { body: { required: true, content: { 'application/json': { schema } } } },
       responses: {
         200: {
           description: 'Decision result, or comparison results, with explicit engine status.',
+          content: { 'application/json': { schema: responseSchema } },
         },
         400: { description: 'Invalid decision input.' },
         401: { description: 'Unauthorized.' },

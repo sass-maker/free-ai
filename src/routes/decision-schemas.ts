@@ -73,6 +73,53 @@ const answerSchema = z
 const decisionOutputSchema = z.object({ answers: z.array(answerSchema).max(60) }).strict();
 export type DecisionAnswer = z.infer<typeof answerSchema>;
 
+const responseAnswer = z.discriminatedUnion('status', [
+  answerSchema.extend({
+    status: z.literal('answered'),
+    value: z.union([z.string().max(256), z.number().finite(), z.boolean()]),
+  }),
+  answerSchema.extend({ status: z.literal('abstained'), value: z.null() }),
+]);
+const resultBase = {
+  input_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  engine: z.enum(['free_ai', 'jev']),
+  requested_model: z.string().min(1).max(200),
+  latency_ms: z.number().nonnegative(),
+};
+const usage = z.object({
+  prompt_tokens: z.number().int().nonnegative().optional(),
+  completion_tokens: z.number().int().nonnegative().optional(),
+  total_tokens: z.number().int().nonnegative().optional(),
+});
+const result = z.discriminatedUnion('status', [
+  z.object({
+    ...resultBase,
+    status: z.literal('ok'),
+    model: z.string().min(1).max(200),
+    provider: z.string().min(1).max(64),
+    answers: z.array(responseAnswer).min(1).max(60),
+    usage: usage.nullable(),
+  }),
+  z.object({
+    ...resultBase,
+    status: z.enum(['error', 'unavailable']),
+    model: z.string().nullable(),
+    provider: z.string().nullable(),
+    answers: z.array(answerSchema).max(0),
+    usage: usage.nullable(),
+    error: z.object({ code: z.string(), message: z.string() }),
+  }),
+]);
+export const decisionResponseSchema = z.intersection(
+  z.object({ project_id: projectIdSchema }),
+  result
+);
+export const comparisonResponseSchema = z.object({
+  input_hash: resultBase.input_hash,
+  project_id: projectIdSchema,
+  results: z.array(result).min(2).max(4),
+});
+
 export function validateDecisionAnswers(
   value: unknown,
   questions: DecisionInput['questions']

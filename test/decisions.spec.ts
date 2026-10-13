@@ -4,6 +4,7 @@ import type { ModelCandidate } from '../src/types';
 import { fetchFleetRequest } from '../src/fleet-gateway';
 import { makeCtx, makeTestEnv } from './helpers/env';
 import contract from '../fixtures/decision-gateway-contract.json';
+import { comparisonResponseSchema, decisionResponseSchema } from '../src/routes/decision-schemas';
 
 const mocks = vi.hoisted(() => ({ registry: [] as ModelCandidate[], call: vi.fn() }));
 vi.mock('../src/config', async (original) => ({
@@ -95,9 +96,13 @@ describe('typed decision routes', () => {
       env,
       makeCtx()
     );
-    const body = (await response.json()) as { paths: Record<string, unknown> };
-    expect(body.paths['/v1/decide']).toBeDefined();
-    expect(body.paths['/v1/compare']).toBeDefined();
+    const body = (await response.json()) as { paths: Record<string, any> };
+    for (const path of ['/v1/decide', '/v1/compare']) {
+      const operation = body.paths[path].post;
+      expect(operation.security).toEqual([{ DecisionBearerAuth: [] }, { DecisionApiKeyAuth: [] }]);
+      expect(operation.requestBody.required).toBe(true);
+      expect(operation.responses['200'].content['application/json'].schema).toBeDefined();
+    }
   });
 
   it('uses real authenticated routing with attribution, typed answers and abstention', async () => {
@@ -114,6 +119,7 @@ describe('typed decision routes', () => {
       usage: { total_tokens: 30 },
     });
     expect(body.input_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(decisionResponseSchema.safeParse(body).success).toBe(true);
     expect(mocks.call).toHaveBeenCalledOnce();
     expect(mocks.call.mock.calls[0][0]).toMatchObject({
       stream: false,
@@ -126,6 +132,7 @@ describe('typed decision routes', () => {
     const { body } = await run(
       request({ engines: [{ engine: 'free_ai' }, { engine: 'jev' }] }, true)
     );
+    expect(comparisonResponseSchema.safeParse(body).success).toBe(true);
     expect(body.results[0]).toMatchObject({
       status: 'ok',
       engine: 'free_ai',
@@ -192,6 +199,19 @@ describe('typed decision routes', () => {
       'free-a',
       'free-b',
     ]);
+  });
+
+  it('accepts API-key auth and strips caller routing overrides', async () => {
+    const { body } = await run(
+      request({}, false, {
+        authorization: '',
+        'x-api-key': 'test-gateway-key',
+        'x-gateway-force-model': 'paid-or-unknown',
+        'x-gateway-force-provider': 'jev',
+      })
+    );
+    expect(body.status).toBe('ok');
+    expect(mocks.call.mock.calls[0][0].model).toBe('free-a');
   });
 
   it('hashes sorted object keys consistently across requests and changed evidence differently', async () => {
@@ -387,6 +407,38 @@ describe('typed decision routes', () => {
     expect(mocks.call).toHaveBeenCalledOnce();
   });
 
+  it('returns promptly on cancellation even when inference ignores abort', async () => {
+    const controller = new AbortController();
+    let began: (() => void) | undefined;
+    let release: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      began = resolve;
+    });
+    mocks.call.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve(completion());
+          began?.();
+        })
+    );
+    const pending = run(request({ limits: { deadline_ms: 1000 } }, false, {}, controller.signal));
+    await started;
+    controller.abort();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const result = await Promise.race([
+      pending,
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), 500);
+      }),
+    ]);
+    clearTimeout(timeout);
+    release?.();
+    await pending;
+    expect(result?.body).toMatchObject({ status: 'error', answers: [] });
+    expect(mocks.call.mock.calls[0][0].signal.aborted).toBe(true);
+    expect(mocks.call).toHaveBeenCalledOnce();
+  });
+
   it('reports underlying gateway unavailability without exposing errors or inference', async () => {
     mocks.registry = [];
     const { env } = makeTestEnv();
@@ -407,6 +459,18 @@ describe('typed decision routes', () => {
     expect((await app.fetch(request(), env, makeCtx())).status).toBe(429);
     expect(mocks.call).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])(
+    'requires configured authentication on both routes (compare=%s)',
+    async (compare) => {
+      const extra = compare ? { engines: [{ engine: 'free_ai' }, { engine: 'jev' }] } : {};
+      const { env } = makeTestEnv({ GATEWAY_API_KEY: '' });
+      const response = await app.fetch(request(extra, compare), env, makeCtx());
+      expect(response.status).toBe(503);
+      expect((await run(request(extra, compare, { authorization: '' }))).response.status).toBe(401);
+      expect(mocks.call).not.toHaveBeenCalled();
+    }
+  );
 
   it('supports private Fleet service binding with real route attribution', async () => {
     const { env } = makeTestEnv({ GROQ_API_KEY: 'test' });
