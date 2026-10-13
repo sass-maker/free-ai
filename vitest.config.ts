@@ -14,6 +14,8 @@ export default defineConfig({
         'src/router/classify-error.ts',
         'src/router/evaluation-weights.ts',
         'src/auth/gateway.ts',
+        'src/routes/decision-generation.ts',
+        'src/routes/decision-schemas.ts',
         'src/lib/telemetry.ts',
         'src/routing/ledger.ts',
         'src/state/client.ts',

@@ -1,0 +1,88 @@
+---
+title: "Decision APIs"
+description: "Typed decisions and comparisons over one frozen input."
+---
+
+## Endpoints
+
+`POST /v1/decide` answers typed questions using a supplied JSON state.
+`POST /v1/compare` runs selected engines on the same state and questions.
+Both require gateway authentication and a nonempty `project_id`. Private Fleet
+service bindings support these operations with the same project allowlist.
+Public callers send `Authorization: Bearer <gateway-key>` or `x-api-key`.
+Project IDs contain 1–64 letters, digits, dots, underscores, colons, or hyphens;
+if `x-gateway-project-id` is present it must match the body.
+
+```json
+{
+  "project_id": "starboard",
+  "engine": "free_ai",
+  "model": "auto",
+  "state": {"requirement": "persistent caching", "tool": "in-memory cache"},
+  "questions": [
+    {"id": "fit", "type": "choice", "prompt": "Does the tool meet the requirement?", "options": ["yes", "no"]},
+    {"id": "priority", "type": "score", "prompt": "How urgent is the gap?", "min": 0, "max": 10},
+    {"id": "proven", "type": "bool", "prompt": "Is the gap supported by evidence?"}
+  ],
+  "limits": {"deadline_ms": 30000, "max_output_tokens": 2048, "max_cost_usd": 0}
+}
+```
+
+`free_ai` uses existing health-aware routing, provider quotas, and the unchanged
+Workers AI fallback neuron budget. `auto` is the default. Explicit registered
+model selections are pinned for comparisons; unknown models are unavailable.
+`max_cost_usd` currently accepts only zero: this API does not authorize paid
+providers or increase any existing budget.
+
+`jev` is a reserved engine selector and always returns `provider_disabled`.
+Its adapter, paid approval, and priced budget integration are future work.
+It never calls Jev or silently substitutes a chat model.
+
+For comparison, replace `engine` and `model` with:
+
+```json
+{"engines": [{"engine": "free_ai", "model": "auto"}, {"engine": "jev"}]}
+```
+
+The request must select 2–4 distinct engine/model pairs. The response contains
+`input_hash`, `project_id`, and `results` in request order. No winner or accuracy
+claim is inferred from agreement.
+
+## Results and limits
+
+Each result includes `input_hash`, `engine`, `requested_model`, actual `model`
+and `provider`, `status`, `answers`, `usage`, and `latency_ms`.
+Each answer has its question `id`, `status: "answered" | "abstained"`, typed
+`value`, and a brief `reason`. Abstention requires `value: null`.
+Result status is `ok`, `error`, or `unavailable`; a successful single decision
+also includes `project_id`. Reasons contain 1–2,000 characters and question IDs
+contain 1–128 characters.
+Successful outputs must contain exactly every question ID once; values must
+match the question type, choice options, and score bounds. Invalid outputs
+return `status: "error"` without usable answers. Reasons are model-generated;
+callers remain responsible for checking citations and semantic correctness.
+
+The SHA-256 `input_hash` covers only `{state, questions}`, using recursively
+sorted object keys (JavaScript codepoint sort) and preserving array order.
+Project, model, engine, and limits are excluded. Comparison freezes this input
+once and supplies the same serialization to every selected engine.
+
+- 1–60 unique questions; each prompt up to 2,000 characters.
+- Choice: 1–64 unique nonempty strings, each up to 256 characters. A sole
+  explicit `none` option is valid; unsupported evidence can still abstain.
+- Score: finite `min` and `max`, with `max > min`. Bool: a boolean value.
+- Request and buffered gateway response: at most 65,536 bytes each.
+- Final decision response: at most 65,536 bytes. Final comparison response:
+  at most 270,336 bytes across all engines. Larger outputs fail closed with
+  `response_limit_exceeded` and empty answers.
+- Canonical frozen state/questions: at most 32,768 UTF-8 bytes and depth 32.
+- Deadline: 1,000–60,000 ms; default 30,000 ms. Cancellation propagates to
+  active provider inference and stops later attempts.
+- Output: 128–4,096 tokens per engine; default 2,048.
+
+Valid requests return HTTP 200 even if an engine is unavailable or errors,
+with a safe `error.code` and message. Unavailable/error results have empty
+answers; disabled engines have null actual model/provider/usage. Malformed,
+oversized, or mismatched project requests return HTTP 400. Authentication and
+rate-limit failures retain existing HTTP 401/503/429 behavior. Providers do
+not receive caller routing override headers through these decision endpoints.

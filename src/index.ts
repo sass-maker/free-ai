@@ -49,6 +49,7 @@ import {
   logUpstreamFailure,
 } from './router/gemini-key-recovery';
 import { registerGatewayAuthMiddleware } from './middleware/gateway-auth';
+import { registerDecisionRoutes } from './routes/decision-generation';
 import {
   EMBEDDING_CANDIDATES,
   embeddingCandidateEnabled,
@@ -118,6 +119,8 @@ app.use(
 
 // Fleet agent indexing (GEO) — discoverable product brief for AI crawlers
 app.use('*', async (c, next) => {
+  // The runtime API registry is authoritative; agent indexing must not replace it.
+  if (new URL(c.req.url).pathname === '/openapi.json') return next();
   const agent = handleAgentEdge(c.req.raw);
   if (agent) return agent;
   return next();
@@ -1493,6 +1496,7 @@ function createChatRetryCallback(
   );
   let keyRetryCandidate: ModelCandidate | undefined;
   return async () => {
+    if (c.req.raw.signal.aborted) throw new AbortError('Request aborted');
     while (selected[nextCandidate] && unavailableProviders.has(selected[nextCandidate].provider)) {
       nextCandidate += 1;
     }
@@ -2379,6 +2383,7 @@ app.openapi(responsesRoute, async (c) => {
   return c.json(chatCompletionToResponsesObject(parsedCompletion) as never, 200);
 });
 
+registerDecisionRoutes(app);
 registerEmbeddingGenerationRoute(app, recordAnalytics);
 
 // ── Speech-to-Text (health-aware routing across providers) ─────────

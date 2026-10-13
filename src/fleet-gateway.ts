@@ -68,7 +68,10 @@ export async function fetchFleetRequest(
   dispatch: (request: Request) => Promise<Response>
 ): Promise<Response> {
   const path = new URL(request.url).pathname;
-  if (request.method !== 'POST' || !['/v1/chat/completions', '/v1/embeddings'].includes(path)) {
+  if (
+    request.method !== 'POST' ||
+    !['/v1/chat/completions', '/v1/embeddings', '/v1/decide', '/v1/compare'].includes(path)
+  ) {
     return Response.json({ error: { message: 'Unsupported Fleet operation' } }, { status: 404 });
   }
   const project = request.headers.get('x-gateway-project-id');

@@ -1,0 +1,154 @@
+{
+  "request": {
+    "project_id": "knowledge-base",
+    "state": {
+      "question": "Find useful citation capabilities.",
+      "context_evidence": {
+        "e1": "Project requires source citations for repository recommendations."
+      },
+      "explicitly_documented_gap_options": [],
+      "candidates": [
+        {
+          "key": "c1",
+          "id": "repo:2",
+          "evidence": {
+            "e1": "Library provides source citations for repository documents."
+          }
+        }
+      ],
+      "evidence_policy": "Bounded source excerpts. Candidate order is not relevance rank. Reject when excerpts do not establish fit."
+    },
+    "questions": [
+      {
+        "id": "c1_fit",
+        "type": "choice",
+        "prompt": "Evaluate c1 against context. Shared words alone do not establish fit.\nreference: Evidence supports a useful comparison or implementation pattern.\nreject: Unsupported, incompatible, no new benefit, or insufficient evidence.",
+        "options": [
+          "reference",
+          "reject"
+        ]
+      },
+      {
+        "id": "c1_project",
+        "type": "choice",
+        "prompt": "Select context_evidence supporting c1 fit, or none.\ne1: e1\nnone: Insufficient source evidence.",
+        "options": [
+          "e1",
+          "none"
+        ]
+      },
+      {
+        "id": "c1_candidate",
+        "type": "choice",
+        "prompt": "Select c1.evidence supporting its capability, or none.\ne1: e1\nnone: Insufficient source evidence.",
+        "options": [
+          "e1",
+          "none"
+        ]
+      }
+    ],
+    "engines": [
+      {
+        "engine": "free_ai",
+        "model": "auto"
+      },
+      {
+        "engine": "jev"
+      }
+    ],
+    "limits": {
+      "deadline_ms": 30000,
+      "max_output_tokens": 4096,
+      "max_cost_usd": 0
+    }
+  },
+  "input_hash": "4e4be981ecff36b2773806fb9993fdc67094f09d9c85a4c331518789a66696ef",
+  "answers": [
+    {
+      "id": "c1_fit",
+      "status": "answered",
+      "value": "reference",
+      "reason": "Fixture source evidence."
+    },
+    {
+      "id": "c1_project",
+      "status": "answered",
+      "value": "e1",
+      "reason": "Fixture source evidence."
+    },
+    {
+      "id": "c1_candidate",
+      "status": "answered",
+      "value": "e1",
+      "reason": "Fixture source evidence."
+    }
+  ],
+  "numeric_request": {
+    "project_id": "knowledge-base",
+    "state": {
+      "question": "Find useful citation capabilities.",
+      "context_evidence": {
+        "e1": "Project requires source citations for repository recommendations."
+      },
+      "explicitly_documented_gap_options": [],
+      "candidates": [
+        {
+          "key": "c1",
+          "id": "repo:2",
+          "evidence": {
+            "e1": "Library provides source citations for repository documents."
+          }
+        }
+      ],
+      "evidence_policy": "Bounded source excerpts. Candidate order is not relevance rank. Reject when excerpts do not establish fit.",
+      "numeric_key_probe": {
+        "2": "two",
+        "10": "ten"
+      }
+    },
+    "questions": [
+      {
+        "id": "c1_fit",
+        "type": "choice",
+        "prompt": "Evaluate c1 against context. Shared words alone do not establish fit.\nreference: Evidence supports a useful comparison or implementation pattern.\nreject: Unsupported, incompatible, no new benefit, or insufficient evidence.",
+        "options": [
+          "reference",
+          "reject"
+        ]
+      },
+      {
+        "id": "c1_project",
+        "type": "choice",
+        "prompt": "Select context_evidence supporting c1 fit, or none.\ne1: e1\nnone: Insufficient source evidence.",
+        "options": [
+          "e1",
+          "none"
+        ]
+      },
+      {
+        "id": "c1_candidate",
+        "type": "choice",
+        "prompt": "Select c1.evidence supporting its capability, or none.\ne1: e1\nnone: Insufficient source evidence.",
+        "options": [
+          "e1",
+          "none"
+        ]
+      }
+    ],
+    "engines": [
+      {
+        "engine": "free_ai",
+        "model": "auto"
+      },
+      {
+        "engine": "jev"
+      }
+    ],
+    "limits": {
+      "deadline_ms": 30000,
+      "max_output_tokens": 4096,
+      "max_cost_usd": 0
+    }
+  },
+  "numeric_input_hash": "88314e6d32300e4fe8230870e5439ef5e30d1543a05dde1649fc7a7591f993ca"
+}

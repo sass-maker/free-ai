@@ -52,6 +52,7 @@ export default defineConfig({
           items: [
             { label: 'Chat Completions', slug: 'chat-completions' },
             { label: 'Responses API', slug: 'responses-api' },
+            { label: 'Decision APIs', slug: 'decisions' },
             { label: 'Embeddings', slug: 'embeddings' },
             { label: 'Models', slug: 'models' },
           ],
