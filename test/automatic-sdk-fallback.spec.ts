@@ -353,12 +353,26 @@ describe('automatic cross-provider fallback through the real SDK', () => {
     expect(response.status).toBe(200);
     expect(calls.map((sent) => new URL(sent.url).hostname)).toEqual([
       'generativelanguage.googleapis.com',
-      'generativelanguage.googleapis.com',
+      status === 429 ? 'api.groq.com' : 'generativelanguage.googleapis.com',
     ]);
-    expect(((await calls[1].json()) as { model: string }).model).toBe('gemini-sibling');
+    const nextModel = status === 429 ? 'groq-alternate' : 'gemini-sibling';
+    expect(((await calls[1].json()) as { model: string }).model).toBe(nextModel);
     expect(await response.json()).toMatchObject({
-      x_gateway: { attempts: 2, model: 'gemini-sibling' },
+      x_gateway: { attempts: 2, model: nextModel },
     });
+  });
+
+  it('keeps a same-provider alternative when no compatible other provider remains', async () => {
+    mocks.registry = [candidate('groq-first', 'groq'), candidate('groq-sibling', 'groq')];
+    const calls: Request[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(new Request(input, init));
+      return calls.length === 1 ? new Response(null, { status: 429 }) : success();
+    });
+    const response = await app.fetch(request(), env(), makeCtx());
+    expect(response.status).toBe(200);
+    expect(calls).toHaveLength(2);
+    expect(((await calls[1].json()) as { model: string }).model).toBe('groq-sibling');
   });
 
   it.each([400, 403])(

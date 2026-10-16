@@ -225,7 +225,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'thinkingmachines/inkling:free',
     reasoning: 'high',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // Live replay returned 403 on 2026-10-16; requalify before enabling.
     priority: 0.55,
     capabilities: {
       toolCalling: true,
@@ -242,7 +242,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'thinkingmachines/inkling-small:free',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // Live replay returned 403 on 2026-10-16; requalify before enabling.
     priority: 0.45,
     capabilities: {
       toolCalling: true,
