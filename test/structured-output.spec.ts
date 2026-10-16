@@ -5,6 +5,7 @@ import { deriveRequiredCapabilities, selectCandidates } from '../src/router/sele
 import { logUpstreamFailure } from '../src/router/gemini-key-recovery';
 import type { ModelCandidate, ResponseFormat } from '../src/types';
 import { makeCtx, makeTestEnv } from './helpers/env';
+import { fetchFleetRequest } from '../src/fleet-gateway';
 
 const mocks = vi.hoisted(() => ({ registry: [] as ModelCandidate[] }));
 vi.mock('../src/config', async (original) => ({
@@ -140,6 +141,34 @@ describe('automatic schema output', () => {
     );
     expect(selected.map((c) => c.model)).toEqual(['codestral-latest', 'ministral-8b-latest']);
   });
+
+  it.each([false, true])(
+    'uses a failed-model exclusion only through private dispatch (private: %s)',
+    async (privateDispatch) => {
+      mocks.registry = [
+        candidate('gemini', 'gemini-3.5-flash-lite'),
+        candidate('mistral', 'codestral-latest'),
+      ];
+      const bodies: Array<Record<string, unknown>> = [];
+      vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return success();
+      });
+      const req = request({ project_id: 'meme-lab' });
+      req.headers.set('x-gateway-project-id', 'meme-lab');
+      req.headers.set('x-gateway-exclude-models', '["gemini:gemini-3.5-flash-lite"]');
+      const environment = { ...env(), MISTRAL_API_KEY: 'synthetic-key' };
+      const response = privateDispatch
+        ? await fetchFleetRequest(req, environment, async (forwarded) =>
+            app.fetch(forwarded, environment, makeCtx())
+          )
+        : await app.fetch(req, environment, makeCtx());
+      expect(response.status).toBe(200);
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0].model).toBe(privateDispatch ? 'codestral-latest' : 'gemini-3.5-flash-lite');
+      expect(bodies[0].response_format).toEqual(format);
+    }
+  );
 
   it('recovers an unavailable schema provider through Mistral without weakening the schema or adding attempts', async () => {
     mocks.registry = [

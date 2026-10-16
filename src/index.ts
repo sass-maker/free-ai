@@ -43,6 +43,7 @@ import {
   MalformedProviderOutputError,
 } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
+import { fleetModelExclusions } from './router/fleet-model-exclusions';
 import {
   GeminiKeyPool,
   logUpstreamAccepted,
@@ -1803,6 +1804,7 @@ async function runCandidateSelection(
         stream: normalized.stream,
         now,
         modelOverride: forcedModel,
+        excludedKeys: forcedModel ? undefined : fleetModelExclusions(c.req.raw),
         requiredCapabilities,
         evaluationMap,
       });

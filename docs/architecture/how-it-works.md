@@ -112,6 +112,11 @@ attempts and returns to unknown health (0.5 success, 1500ms latency), allowing a
 unused provider to be tried again. This never clears daily usage, an active
 cooldown or provider-supplied exhaustion; a real new attempt establishes health.
 
+A private Fleet consumer can exclude up to four model keys from a repair
+request after rejecting generated output. The private entrypoint validates and
+strips `x-gateway-exclude-models`, retaining the hint on that request only.
+Public headers cannot set it; explicit model pins and global health are unchanged.
+
 ### 5. Derive required capabilities (the hard filter)
 
 `deriveRequiredCapabilities` (`select-model.ts:75`) inspects the request *before*
