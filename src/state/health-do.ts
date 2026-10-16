@@ -327,6 +327,27 @@ export class HealthStateDO {
     await this.persistSnapshot();
   }
 
+  private async regionAvailability(request: Request): Promise<Response> {
+    const body = (await request.json()) as { colo?: string; operation?: string; now?: number };
+    if (
+      typeof body.colo !== 'string' ||
+      !/^[A-Z]{3}$/.test(body.colo) ||
+      !['lookup', 'record'].includes(body.operation ?? '') ||
+      typeof body.now !== 'number' ||
+      !Number.isFinite(body.now)
+    )
+      return json({ error: 'Invalid region operation' }, 400);
+    // Keep regional egress failures out of global model statistics and quotas.
+    const key = `region-unavailable:gemini:${body.colo}`;
+    if (body.operation === 'record') {
+      const unavailableUntil = body.now + 30 * 60_000;
+      await this.ctx.storage.put(key, unavailableUntil);
+      return json({ unavailableUntil });
+    }
+    const until = (await this.ctx.storage.get<number>(key)) ?? 0;
+    return json({ unavailableUntil: until > body.now ? until : 0 });
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -334,6 +355,8 @@ export class HealthStateDO {
     if (request.method !== 'POST' && path !== '/snapshot' && path !== '/providers/stats') {
       return json({ error: 'Method not allowed' }, 405);
     }
+
+    if (path === '/region') return this.regionAvailability(request);
 
     if (path === '/record') {
       const body = (await request.json()) as {

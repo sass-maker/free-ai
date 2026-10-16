@@ -177,21 +177,29 @@ describe('chat automatic health rotation', () => {
     await request(1, [health('healthy-a'), health('other-tier')]);
     expect(mocks.call.mock.calls[0][0].model).toBe('healthy-a');
   });
-  it('continues to the next healthy peer after a retriable failure', async () => {
-    mocks.registry = [
-      candidate('healthy-a'),
-      candidate('healthy-b'),
-      candidate('fallback', 'workers_ai'),
-    ];
-    mocks.call.mockRejectedValueOnce(Object.assign(new Error('server error'), { status: 500 }));
-    const response = await request(1, [
-      health('healthy-a'),
-      health('healthy-b'),
-      health('fallback', 1, 'workers_ai'),
-    ]);
-    expect(response.status).toBe(200);
-    expect(mocks.call.mock.calls.map(([input]) => input.model)).toEqual(['healthy-b', 'healthy-a']);
-  });
+  it.each([429, 500])(
+    'keeps a healthy external peer ahead of Workers AI after upstream %i',
+    async (status) => {
+      mocks.registry = [
+        candidate('healthy-a'),
+        candidate('healthy-b'),
+        candidate('fallback', 'workers_ai'),
+      ];
+      mocks.call.mockRejectedValueOnce(
+        Object.assign(new Error('upstream unavailable'), { status })
+      );
+      const response = await request(1, [
+        health('healthy-a'),
+        health('healthy-b'),
+        health('fallback', 1, 'workers_ai'),
+      ]);
+      expect(response.status).toBe(200);
+      expect(mocks.call.mock.calls.map(([input]) => input.model)).toEqual([
+        'healthy-b',
+        'healthy-a',
+      ]);
+    }
+  );
   it('never rotates Workers AI ahead of available external providers', async () => {
     mocks.registry = [candidate('healthy-a'), candidate('fallback', 'workers_ai')];
     const response = await request(1, [health('healthy-a'), health('fallback', 1, 'workers_ai')]);

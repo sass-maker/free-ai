@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import app from '../src/index';
 import { fetchFleetRequest, runFleetNative } from '../src/fleet-gateway';
 import { makeCtx, makeTestEnv } from './helpers/env';
+import { requestColo } from '../src/router/regional-availability';
 
 function request(
   body: Record<string, unknown> = {},
@@ -48,6 +49,21 @@ function nativeEnv(allowed = true) {
 }
 
 describe('private Fleet gateway HTTP boundary', () => {
+  it.each(['HKG', 'invalid'])(
+    'accepts bounded colo context only through the private entrypoint: %s',
+    async (colo) => {
+      const req = request();
+      req.headers.set('x-gateway-caller-colo', colo);
+      expect(requestColo(req)).toBeNull();
+      const { env } = makeTestEnv();
+      await fetchFleetRequest(req, env, async (forwarded) => {
+        expect(requestColo(forwarded)).toBe(colo === 'HKG' ? colo : null);
+        expect(forwarded.headers.has('x-gateway-caller-colo')).toBe(false);
+        return new Response(null, { status: 204 });
+      });
+    }
+  );
+
   it('authenticates only the internal dispatch and preserves streaming without buffering', async () => {
     const { env } = makeTestEnv();
     const stream = new ReadableStream({

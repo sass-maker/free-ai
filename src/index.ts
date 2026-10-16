@@ -48,6 +48,11 @@ import {
   logUpstreamAccepted,
   logUpstreamFailure,
 } from './router/gemini-key-recovery';
+import {
+  geminiAvailableInRegion,
+  recordGeminiRegionRejection,
+  requestColo,
+} from './router/regional-availability';
 import { registerGatewayAuthMiddleware } from './middleware/gateway-auth';
 import { registerDecisionRoutes } from './routes/decision-generation';
 import {
@@ -1378,6 +1383,10 @@ async function handleChatProviderError(
     latency_ms: Date.now() - startedAt,
   });
 
+  if (candidate.provider === 'gemini' && isUpstreamRegionFailure(error)) {
+    await recordGeminiRegionRejection(c.env, requestColo(c.req.raw));
+  }
+
   // Caller input errors and colo-bound egress rejections say nothing about the
   // model's health; recording them would demote a working model for everyone.
   if (failureClass !== 'input_nonretriable' && !isUpstreamRegionFailure(error)) {
@@ -1410,11 +1419,6 @@ async function handleChatProviderError(
   }
 
   throw error instanceof Error ? error : new Error(state.lastErrorMessage);
-}
-
-function requestColo(request: Request): string | null {
-  const colo = (request as Request & { cf?: { colo?: unknown } }).cf?.colo;
-  return typeof colo === 'string' && /^[A-Z]{3}$/.test(colo) ? colo : null;
 }
 
 function shouldRetryChat(state: ChatRetryState): () => boolean {
@@ -1458,16 +1462,20 @@ function skipProviderAfterFailure(
   if (keyRetryPending) return false;
   const inputFailure = !pinned && classifyError(error) === 'input_nonretriable';
   const fallback = inputFailure && hasAlternateProvider(remaining, candidate, unavailable);
-  // A 429 may cover a shared provider allowance. Spend the bounded retry on
-  // another compatible provider when possible, rather than a sibling model.
-  const rateLimitFallback =
+  // Rate limits, overloads and timeouts can affect sibling models together.
+  // Prefer a compatible alternate without increasing the attempt budget.
+  const transientFallback =
     !pinned &&
-    getUpstreamStatus(error) === 429 &&
-    hasAlternateProvider(remaining, candidate, unavailable);
+    isRetriableFailure(classifyError(error)) &&
+    hasAlternateProvider(
+      remaining.filter((next) => next.provider !== 'workers_ai'),
+      candidate,
+      unavailable
+    );
   if (
     isProviderUnavailableForRequest(error) ||
     inputFailure ||
-    rateLimitFallback ||
+    transientFallback ||
     dailyQuotaReset(error, candidate.provider, Date.now())
   )
     unavailable.add(candidate.provider);
@@ -1766,8 +1774,18 @@ async function runCandidateSelection(
   now: number
 ) {
   const limits = getProviderLimits(c.env);
-  const modelKeys = registry.map((candidate) => getModelKey(candidate.provider, candidate.model));
-  const lookupLimits = buildLookupLimits(registry, limits);
+  // Explicit operator pins still probe the requested provider for recovery.
+  const regionBlocked =
+    !forcedModel &&
+    !c.req.header('x-gateway-force-provider') &&
+    !(await geminiAvailableInRegion(c.env, requestColo(c.req.raw)));
+  const regionalRegistry = regionBlocked
+    ? registry.filter((candidate) => candidate.provider !== 'gemini')
+    : registry;
+  const modelKeys = regionalRegistry.map((candidate) =>
+    getModelKey(candidate.provider, candidate.model)
+  );
+  const lookupLimits = buildLookupLimits(regionalRegistry, limits);
   const stateMap = await healthLookup(c.env, modelKeys, lookupLimits, now);
   const evaluationMap = parseEvaluationWeights(c.env.MODEL_EVALUATIONS_JSON);
   const requiredCapabilities = deriveRequiredCapabilities({
@@ -1778,7 +1796,7 @@ async function runCandidateSelection(
   return trace(
     'ai:route',
     () => {
-      const selected = selectCandidates(registry, stateMap, {
+      const selected = selectCandidates(regionalRegistry, stateMap, {
         min_reasoning_level: normalized.min_reasoning_level,
         stream: normalized.stream,
         now,
