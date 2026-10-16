@@ -26,7 +26,7 @@ const format: ResponseFormat = {
     },
   },
 };
-function candidate(provider: 'gemini' | 'groq', model: string): ModelCandidate {
+function candidate(provider: 'gemini' | 'groq' | 'mistral', model: string): ModelCandidate {
   return {
     id: model,
     model,
@@ -114,6 +114,59 @@ describe('automatic schema output', () => {
       expect(body.max_tokens).toBe(2000);
     }
     expect(await response.json()).toMatchObject({ x_gateway: { attempts: 2, provider: 'groq' } });
+  });
+
+  it('admits documented Mistral schema models while excluding unqualified models', () => {
+    const selected = selectCandidates(
+      [
+        candidate('mistral', 'codestral-latest'),
+        candidate('mistral', 'ministral-8b-latest'),
+        candidate('mistral', 'unqualified-future-model'),
+        {
+          ...candidate('mistral', 'codestral-latest'),
+          id: 'json-disabled',
+          capabilities: {
+            ...candidate('mistral', 'codestral-latest').capabilities,
+            jsonMode: false,
+          },
+        },
+      ],
+      new Map(),
+      {
+        now: Date.now(),
+        stream: false,
+        requiredCapabilities: deriveRequiredCapabilities({ response_format: format }),
+      }
+    );
+    expect(selected.map((c) => c.model)).toEqual(['codestral-latest', 'ministral-8b-latest']);
+  });
+
+  it('recovers an unavailable schema provider through Mistral without weakening the schema or adding attempts', async () => {
+    mocks.registry = [
+      candidate('gemini', 'gemini-3.5-flash-lite'),
+      candidate('mistral', 'ministral-8b-latest'),
+    ];
+    const bodies: Array<Record<string, unknown>> = [];
+    vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return bodies.length === 1
+        ? Response.json({ error: { message: 'Unavailable' } }, { status: 503 })
+        : success();
+    });
+    const response = await app.fetch(
+      request(),
+      { ...makeTestEnv({ GEMINI_API_KEY: 'synthetic-key' }).env, MISTRAL_API_KEY: 'synthetic-key' },
+      makeCtx()
+    );
+    expect(response.status).toBe(200);
+    expect(bodies.map((b) => b.model)).toEqual(['gemini-3.5-flash-lite', 'ministral-8b-latest']);
+    for (const body of bodies) {
+      expect(body.response_format).toEqual(format);
+      expect(body.max_tokens).toBe(2000);
+    }
+    expect(await response.json()).toMatchObject({
+      x_gateway: { attempts: 2, provider: 'mistral' },
+    });
   });
 
   it('falls back from generated JSON validation within two attempts but never retries caller errors', async () => {
