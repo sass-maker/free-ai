@@ -1,5 +1,6 @@
 import { isWorkersAiEnabled } from './config';
 import { attachFleetColo, requestColo } from './router/regional-availability';
+import { attachFleetModelExclusions } from './router/fleet-model-exclusions';
 import { estimateNeuronCost, tryDebitNeurons } from './state/neuron-budget';
 import type { Env } from './types';
 
@@ -111,6 +112,8 @@ export async function fetchFleetRequest(
   });
   attachFleetColo(forwarded, requestColo(request) ?? request.headers.get('x-gateway-caller-colo'));
   forwarded.headers.delete('x-gateway-caller-colo');
+  attachFleetModelExclusions(forwarded, request.headers.get('x-gateway-exclude-models'));
+  forwarded.headers.delete('x-gateway-exclude-models');
   return dispatch(forwarded);
 }
 

@@ -3,6 +3,7 @@ import app from '../src/index';
 import { fetchFleetRequest, runFleetNative } from '../src/fleet-gateway';
 import { makeCtx, makeTestEnv } from './helpers/env';
 import { requestColo } from '../src/router/regional-availability';
+import { fleetModelExclusions } from '../src/router/fleet-model-exclusions';
 
 function request(
   body: Record<string, unknown> = {},
@@ -49,6 +50,25 @@ function nativeEnv(allowed = true) {
 }
 
 describe('private Fleet gateway HTTP boundary', () => {
+  it.each([
+    ['["mistral:codestral-latest"]', ['mistral:codestral-latest']],
+    ['["mistral:codestral-latest","mistral:codestral-latest"]', ['mistral:codestral-latest']],
+    ['["a:b",1]', []],
+    ['["a:b","c:d","e:f","g:h","i:j"]', []],
+    ['["bad header value"]', []],
+    ['not-json', []],
+  ])('bounds repair exclusions to the private forwarded request: %s', async (encoded, expected) => {
+    const req = request();
+    req.headers.set('x-gateway-exclude-models', encoded as string);
+    expect([...fleetModelExclusions(req)]).toEqual([]);
+    const { env } = makeTestEnv();
+    await fetchFleetRequest(req, env, async (forwarded) => {
+      expect([...fleetModelExclusions(forwarded)]).toEqual(expected);
+      expect(forwarded.headers.has('x-gateway-exclude-models')).toBe(false);
+      expect([...fleetModelExclusions(request())]).toEqual([]);
+      return new Response(null, { status: 204 });
+    });
+  });
   it.each(['HKG', 'invalid'])(
     'accepts bounded colo context only through the private entrypoint: %s',
     async (colo) => {
