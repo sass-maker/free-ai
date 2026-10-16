@@ -46,18 +46,18 @@ function digest(value: unknown): string {
 
 describe('model selection performance', () => {
   it('model selection scales across the supported registry size', () => {
-    expect(registry).toHaveLength(39);
+    expect(registry).toHaveLength(38);
     const metrics: string[] = [];
     const observedHashes: Record<number, string> = {};
 
-    // Two Inkling endpoints are disabled after live 403s. This shifts the
+    // Inkling access failures and Nemotron timeouts are quarantined. This shifts the
     // index-derived synthetic health fixture; these hashes pin the workload.
     const expectedHashes: Record<number, string> = {
-      20: '75eb039a814b7daf087a378928f42a5900c9bdf80f858a09c2567cb2e8f8924b',
-      39: 'b584999d1c0f954d9fe9cfcc1e4cd11c48bf287471d768c8a120ff58c6841ce0',
+      20: '78b21be55fb24241797eaf0e21b375548d02c655c592496fbb3a47d135b0153a',
+      38: '3f47107074be977f6c0a06c89152965de433a8c83224ce25ffb65c6a770f84cd',
     };
 
-    for (const size of [20, 39]) {
+    for (const size of [20, 38]) {
       const candidates = registry.slice(0, size);
       const states = new Map(
         candidates.map((candidate, index) => {

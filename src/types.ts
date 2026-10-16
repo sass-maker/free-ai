@@ -260,4 +260,6 @@ export interface ProviderQuotaStatus {
   usageDaily?: number;
   isFreeTier?: boolean;
   freeDailyLimit?: number;
+  freeDailyUsed?: number;
+  freeDailyRemaining?: number;
 }
