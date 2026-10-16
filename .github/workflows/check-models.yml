@@ -28,6 +28,8 @@ jobs:
       - name: Check configured models against official catalogs
         id: catalog
         env:
+          FREE_AI_BASE_URL: https://ai-gateway.sassmaker.com
+          GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
@@ -35,7 +37,6 @@ jobs:
           SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
           SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
@@ -60,6 +61,8 @@ jobs:
       - name: Build conservative registry patch
         if: steps.catalog.outputs.drift != '0'
         env:
+          FREE_AI_BASE_URL: https://ai-gateway.sassmaker.com
+          GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
@@ -67,7 +70,6 @@ jobs:
           SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
           SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}

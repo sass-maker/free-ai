@@ -8,6 +8,98 @@ import {
 } from '../scripts/check-model-ids.mjs';
 
 describe('model catalog checker', () => {
+  const gatewayEnv = {
+    FREE_AI_BASE_URL: 'https://gateway.test',
+    GATEWAY_API_KEY: 'synthetic-gateway-key',
+  };
+  const mistralOnly = new Set(['mistral']);
+
+  it('checks Mistral through the Worker with no provider key outside the Worker', async () => {
+    const upstream = vi.fn(async (url, options) => {
+      expect(url).toBe('https://gateway.test/v1/provider-catalogs/mistral');
+      expect(options.headers).toEqual({ Authorization: 'Bearer synthetic-gateway-key' });
+      expect(options.redirect).toBe('manual');
+      return Response.json({ data: [{ id: 'existing-model' }, { id: 'upstream-only-model' }] });
+    });
+    const catalogs = await fetchCatalogs(gatewayEnv, upstream, mistralOnly);
+    const mistral = catalogs.find((catalog) => catalog.provider === 'mistral');
+    expect(mistral).toMatchObject({
+      status: 'ok',
+      all: new Set(['existing-model', 'upstream-only-model']),
+    });
+    expect(
+      buildRegistryReport([{ id: 'old', provider: 'mistral', model: 'retired-model' }], catalogs)
+        .stale
+    ).toEqual([{ id: 'old', provider: 'mistral', model: 'retired-model' }]);
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it('prefers Worker credentials when a local Mistral key also exists', async () => {
+    const upstream = vi.fn(async (url, options) => {
+      expect(new URL(url).hostname).toBe('gateway.test');
+      expect(options.headers.Authorization).toBe('Bearer synthetic-gateway-key');
+      return Response.json({ data: [{ id: 'codestral-latest' }] });
+    });
+    await fetchCatalogs(
+      { ...gatewayEnv, MISTRAL_API_KEY: 'unused-provider-key' },
+      upstream,
+      mistralOnly
+    );
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    () => new Response('denied synthetic-gateway-key', { status: 401 }),
+    () => Response.redirect('https://other.test', 302),
+    () => Response.json({ unexpected: [] }),
+    () => Response.json({ data: [] }),
+    () => Response.json({ data: [{ id: 'partial-model' }, {}] }),
+  ])('keeps gateway catalog failures explicit without marking models stale', async (response) => {
+    const upstream = vi.fn(async () => response());
+    const catalogs = await fetchCatalogs(gatewayEnv, upstream, mistralOnly);
+    const mistral = catalogs.find((catalog) => catalog.provider === 'mistral');
+    expect(mistral.status).toBe('error');
+    expect(mistral.reason).not.toContain('synthetic-gateway-key');
+    expect(mistral.all.size).toBe(0);
+    const report = buildRegistryReport(
+      [{ id: 'chat', provider: 'mistral', model: 'configured-model' }],
+      catalogs
+    );
+    expect(report.stale).toEqual([]);
+    expect(report.summary.catalogErrors).toBe(1);
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    'http://gateway.test',
+    'https://user:password@gateway.test',
+    'https://gateway.test/path',
+  ])('rejects an unsafe gateway origin %s before sending credentials', async (base) => {
+    const upstream = vi.fn();
+    const catalogs = await fetchCatalogs(
+      { ...gatewayEnv, FREE_AI_BASE_URL: base },
+      upstream,
+      mistralOnly
+    );
+    expect(catalogs.find((catalog) => catalog.provider === 'mistral').status).toBe('error');
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('preserves direct Mistral catalog checks for local use', async () => {
+    const upstream = vi.fn(async (url, options) => {
+      expect(url).toBe('https://api.mistral.ai/v1/models');
+      expect(options.headers).toEqual({ Authorization: 'Bearer local-provider-key' });
+      return Response.json({ data: [{ id: 'codestral-latest' }] });
+    });
+    const catalogs = await fetchCatalogs(
+      { MISTRAL_API_KEY: 'local-provider-key' },
+      upstream,
+      mistralOnly
+    );
+    expect(catalogs.find((catalog) => catalog.provider === 'mistral').status).toBe('ok');
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
   it('checks every Gemini page before declaring a configured model stale', async () => {
     const requests = [];
     const fetchImpl = async (input, options) => {

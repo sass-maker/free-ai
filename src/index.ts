@@ -57,6 +57,7 @@ import {
 } from './routes/embedding-generation';
 import { registerImageGenerationRoute } from './routes/image-generation';
 import { registerOperatorUiRoutes } from './routes/operator-ui';
+import { registerProviderCatalogRoutes } from './routes/provider-catalogs';
 import { sortFallbackLast } from './routes/provider-order';
 import { registerTtsGenerationRoute } from './routes/tts-generation';
 import { registerVideoGenerationRoutes } from './routes/video-generation';
@@ -2871,6 +2872,7 @@ async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
 }
 
 registerOperatorUiRoutes(app);
+registerProviderCatalogRoutes(app);
 
 app.openapi(modelsRoute, async (c) => {
   return c.json(await buildModelListResponse(c.env));

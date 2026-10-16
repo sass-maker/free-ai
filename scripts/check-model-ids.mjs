@@ -7,7 +7,8 @@
  *   GROQ_API_KEY=... CEREBRAS_API_KEY=... GEMINI_API_KEY=... node scripts/check-model-ids.mjs
  *
  * OpenRouter's model catalog is public. OPENROUTER_API_KEY is optional and is
- * sent only when present; the other checked catalogs still require keys.
+ * sent only when present. Mistral can use the Worker's existing provider key
+ * via FREE_AI_BASE_URL + GATEWAY_API_KEY; other catalogs require provider keys.
  *
  * Flags:
  *   --patch   Rewrite config.ts, removing models that no longer exist
@@ -164,6 +165,7 @@ async function fetchCatalogItems(spec, key, fetchImpl) {
     const response = await fetchImpl(url.toString(), {
       headers: spec.headers({ key }),
       signal,
+      ...(spec.redirect ? { redirect: spec.redirect } : {}),
     });
     if (!response.ok) {
       // A bare status (e.g. HTTP 400) hides whether the provider rejected the
@@ -183,6 +185,12 @@ async function fetchCatalogItems(spec, key, fetchImpl) {
     const body = await response.json();
     const pageItems = asModelItems(body);
     if (!pageItems) throw new Error('catalog response did not contain a model array');
+    if (
+      spec.requireCompleteIds &&
+      (!pageItems.length || pageItems.some((item) => !modelId(item)))
+    ) {
+      throw new Error('gateway catalog did not contain a complete nonempty model ID list');
+    }
     items.push(...pageItems);
     if (!spec.paginated || body.nextPageToken === undefined || body.nextPageToken === '') {
       return items;
@@ -195,6 +203,35 @@ async function fetchCatalogItems(spec, key, fetchImpl) {
     url.searchParams.set('pageToken', body.nextPageToken);
   }
   throw new Error('catalog pagination exceeded the 20-page safety limit');
+}
+
+function resolveCatalogRequest(spec, env, providerKey) {
+  const gatewayKey = env.GATEWAY_API_KEY?.trim();
+  const gatewayBase = env.FREE_AI_BASE_URL?.trim();
+  if (spec.provider !== 'mistral' || !gatewayKey || !gatewayBase) {
+    return { spec, key: providerKey };
+  }
+  const base = new URL(gatewayBase);
+  if (
+    base.protocol !== 'https:' ||
+    base.username ||
+    base.password ||
+    base.pathname !== '/' ||
+    base.search ||
+    base.hash
+  ) {
+    throw new Error('FREE_AI_BASE_URL must be an HTTPS origin without credentials');
+  }
+  return {
+    key: gatewayKey,
+    spec: {
+      ...spec,
+      url: () => new URL('/v1/provider-catalogs/mistral', base).toString(),
+      headers: ({ key }) => ({ Authorization: `Bearer ${key}` }),
+      redirect: 'manual',
+      requireCompleteIds: true,
+    },
+  };
 }
 
 async function fetchCatalog(
@@ -232,18 +269,18 @@ async function fetchCatalog(
     ?.split(',')
     .map((value) => value.trim())
     .find(Boolean);
-  if (!key && !spec.optionalSecret) {
-    return {
-      provider: spec.provider,
-      status: 'missing_key',
-      reason: `${spec.secret} is not configured`,
-      all: new Set(),
-      addable: new Set(),
-    };
-  }
-
   try {
-    const items = await fetchCatalogItems(spec, key, fetchImpl);
+    const request = resolveCatalogRequest(spec, env, key);
+    if (!request.key && !spec.optionalSecret) {
+      return {
+        provider: spec.provider,
+        status: 'missing_key',
+        reason: `${spec.secret} is not configured`,
+        all: new Set(),
+        addable: new Set(),
+      };
+    }
+    const items = await fetchCatalogItems(request.spec, request.key, fetchImpl);
     const validItems = items.filter((item) => modelId(item));
     const all = new Set(validItems.map(modelId));
     const addable = new Set(spec.discover ? validItems.filter(spec.discover).map(modelId) : []);
