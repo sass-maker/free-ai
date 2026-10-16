@@ -43,6 +43,7 @@ export interface ProviderStats {
 const MODEL_PREFIX = 'm:';
 const ROUND_ROBIN_STORAGE_KEY = 'round-robin';
 const HISTORY_LIMIT = 100;
+const ROUTING_HISTORY_WINDOW_MS = 24 * 60 * 60_000;
 const SHORT_WINDOW = 10;
 const SHORT_FAILURE_THRESHOLD = 7;
 const COOL_DOWN_MS = 120_000;
@@ -70,6 +71,12 @@ function emptyModelState(now: number): ModelState {
   };
 }
 
+function routingHistory(state: ModelState, now: number): ModelState['history'] {
+  // Retain the diagnostic ring, but let unused providers recover to unknown
+  // after a day. Quotas and provider-supplied cooldowns remain independent.
+  return state.history.filter((attempt) => attempt.ts > now - ROUTING_HISTORY_WINDOW_MS);
+}
+
 function toSnapshot(
   key: string,
   state: ModelState,
@@ -77,16 +84,17 @@ function toSnapshot(
   now: number,
   providerState?: ModelState
 ): ModelStateSnapshot {
-  const attempts = state.history.length;
-  const successful = state.history.filter((item) => item.success).length;
+  const history = routingHistory(state, now);
+  const attempts = history.length;
+  const successful = history.filter((item) => item.success).length;
   const successRate = attempts === 0 ? 0.5 : successful / attempts;
   const avgLatencyMs =
-    attempts === 0 ? 1500 : state.history.reduce((sum, item) => sum + item.latencyMs, 0) / attempts;
-  const latencies = state.history.map((item) => item.latencyMs).sort((a, b) => a - b);
+    attempts === 0 ? 1500 : history.reduce((sum, item) => sum + item.latencyMs, 0) / attempts;
+  const latencies = history.map((item) => item.latencyMs).sort((a, b) => a - b);
   const p90LatencyMs = attempts === 0 ? 1500 : percentile(latencies, 0.9);
   const p99LatencyMs = attempts === 0 ? 1500 : percentile(latencies, 0.99);
 
-  const recent = state.history.slice(-SHORT_WINDOW);
+  const recent = history.slice(-SHORT_WINDOW);
   const shortRetriableFailures = recent.filter(
     (item) => !item.success && !item.keyRetryPending && item.failureClass === 'usage_retriable'
   ).length;
@@ -392,7 +400,7 @@ export class HealthStateDO {
         modelState.dailyUsed += 1;
       }
 
-      const recent = modelState.history.slice(-SHORT_WINDOW);
+      const recent = routingHistory(modelState, body.now).slice(-SHORT_WINDOW);
       const shortRetriableFailures = recent.filter(
         (attempt) =>
           !attempt.success && !attempt.keyRetryPending && attempt.failureClass === 'usage_retriable'

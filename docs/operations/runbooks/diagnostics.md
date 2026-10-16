@@ -11,8 +11,10 @@ Operational procedures for common gateway issues. For deploy steps see
    ```
    Inspect each entry's `status` and `reasons`. Degraded can mean low success
    rate or high latency as well as retriable errors; it does not establish
-   rate limiting. Health history retains the last 100 attempts per model, so
-   aggregate provider figures can include old or disabled models.
+   rate limiting. Routing metrics use up to 100 attempts from the last 24 hours;
+   older evidence returns to unknown health without resetting quotas or active
+   exhaustion/cooldowns. The diagnostic ring retains 100 attempts per model, so
+   aggregate provider figures can still include old or disabled models.
 2. Check `/v1/provider-quotas` for OpenRouter credit exhaustion:
    ```bash
    curl -s https://ai-gateway.sassmaker.com/v1/provider-quotas | jq

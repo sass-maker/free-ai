@@ -248,7 +248,7 @@ describe('HealthStateDO', () => {
             key: 'groq:test-model',
             success: true,
             latencyMs,
-            now: Date.UTC(2026, 4, 27) + index,
+            now: Date.now() + index,
           }),
         })
       );
