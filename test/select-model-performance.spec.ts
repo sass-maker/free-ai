@@ -46,16 +46,18 @@ function digest(value: unknown): string {
 
 describe('model selection performance', () => {
   it('model selection scales across the supported registry size', () => {
-    expect(registry).toHaveLength(43);
+    expect(registry).toHaveLength(41);
     const metrics: string[] = [];
     const observedHashes: Record<number, string> = {};
 
+    // Kimi K3 and Pixtral Large retired upstream. Their removal also shifts
+    // the index-derived synthetic health fixture; these pin the new workload.
     const expectedHashes: Record<number, string> = {
-      20: '6a29ab82884d6ce2e53a97e8cabc2283ac518a20130d5304aadb744316c13c94',
-      43: 'ff4cc42c9505725f177c2bac3a079b1bbe05419a8e429de12b797a95c1ea6801',
+      20: '3724fc77f6140e42831dde679e066d39a5c56ee276bca711dc0327d6a0843c15',
+      41: '00498dfa40d14c64992120ee4c6ecd03fb4b91e6a92f3ff455213c1db762a2f5',
     };
 
-    for (const size of [20, 43]) {
+    for (const size of [20, 41]) {
       const candidates = registry.slice(0, size);
       const states = new Map(
         candidates.map((candidate, index) => {
