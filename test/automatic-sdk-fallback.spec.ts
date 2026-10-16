@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import app from '../src/index';
 import type { ModelCandidate } from '../src/types';
+import { fetchFleetRequest } from '../src/fleet-gateway';
+import { HealthStateDO } from '../src/state/health-do';
 import { makeCtx, makeTestEnv } from './helpers/env';
 
 const mocks = vi.hoisted(() => ({ registry: [] as ModelCandidate[] }));
@@ -32,7 +34,12 @@ function candidate(
   };
 }
 
-function request(signal?: AbortSignal, vision = false, stream = false) {
+function request(
+  signal?: AbortSignal,
+  vision = false,
+  stream = false,
+  project = 'automatic-sdk-regression'
+) {
   return new Request('https://gateway.test/v1/chat/completions', {
     method: 'POST',
     signal,
@@ -42,7 +49,7 @@ function request(signal?: AbortSignal, vision = false, stream = false) {
     },
     body: JSON.stringify({
       model: 'auto',
-      project_id: 'automatic-sdk-regression',
+      project_id: project,
       max_tokens: 800,
       stream,
       response_format: { type: 'json_object' },
@@ -95,6 +102,67 @@ describe('automatic cross-provider fallback through the real SDK', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.useRealTimers();
+  });
+
+  it('remembers a private caller region rejection without disabling Gemini elsewhere', async () => {
+    mocks.registry = [
+      candidate('gemini-first', 'gemini'),
+      candidate('groq-alternate', 'groq'),
+      candidate('nvidia-third', 'nvidia'),
+    ];
+    const testEnv = env('single-synthetic-key');
+    const storage = new Map<string, unknown>();
+    const regional = new HealthStateDO(
+      {
+        storage: {
+          get: async (key: string) => storage.get(key),
+          put: async (key: string, value: unknown) => {
+            storage.set(key, value);
+          },
+        },
+      } as unknown as DurableObjectState,
+      {}
+    );
+    const original = testEnv.HEALTH_DO.get(testEnv.HEALTH_DO.idFromName('global-health'));
+    testEnv.HEALTH_DO = {
+      ...testEnv.HEALTH_DO,
+      get: () => ({
+        fetch: (url: string, init?: RequestInit) =>
+          new URL(url).pathname === '/region'
+            ? regional.fetch(new Request(url, init))
+            : original.fetch(url, init),
+      }),
+    } as unknown as DurableObjectNamespace;
+    let phase = 0;
+    const calls: string[][] = [[], [], [], []];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const host = new URL(new Request(input, init).url).hostname;
+      calls[phase].push(host);
+      if (phase === 0 && host.startsWith('generativelanguage'))
+        return Response.json(
+          [{ error: { status: 'FAILED_PRECONDITION', message: 'location is not supported' } }],
+          { status: 400 }
+        );
+      if (phase === 1 && host === 'api.groq.com') return new Response(null, { status: 429 });
+      return success();
+    });
+    for (const colo of ['HKG', 'HKG', 'IAD', 'HKG']) {
+      const req = request(undefined, false, false, 'meme-lab');
+      req.headers.set('x-gateway-project-id', 'meme-lab');
+      req.headers.set('x-gateway-caller-colo', colo);
+      if (phase === 3) req.headers.set('x-gateway-force-provider', 'gemini');
+      const response = await fetchFleetRequest(req, testEnv, async (forwarded) =>
+        app.fetch(forwarded, testEnv, makeCtx())
+      );
+      expect(response.status).toBe(200);
+      phase++;
+    }
+    expect(calls).toEqual([
+      ['generativelanguage.googleapis.com', 'api.groq.com'],
+      ['api.groq.com', 'integrate.api.nvidia.com'],
+      ['generativelanguage.googleapis.com'],
+      ['generativelanguage.googleapis.com'],
+    ]);
   });
 
   it.each(['deadline', 'caller cancellation'])(
@@ -353,9 +421,9 @@ describe('automatic cross-provider fallback through the real SDK', () => {
     expect(response.status).toBe(200);
     expect(calls.map((sent) => new URL(sent.url).hostname)).toEqual([
       'generativelanguage.googleapis.com',
-      status === 429 ? 'api.groq.com' : 'generativelanguage.googleapis.com',
+      'api.groq.com',
     ]);
-    const nextModel = status === 429 ? 'groq-alternate' : 'gemini-sibling';
+    const nextModel = 'groq-alternate';
     expect(((await calls[1].json()) as { model: string }).model).toBe(nextModel);
     expect(await response.json()).toMatchObject({
       x_gateway: { attempts: 2, model: nextModel },

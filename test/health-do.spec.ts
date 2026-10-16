@@ -21,6 +21,37 @@ function makeState() {
 }
 
 describe('HealthStateDO', () => {
+  it('persists regional rejection separately from global model health and expires it', async () => {
+    const state = makeState();
+    let health = new HealthStateDO(state, {});
+    const now = Date.now();
+    const region = async (colo: string, operation: string, time = now) =>
+      health.fetch(
+        new Request('https://internal.local/region', {
+          method: 'POST',
+          body: JSON.stringify({ colo, operation, now: time }),
+        })
+      );
+    expect(await (await region('HKG', 'lookup')).json()).toEqual({ unavailableUntil: 0 });
+    await region('HKG', 'record');
+    health = new HealthStateDO(state, {});
+    expect(await (await region('HKG', 'lookup')).json()).toEqual({
+      unavailableUntil: now + 1_800_000,
+    });
+    expect(await (await region('IAD', 'lookup')).json()).toEqual({ unavailableUntil: 0 });
+    expect(await (await region('HKG', 'lookup', now + 1_800_000)).json()).toEqual({
+      unavailableUntil: 0,
+    });
+    expect((await region('untrusted', 'record')).status).toBe(400);
+    expect((await region('HKG', 'unknown')).status).toBe(400);
+    expect(
+      await (await health.fetch(new Request('https://internal.local/snapshot'))).json()
+    ).toEqual({ snapshots: [] });
+    expect(
+      await (await health.fetch(new Request('https://internal.local/providers/stats'))).json()
+    ).toEqual({ stats: [] });
+  });
+
   it.each([false, true])(
     'persists quota exhaustion across eviction (provider-wide: %s)',
     async (providerWide) => {

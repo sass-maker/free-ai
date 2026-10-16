@@ -1,4 +1,5 @@
 import { isWorkersAiEnabled } from './config';
+import { attachFleetColo, requestColo } from './router/regional-availability';
 import { estimateNeuronCost, tryDebitNeurons } from './state/neuron-budget';
 import type { Env } from './types';
 
@@ -102,14 +103,15 @@ export async function fetchFleetRequest(
   headers.set('content-type', 'application/json');
   // Preserve a forwarded visitor address; isolate addressless server jobs by project.
   if (!headers.has('cf-connecting-ip')) headers.set('cf-connecting-ip', `fleet:${project}`);
-  return dispatch(
-    new Request(`https://fleet-gateway.internal${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ ...body, project_id: project }),
-      signal: request.signal,
-    })
-  );
+  const forwarded = new Request(`https://fleet-gateway.internal${path}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ ...body, project_id: project }),
+    signal: request.signal,
+  });
+  attachFleetColo(forwarded, requestColo(request) ?? request.headers.get('x-gateway-caller-colo'));
+  forwarded.headers.delete('x-gateway-caller-colo');
+  return dispatch(forwarded);
 }
 
 function nativeError(code: string): Error {
