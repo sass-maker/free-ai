@@ -102,11 +102,15 @@ hold — so the usable set is computed fresh per request from the environment.
 
 `healthLookup` (`state/client.ts:8`) asks the single global `HealthStateDO`
 (`idFromName('global-health')`) for a snapshot of every candidate key: success
-rate over its last-100-attempt ring, average/p90/p99 latency, `cooldownUntil`, and
+rate over up to 100 attempts from the last 24 hours, average/p90/p99 latency, `cooldownUntil`, and
 `headroom` (`1 - dailyUsed / dailyLimit`). *Why one global DO:* health is a
 cross-request signal — a 429 seen on request A must inform request B milliseconds
 later. Splitting per provider would need a key-routing layer; at current traffic
 one instance is fine ([ADR-001](decisions/adr-001-007.md), [ADR-007](decisions/adr-001-007.md)).
+The retained 100-attempt diagnostic ring is unchanged. Routing ignores older
+attempts and returns to unknown health (0.5 success, 1500ms latency), allowing an
+unused provider to be tried again. This never clears daily usage, an active
+cooldown or provider-supplied exhaustion; a real new attempt establishes health.
 
 ### 5. Derive required capabilities (the hard filter)
 

@@ -143,7 +143,7 @@ describe('HealthStateDO coverage', () => {
   it('caps history at 100 attempts and schedules one debounced snapshot', async () => {
     const { state, setAlarm } = makeState();
     const health = new HealthStateDO(state, {});
-    const now = Date.UTC(2026, 6, 31);
+    const now = Date.now();
 
     for (let index = 0; index < 101; index += 1) {
       await record(health, {
@@ -160,6 +160,130 @@ describe('HealthStateDO coverage', () => {
     });
     expect(setAlarm).toHaveBeenCalledTimes(1);
   });
+
+  it('expires routing evidence without clearing quota, exhaustion, cooldown or diagnostic history', async () => {
+    const now = Date.UTC(2026, 9, 16, 12);
+    const oldHistory = Array.from({ length: 100 }, (_, index) => ({
+      ts: now - 86400000 - index,
+      success: false,
+      latencyMs: 9000,
+      failureClass: 'usage_retriable',
+    }));
+    const { state, values } = makeState({
+      'm:mistral:codestral-latest': {
+        history: oldHistory,
+        cooldownUntil: now + 30000,
+        exhaustedUntil: now + 7200000,
+        dayKey: '2026-10-16',
+        dailyUsed: 7,
+      },
+      'm:mistral:*': {
+        history: [],
+        cooldownUntil: 0,
+        exhaustedUntil: now + 10800000,
+        dayKey: '2026-10-16',
+        dailyUsed: 0,
+      },
+    });
+    const health = new HealthStateDO(state, {});
+    const lookup = async (time: number) =>
+      (
+        (await (
+          await health.fetch(
+            post('/lookup', {
+              keys: ['mistral:codestral-latest'],
+              limits: { 'mistral:codestral-latest': { requestsPerDay: 10 } },
+              now: time,
+            })
+          )
+        ).json()) as { snapshots: Array<Record<string, number>> }
+      ).snapshots[0];
+    expect(await lookup(now)).toMatchObject({
+      attempts: 0,
+      successRate: 0.5,
+      avgLatencyMs: 1500,
+      p90LatencyMs: 1500,
+      p99LatencyMs: 1500,
+      shortRetriableFailures: 0,
+      dailyUsed: 7,
+      dailyLimit: 10,
+      headroom: 0,
+      cooldownUntil: now + 10800000,
+    });
+    expect(values.get('m:mistral:codestral-latest')).toMatchObject({
+      history: oldHistory,
+      dailyUsed: 7,
+      exhaustedUntil: now + 7200000,
+    });
+    const afterExpiry = now + 10800001;
+    expect(await lookup(afterExpiry)).toMatchObject({
+      attempts: 0,
+      successRate: 0.5,
+      dailyUsed: 7,
+    });
+    expect((await lookup(afterExpiry)).headroom).toBeCloseTo(0.3);
+    await record(health, {
+      key: 'mistral:codestral-latest',
+      success: true,
+      latencyMs: 400,
+      now: afterExpiry,
+    });
+    expect(await lookup(afterExpiry)).toMatchObject({
+      attempts: 1,
+      successRate: 1,
+      avgLatencyMs: 400,
+      dailyUsed: 8,
+    });
+    expect(
+      (values.get('m:mistral:codestral-latest') as { history: unknown[] }).history
+    ).toHaveLength(100);
+  });
+
+  it.each([false, true])(
+    'ignores expired failures when computing fresh cooldowns (malformed: %s)',
+    async (malformed) => {
+      const now = Date.now();
+      const { state } = makeState({
+        'm:groq:model': {
+          history: Array.from({ length: 7 }, () => ({
+            ts: now - 86400001,
+            success: false,
+            latencyMs: 100,
+            failureClass: 'usage_retriable',
+            malformed,
+          })),
+          cooldownUntil: 0,
+          dayKey: new Date(now).toISOString().slice(0, 10),
+          dailyUsed: 0,
+        },
+      });
+      const health = new HealthStateDO(state, {});
+      await health.fetch(
+        post('/record', {
+          key: 'groq:model',
+          success: false,
+          latencyMs: 200,
+          failureClass: malformed ? 'provider_fatal' : 'usage_retriable',
+          malformed,
+          now,
+        })
+      );
+      const response = await health.fetch(
+        post('/lookup', { keys: ['groq:model'], limits: {}, now })
+      );
+      await expect(response.json()).resolves.toMatchObject({
+        snapshots: [
+          {
+            attempts: 1,
+            successRate: 0,
+            avgLatencyMs: 200,
+            shortRetriableFailures: malformed ? 0 : 1,
+            cooldownUntil: malformed ? 0 : now + 45000,
+          },
+        ],
+      });
+    }
+  );
 
   it('applies base and burst cooldowns for retriable failures', async () => {
     const { state } = makeState();
