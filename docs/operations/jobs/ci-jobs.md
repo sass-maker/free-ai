@@ -37,8 +37,11 @@ files (cron) — those are authoritative, not this page.
   4. Opens or updates `[provider-registry] Catalog drift or coverage gap` and
      fails on drift, incomplete catalog coverage, or smoke failure. A fully
      healthy run closes the issue.
-- **Secrets:** one API key per authenticated provider catalog; optional
-  `OPENROUTER_API_KEY`; optional `GATEWAY_API_KEY` for the bounded smoke.
+- **Secrets:** Mistral's catalog uses `GATEWAY_API_KEY` and `FREE_AI_BASE_URL`
+  to call the authenticated `/v1/provider-catalogs/mistral` endpoint. Its provider
+  key stays in the Worker; the response contains only upstream model IDs.
+  Other authenticated catalogs use their provider keys; `OPENROUTER_API_KEY`
+  is optional. The bounded smoke also uses `GATEWAY_API_KEY`.
 - **Activation boundary:** generated candidates stay disabled. The workflow
   never commits, opens a PR, activates routing, uploads keys, or deploys.
 

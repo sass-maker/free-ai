@@ -33,11 +33,22 @@ const consumer = `export default {async fetch(req,env){
 }}`;
 test('private Fleet bindings in the compiled Workers runtime', async () => {
   let decisionCalls = 0;
+  let catalogCalls = 0;
   const mf = new Miniflare({
     workers: [
       {
         name: 'gateway',
         outboundService: async (request) => {
+          if (request.url === 'https://api.mistral.ai/v1/models') {
+            catalogCalls++;
+            assert.equal(
+              request.headers.get('authorization'),
+              'Bearer runtime-synthetic-mistral-key'
+            );
+            return Response.json({
+              data: [{ id: 'codestral-latest', api_key: 'runtime-synthetic-mistral-key' }],
+            });
+          }
           if (request.url === 'https://api.groq.com/openai/v1/chat/completions') {
             decisionCalls++;
             assert.equal(request.headers.get('authorization'), 'Bearer runtime-synthetic-groq-key');
@@ -108,6 +119,7 @@ test('private Fleet bindings in the compiled Workers runtime', async () => {
         bindings: {
           GATEWAY_API_KEY: 'runtime-synthetic-key',
           GROQ_API_KEY: 'runtime-synthetic-groq-key',
+          MISTRAL_API_KEY: 'runtime-synthetic-mistral-key',
           WORKERS_AI_ENABLED: 'true',
           MODAL_PROXY_KEY: 'runtime-synthetic-modal-key',
           MODAL_PROXY_SECRET: 'runtime-synthetic-modal-secret',
@@ -159,6 +171,16 @@ test('private Fleet bindings in the compiled Workers runtime', async () => {
     });
     assert.equal(decisionCalls, 2, 'Jev must not make any additional provider call');
     const gateway = await mf.getWorker('gateway');
+    const catalogUrl = 'https://gateway.test/v1/provider-catalogs/mistral';
+    assert.equal((await gateway.fetch(catalogUrl)).status, 401);
+    assert.equal(catalogCalls, 0, 'Unauthenticated catalogs must not invoke providers');
+    const catalog = await gateway.fetch(catalogUrl, {
+      headers: { authorization: 'Bearer runtime-synthetic-key' },
+    });
+    assert.equal(catalog.status, 200);
+    assert.equal(catalog.headers.get('cache-control'), 'private, no-store');
+    assert.deepEqual(await catalog.json(), { data: [{ id: 'codestral-latest' }] });
+    assert.equal(catalogCalls, 1);
     const publicResponse = await gateway.fetch('https://gateway.test/v1/chat/completions', {
       method: 'POST',
       headers: { authorization: 'Bearer service-binding', 'x-gateway-internal': '1' },
