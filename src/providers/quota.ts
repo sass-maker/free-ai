@@ -79,6 +79,31 @@ function requestCount(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
+function buildOpenRouterStatus(
+  data: NonNullable<OpenRouterKeyResponse['data']>
+): ProviderQuotaStatus {
+  const limitRemaining = typeof data.limit_remaining === 'number' ? data.limit_remaining : null;
+  const freeDailyRemaining = requestCount(data.free_model_daily_requests?.remaining);
+  const freeAvailable = limitRemaining === 0 && (freeDailyRemaining ?? 0) > 0;
+  return {
+    provider: 'openrouter',
+    status: limitRemaining !== null && limitRemaining <= 0 && !freeAvailable ? 'exhausted' : 'ok',
+    source: 'openrouter_key',
+    checkedAt: new Date().toISOString(),
+    reason: openRouterQuotaReason(limitRemaining, data.is_free_tier, freeDailyRemaining),
+    limitRemaining,
+    limit: typeof data.limit === 'number' ? data.limit : null,
+    usage: typeof data.usage === 'number' ? data.usage : undefined,
+    usageDaily: typeof data.usage_daily === 'number' ? data.usage_daily : undefined,
+    isFreeTier: data.is_free_tier,
+    freeDailyLimit:
+      requestCount(data.free_model_daily_requests?.limit) ??
+      (data.is_free_tier ? OPENROUTER_FREE_DAILY_LIMIT : undefined),
+    freeDailyUsed: requestCount(data.free_model_daily_requests?.used),
+    freeDailyRemaining,
+  };
+}
+
 async function fetchOpenRouterQuota(env: Env): Promise<ProviderQuotaStatus> {
   if (!env.OPENROUTER_API_KEY) {
     return fallbackStatus('openrouter', 'unconfigured', 'OPENROUTER_API_KEY is not configured');
@@ -108,27 +133,7 @@ async function fetchOpenRouterQuota(env: Env): Promise<ProviderQuotaStatus> {
     }
 
     const body = (await response.json()) as OpenRouterKeyResponse;
-    const data = body.data ?? {};
-    const limitRemaining = typeof data.limit_remaining === 'number' ? data.limit_remaining : null;
-    const freeDailyRemaining = requestCount(data.free_model_daily_requests?.remaining);
-    const freeAvailable = limitRemaining === 0 && (freeDailyRemaining ?? 0) > 0;
-    const status: ProviderQuotaStatus = {
-      provider: 'openrouter',
-      status: limitRemaining !== null && limitRemaining <= 0 && !freeAvailable ? 'exhausted' : 'ok',
-      source: 'openrouter_key',
-      checkedAt: new Date().toISOString(),
-      reason: openRouterQuotaReason(limitRemaining, data.is_free_tier, freeDailyRemaining),
-      limitRemaining,
-      limit: typeof data.limit === 'number' ? data.limit : null,
-      usage: typeof data.usage === 'number' ? data.usage : undefined,
-      usageDaily: typeof data.usage_daily === 'number' ? data.usage_daily : undefined,
-      isFreeTier: data.is_free_tier,
-      freeDailyLimit:
-        requestCount(data.free_model_daily_requests?.limit) ??
-        (data.is_free_tier ? OPENROUTER_FREE_DAILY_LIMIT : undefined),
-      freeDailyUsed: requestCount(data.free_model_daily_requests?.used),
-      freeDailyRemaining,
-    };
+    const status = buildOpenRouterStatus(body.data ?? {});
 
     await writeCachedQuota(env, status);
     return status;
