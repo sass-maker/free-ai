@@ -209,7 +209,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'nvidia/nemotron-3.5-lightning:free',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // Repeated live15s body-deadline failures; requalify latency before enabling.
     priority: 0.6,
     capabilities: {
       toolCalling: true,

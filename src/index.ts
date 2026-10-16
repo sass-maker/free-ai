@@ -456,6 +456,8 @@ const providerQuotaSchema = z.object({
   usageDaily: z.number().optional(),
   isFreeTier: z.boolean().optional(),
   freeDailyLimit: z.number().optional(),
+  freeDailyUsed: z.number().optional(),
+  freeDailyRemaining: z.number().optional(),
 });
 
 const healthSchema = z.object({

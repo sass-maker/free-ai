@@ -11,6 +11,7 @@ interface OpenRouterKeyResponse {
     limit_remaining?: number | null;
     usage_daily?: number;
     is_free_tier?: boolean;
+    free_model_daily_requests?: { used?: number; limit?: number; remaining?: number };
     rate_limit?: {
       requests?: number;
       interval?: string;
@@ -19,7 +20,7 @@ interface OpenRouterKeyResponse {
 }
 
 function cacheKey(provider: TextProvider): string {
-  return `provider-quota:${provider}`;
+  return `provider-quota:v2:${provider}`;
 }
 
 function fallbackStatus(
@@ -59,15 +60,23 @@ async function writeCachedQuota(env: Env, status: ProviderQuotaStatus): Promise<
 
 function openRouterQuotaReason(
   limitRemaining: number | null,
-  isFreeTier: boolean | undefined
+  isFreeTier: boolean | undefined,
+  freeDailyRemaining?: number
 ): string {
+  if (limitRemaining === 0 && (freeDailyRemaining ?? 0) > 0) {
+    return 'No paid credit remains; the separate free-model daily allowance is available';
+  }
   if (limitRemaining !== null && limitRemaining <= 0) {
-    return 'OpenRouter key reports no remaining credit limit';
+    return 'OpenRouter key reports no remaining paid credit limit';
   }
   if (isFreeTier) {
-    return 'OpenRouter free-model daily request limit is account-level and not exposed per model';
+    return 'OpenRouter free-model daily request limits apply across the account';
   }
   return 'OpenRouter key status is usable';
+}
+
+function requestCount(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
 async function fetchOpenRouterQuota(env: Env): Promise<ProviderQuotaStatus> {
@@ -101,18 +110,24 @@ async function fetchOpenRouterQuota(env: Env): Promise<ProviderQuotaStatus> {
     const body = (await response.json()) as OpenRouterKeyResponse;
     const data = body.data ?? {};
     const limitRemaining = typeof data.limit_remaining === 'number' ? data.limit_remaining : null;
+    const freeDailyRemaining = requestCount(data.free_model_daily_requests?.remaining);
+    const freeAvailable = limitRemaining === 0 && (freeDailyRemaining ?? 0) > 0;
     const status: ProviderQuotaStatus = {
       provider: 'openrouter',
-      status: limitRemaining !== null && limitRemaining <= 0 ? 'exhausted' : 'ok',
+      status: limitRemaining !== null && limitRemaining <= 0 && !freeAvailable ? 'exhausted' : 'ok',
       source: 'openrouter_key',
       checkedAt: new Date().toISOString(),
-      reason: openRouterQuotaReason(limitRemaining, data.is_free_tier),
+      reason: openRouterQuotaReason(limitRemaining, data.is_free_tier, freeDailyRemaining),
       limitRemaining,
       limit: typeof data.limit === 'number' ? data.limit : null,
       usage: typeof data.usage === 'number' ? data.usage : undefined,
       usageDaily: typeof data.usage_daily === 'number' ? data.usage_daily : undefined,
       isFreeTier: data.is_free_tier,
-      freeDailyLimit: data.is_free_tier ? OPENROUTER_FREE_DAILY_LIMIT : undefined,
+      freeDailyLimit:
+        requestCount(data.free_model_daily_requests?.limit) ??
+        (data.is_free_tier ? OPENROUTER_FREE_DAILY_LIMIT : undefined),
+      freeDailyUsed: requestCount(data.free_model_daily_requests?.used),
+      freeDailyRemaining,
     };
 
     await writeCachedQuota(env, status);
@@ -150,5 +165,16 @@ export function providerQuotaAllowsCandidate(
   candidate: ModelCandidate,
   quotas: Map<TextProvider, ProviderQuotaStatus>
 ): boolean {
-  return quotas.get(candidate.provider)?.status !== 'exhausted';
+  const quota = quotas.get(candidate.provider);
+  if (candidate.provider !== 'openrouter' || quota?.source !== 'openrouter_key') {
+    return quota?.status !== 'exhausted';
+  }
+  const freeVariant = candidate.model.endsWith(':free');
+  if (freeVariant && quota.freeDailyRemaining === 0) return false;
+  if (typeof quota.limitRemaining === 'number' && quota.limitRemaining <= 0) {
+    // A positive, explicitly reported request allowance can admit only the
+    // zero-priced variant. Unknown allowance and negative credit fail closed.
+    return freeVariant && quota.limitRemaining === 0 && (quota.freeDailyRemaining ?? 0) > 0;
+  }
+  return quota.status !== 'exhausted';
 }
