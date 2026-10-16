@@ -46,18 +46,18 @@ function digest(value: unknown): string {
 
 describe('model selection performance', () => {
   it('model selection scales across the supported registry size', () => {
-    expect(registry).toHaveLength(41);
+    expect(registry).toHaveLength(39);
     const metrics: string[] = [];
     const observedHashes: Record<number, string> = {};
 
-    // Kimi K3 and Pixtral Large retired upstream. Their removal also shifts
-    // the index-derived synthetic health fixture; these pin the new workload.
+    // Two Inkling endpoints are disabled after live 403s. This shifts the
+    // index-derived synthetic health fixture; these hashes pin the workload.
     const expectedHashes: Record<number, string> = {
-      20: '3724fc77f6140e42831dde679e066d39a5c56ee276bca711dc0327d6a0843c15',
-      41: '00498dfa40d14c64992120ee4c6ecd03fb4b91e6a92f3ff455213c1db762a2f5',
+      20: '75eb039a814b7daf087a378928f42a5900c9bdf80f858a09c2567cb2e8f8924b',
+      39: 'b584999d1c0f954d9fe9cfcc1e4cd11c48bf287471d768c8a120ff58c6841ce0',
     };
 
-    for (const size of [20, 41]) {
+    for (const size of [20, 39]) {
       const candidates = registry.slice(0, size);
       const states = new Map(
         candidates.map((candidate, index) => {

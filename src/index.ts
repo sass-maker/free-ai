@@ -1458,9 +1458,16 @@ function skipProviderAfterFailure(
   if (keyRetryPending) return false;
   const inputFailure = !pinned && classifyError(error) === 'input_nonretriable';
   const fallback = inputFailure && hasAlternateProvider(remaining, candidate, unavailable);
+  // A 429 may cover a shared provider allowance. Spend the bounded retry on
+  // another compatible provider when possible, rather than a sibling model.
+  const rateLimitFallback =
+    !pinned &&
+    getUpstreamStatus(error) === 429 &&
+    hasAlternateProvider(remaining, candidate, unavailable);
   if (
     isProviderUnavailableForRequest(error) ||
     inputFailure ||
+    rateLimitFallback ||
     dailyQuotaReset(error, candidate.provider, Date.now())
   )
     unavailable.add(candidate.provider);

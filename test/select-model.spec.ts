@@ -591,12 +591,13 @@ describe('default registry vision coverage', () => {
     const models = selected.map((candidate) => candidate.model);
 
     expect(selected.every((candidate) => candidate.reasoning === 'high')).toBe(true);
-    // GitHub Models is manual-only after its 100% observed failure window, so
-    // Mistral retired Pixtral Large, so automatic high-tier vision relies on
-    // Gemini and the free OpenRouter reasoning+vision model (stealth/ox-alpha).
-    expect(selected.length).toBeGreaterThanOrEqual(2);
-    expect(highTier.length).toBeGreaterThanOrEqual(2);
-    expect(providers).toEqual(new Set(['gemini', 'openrouter']));
+    // Pixtral retired upstream; both Inkling endpoints now reject live replay
+    // with 403. Gemini is the remaining qualified automatic high-tier pool.
+    expect(selected.length).toBeGreaterThanOrEqual(1);
+    expect(highTier.length).toBeGreaterThanOrEqual(1);
+    expect(providers).toEqual(new Set(['gemini']));
+    expect(models).not.toContain('thinkingmachines/inkling:free');
+    expect(models).not.toContain('thinkingmachines/inkling-small:free');
     expect(selected.every((candidate) => candidate.provider !== 'github_models')).toBe(true);
     expect(models).not.toContain('openai/gpt-5-mini');
     expect(models).not.toContain('openai/o4-mini');
