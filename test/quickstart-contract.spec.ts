@@ -70,6 +70,8 @@ describe('published quickstart contract', () => {
 
   it.each([
     ['groq', 'synthetic-model', 'low'],
+    ['groq', 'openai/gpt-oss-20b', 'auto'],
+    ['mistral', 'codestral-latest', 'low'],
     ['gemini', 'gemini-3.5-flash-lite', 'low'],
     ['gemini', 'gemini-3.8-flash', 'auto'],
   ] as const)(
@@ -96,6 +98,39 @@ describe('published quickstart contract', () => {
         )
       ).rejects.toMatchObject({ status: 503 });
       expect(upstream).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'qwen/qwen3.8-27b'])(
+    'forwards explicit bounded Groq reasoning effort for %s',
+    async (model) => {
+      for (const stream of [false, true]) {
+        const upstream = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+          expect(await new Request(input, init).json()).toMatchObject({
+            model,
+            stream,
+            reasoning_effort: 'low',
+            max_tokens: 2000,
+          });
+          return Response.json({ error: { message: 'Synthetic unavailable' } }, { status: 503 });
+        });
+        vi.stubGlobal('fetch', upstream);
+        await expect(
+          runOpenAICompatibleRequest(
+            {
+              env: makeTestEnv().env,
+              provider: 'groq',
+              model,
+              reasoning_effort: 'low',
+              max_tokens: 2000,
+              stream,
+              messages: [{ role: 'user', content: 'Synthetic classifier request' }],
+            },
+            { provider: 'groq', baseURL: 'https://provider.test/v1', apiKey: 'synthetic-key' }
+          )
+        ).rejects.toMatchObject({ status: 503 });
+        expect(upstream).toHaveBeenCalledTimes(1);
+      }
     }
   );
 

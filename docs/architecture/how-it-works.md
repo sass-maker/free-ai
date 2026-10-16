@@ -116,6 +116,10 @@ A private Fleet consumer can exclude up to four model keys from a repair
 request after rejecting generated output. The private entrypoint validates and
 strips `x-gateway-exclude-models`, retaining the hint on that request only.
 Public headers cannot set it; explicit model pins and global health are unchanged.
+Repair ordering prefers another compatible external provider before siblings of
+the rejected model. Siblings remain available as fallback, with Workers AI last.
+Explicit reasoning effort is forwarded only for qualified Gemini3.8 and Groq
+GPT-OSS/Qwen3.8 models; automatic effort and other model defaults are preserved.
 
 ### 5. Derive required capabilities (the hard filter)
 

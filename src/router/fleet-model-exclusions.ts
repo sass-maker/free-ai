@@ -26,3 +26,25 @@ export function fleetModelExclusions(request: Request): Set<string> {
   // Public headers alone cannot populate this map or influence routing.
   return new Set(exclusions.get(request) ?? []);
 }
+import type { ModelCandidate } from '../types';
+
+export function prioritizeFleetRepairProviders(
+  request: Request,
+  selected: ModelCandidate[]
+): ModelCandidate[] {
+  const failedProviders = new Set(
+    [...fleetModelExclusions(request)].map((key) => key.split(':')[0])
+  );
+  if (!failedProviders.size) return selected;
+  // Invalid output can recur across sibling models. Try a compatible external
+  // provider first, retaining siblings as fallback and Workers AI last.
+  return [
+    ...selected.filter(
+      (candidate) => candidate.provider !== 'workers_ai' && !failedProviders.has(candidate.provider)
+    ),
+    ...selected.filter(
+      (candidate) => candidate.provider !== 'workers_ai' && failedProviders.has(candidate.provider)
+    ),
+    ...selected.filter((candidate) => candidate.provider === 'workers_ai'),
+  ];
+}

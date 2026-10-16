@@ -198,6 +198,29 @@ describe('automatic schema output', () => {
     });
   });
 
+  it('prefers another schema provider over a sibling of the invalid-output model on repair', async () => {
+    mocks.registry = [
+      candidate('mistral', 'codestral-latest'),
+      candidate('mistral', 'ministral-8b-latest'),
+      candidate('gemini', 'gemini-3.5-flash-lite'),
+    ];
+    const bodies: Array<Record<string, unknown>> = [];
+    vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return success();
+    });
+    const req = request({ project_id: 'meme-lab' });
+    req.headers.set('x-gateway-project-id', 'meme-lab');
+    req.headers.set('x-gateway-exclude-models', '["mistral:codestral-latest"]');
+    const environment = { ...env(), MISTRAL_API_KEY: 'synthetic-key' };
+    const response = await fetchFleetRequest(req, environment, async (forwarded) =>
+      app.fetch(forwarded, environment, makeCtx())
+    );
+    expect(response.status).toBe(200);
+    expect(bodies.map((b) => b.model)).toEqual(['gemini-3.5-flash-lite']);
+    expect(bodies[0].response_format).toEqual(format);
+  });
+
   it('falls back from generated JSON validation within two attempts but never retries caller errors', async () => {
     mocks.registry = [
       candidate('groq', 'openai/gpt-oss-120b'),
