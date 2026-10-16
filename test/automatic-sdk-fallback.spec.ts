@@ -94,7 +94,57 @@ describe('automatic cross-provider fallback through the real SDK', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
+
+  it.each(['deadline', 'caller cancellation'])(
+    'bounds an unfinished JSON body after headers: %s',
+    async (ending) => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      mocks.registry = [candidate('nvidia-first', 'nvidia'), candidate('groq-alternate', 'groq')];
+      const controller = new AbortController();
+      const calls: Request[] = [];
+      let started!: () => void;
+      const upstreamStarted = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        const sent = new Request(input, init);
+        calls.push(sent);
+        if (calls.length > 1) return success();
+        const body = new ReadableStream({
+          start(stream) {
+            stream.enqueue(new TextEncoder().encode('{"choices":['));
+            sent.signal.addEventListener('abort', () => stream.error(sent.signal.reason));
+          },
+        });
+        started();
+        return new Response(body, { headers: { 'content-type': 'application/json' } });
+      });
+      const pending = app.fetch(request(controller.signal), env(), makeCtx());
+      try {
+        await upstreamStarted;
+        await vi.advanceTimersByTimeAsync(14_999);
+        expect(calls).toHaveLength(1);
+        if (ending === 'caller cancellation') controller.abort();
+        await vi.advanceTimersByTimeAsync(ending === 'deadline' ? 502 : 2);
+        expect(calls).toHaveLength(ending === 'deadline' ? 2 : 1);
+        const response = await pending;
+        if (ending === 'deadline') {
+          expect(response.status).toBe(200);
+          expect(calls[0].signal.aborted).toBe(true);
+          expect(await response.json()).toMatchObject({
+            x_gateway: { attempts: 2, provider: 'groq', model: 'groq-alternate' },
+          });
+        } else {
+          expect(response.status).toBe(502);
+        }
+      } finally {
+        controller.abort();
+        await pending;
+      }
+    }
+  );
 
   it.each([
     { error: { status: 'FAILED_PRECONDITION', message: 'location is not supported' } },

@@ -31,6 +31,37 @@ function createClient<TProvider extends TextProvider | EmbeddingProvider>(
   });
 }
 
+async function completeWithDeadline(
+  client: OpenAI,
+  body: Record<string, unknown>,
+  callerSignal?: AbortSignal
+): Promise<ProviderCallResult['completion']> {
+  if (callerSignal?.aborted) throw new OpenAI.APIUserAbortError();
+  const controller = new AbortController();
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, controller.signal])
+    : controller.signal;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      // Reject first so our deadline remains retriable, rather than looking
+      // like a caller cancellation when abort interrupts response.json().
+      reject(new OpenAI.APIConnectionTimeoutError());
+      controller.abort();
+    }, 15_000);
+  });
+  try {
+    // The SDK's own timeout ends at headers. Cover JSON body consumption too,
+    // without applying a total-response deadline to long-lived SSE streams.
+    return (await Promise.race([
+      client.chat.completions.create(body as never, { maxRetries: 0, signal }),
+      deadline,
+    ])) as ProviderCallResult['completion'];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function runOpenAICompatibleRequest(
   input: ProviderCallInput,
   config: OpenAICompatibleConfig<TextProvider>
@@ -84,12 +115,7 @@ export async function runOpenAICompatibleRequest(
     ...(input.response_format && { response_format: input.response_format }),
   };
 
-  const completion = (await client.chat.completions.create(
-    completionBody as never,
-    // The gateway owns the two-attempt budget and selects the next candidate.
-    // SDK retries would repeat the same failed model outside that accounting.
-    { maxRetries: 0, signal: input.signal }
-  )) as ProviderCallResult['completion'];
+  const completion = await completeWithDeadline(client, completionBody, input.signal);
   return {
     provider: config.provider,
     model: input.model,
