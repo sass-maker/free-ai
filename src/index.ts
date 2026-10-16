@@ -1467,7 +1467,11 @@ function skipProviderAfterFailure(
   const transientFallback =
     !pinned &&
     isRetriableFailure(classifyError(error)) &&
-    hasAlternateProvider(remaining, candidate, unavailable);
+    hasAlternateProvider(
+      remaining.filter((next) => next.provider !== 'workers_ai'),
+      candidate,
+      unavailable
+    );
   if (
     isProviderUnavailableForRequest(error) ||
     inputFailure ||
