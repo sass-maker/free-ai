@@ -17,6 +17,21 @@ interface OpenAICompatibleConfig<TProvider extends TextProvider | EmbeddingProvi
   fetch?: typeof fetch;
 }
 
+// https://console.groq.com/docs/api-reference
+const GROQ_REASONING_MODELS = new Set([
+  'openai/gpt-oss-20b',
+  'openai/gpt-oss-120b',
+  'qwen/qwen3.8-27b',
+]);
+
+function reasoningOptions(input: ProviderCallInput, provider: TextProvider) {
+  if (!input.reasoning_effort || input.reasoning_effort === 'auto') return {};
+  const supported =
+    (provider === 'gemini' && input.model === 'gemini-3.8-flash') ||
+    (provider === 'groq' && GROQ_REASONING_MODELS.has(input.model));
+  return supported ? { reasoning_effort: input.reasoning_effort } : {};
+}
+
 function createClient<TProvider extends TextProvider | EmbeddingProvider>(
   config: OpenAICompatibleConfig<TProvider>
 ): OpenAI {
@@ -68,15 +83,8 @@ export async function runOpenAICompatibleRequest(
 ): Promise<ProviderCallResult> {
   const client = createClient(config);
 
-  // Gemini 3.8 supports explicit thinking levels. Preserve provider defaults
-  // for automatic effort and models whose compatibility has not been qualified.
-  const reasoning =
-    config.provider === 'gemini' &&
-    input.model === 'gemini-3.8-flash' &&
-    input.reasoning_effort &&
-    input.reasoning_effort !== 'auto'
-      ? { reasoning_effort: input.reasoning_effort }
-      : {};
+  // Preserve defaults for automatic effort and unqualified model families.
+  const reasoning = reasoningOptions(input, config.provider);
 
   if (input.stream) {
     const streamBody = {

@@ -43,7 +43,10 @@ import {
   MalformedProviderOutputError,
 } from './router/classify-error';
 import { evaluationWeight, parseEvaluationWeights } from './router/evaluation-weights';
-import { fleetModelExclusions } from './router/fleet-model-exclusions';
+import {
+  fleetModelExclusions,
+  prioritizeFleetRepairProviders,
+} from './router/fleet-model-exclusions';
 import {
   GeminiKeyPool,
   logUpstreamAccepted,
@@ -1808,7 +1811,11 @@ async function runCandidateSelection(
         requiredCapabilities,
         evaluationMap,
       });
-      return Promise.resolve({ selected, poolSize: healthyRotationPoolSize(selected, stateMap) });
+      const ordered = forcedModel ? selected : prioritizeFleetRepairProviders(c.req.raw, selected);
+      return Promise.resolve({
+        selected: ordered,
+        poolSize: healthyRotationPoolSize(ordered, stateMap),
+      });
     },
     { context: { project: projectId, model: normalized.model } }
   );

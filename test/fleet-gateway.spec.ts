@@ -3,7 +3,11 @@ import app from '../src/index';
 import { fetchFleetRequest, runFleetNative } from '../src/fleet-gateway';
 import { makeCtx, makeTestEnv } from './helpers/env';
 import { requestColo } from '../src/router/regional-availability';
-import { fleetModelExclusions } from '../src/router/fleet-model-exclusions';
+import {
+  fleetModelExclusions,
+  prioritizeFleetRepairProviders,
+} from '../src/router/fleet-model-exclusions';
+import type { ModelCandidate } from '../src/types';
 
 function request(
   body: Record<string, unknown> = {},
@@ -50,6 +54,28 @@ function nativeEnv(allowed = true) {
 }
 
 describe('private Fleet gateway HTTP boundary', () => {
+  it('retains external siblings ahead of Workers AI after failed-provider diversification', async () => {
+    const req = request();
+    req.headers.set('x-gateway-exclude-models', '["mistral:codestral-latest"]');
+    const { env } = makeTestEnv();
+    const candidates = [
+      { provider: 'mistral', id: 'sibling' },
+      { provider: 'workers_ai', id: 'workers' },
+      { provider: 'gemini', id: 'other' },
+    ] as ModelCandidate[];
+    expect(prioritizeFleetRepairProviders(req, candidates)).toBe(candidates);
+    await fetchFleetRequest(req, env, async (forwarded) => {
+      expect(prioritizeFleetRepairProviders(forwarded, candidates).map((c) => c.id)).toEqual([
+        'other',
+        'sibling',
+        'workers',
+      ]);
+      expect(
+        prioritizeFleetRepairProviders(forwarded, candidates.slice(0, 2)).map((c) => c.id)
+      ).toEqual(['sibling', 'workers']);
+      return new Response(null, { status: 204 });
+    });
+  });
   it.each([
     ['["mistral:codestral-latest"]', ['mistral:codestral-latest']],
     ['["mistral:codestral-latest","mistral:codestral-latest"]', ['mistral:codestral-latest']],
