@@ -2083,6 +2083,7 @@ async function executeReplayCall(
       tools: normalized.tools,
       tool_choice: normalized.tool_choice,
       response_format: normalized.response_format,
+      signal: c.req.raw.signal,
     });
     return c.json(
       {
