@@ -409,22 +409,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'nvidia-kimi-k3',
-    provider: 'nvidia',
-    model: 'moonshotai/kimi-k3',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.71,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
     id: 'nvidia-nemotron-3-5-lightning-30b',
     provider: 'nvidia',
     model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
@@ -543,24 +527,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 
   // ── Mistral La Plateforme (Experiment tier, 1 RPS, 500k tok/min) ────
   {
-    id: 'mistral-large',
-    provider: 'mistral',
-    model: 'mistral-large-latest',
-    reasoning: 'high',
-    supportsStreaming: true,
-    // 2026-10: the org is on Mistral's Free plan, which returns HTTP 403 for
-    // mistral-large-latest while the smaller models still answer.
-    enabled: false,
-    priority: 0.85,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
     id: 'mistral-medium',
     provider: 'mistral',
     model: 'mistral-medium-latest',
@@ -642,22 +608,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       toolCalling: true,
       jsonMode: true,
       vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'mistral-pixtral',
-    provider: 'mistral',
-    model: 'pixtral-large-latest',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.76,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: true,
       contextWindow: 131072,
       maxOutputTokens: 8192,
     },
@@ -996,6 +946,40 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       maxOutputTokens: 8192,
     },
   },
+
+  // ── Auto-added by weekly model check (review priority + capabilities) ──
+  {
+    id: 'openrouter-nvidia-nemotron-3-5-super-vl-free',
+    provider: 'openrouter',
+    model: 'nvidia/nemotron-3.5-super-vl:free',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
+  {
+    id: 'gemini-gemini-4-argon',
+    provider: 'gemini',
+    model: 'gemini-4-argon',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: false,
+    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: false,
+      contextWindow: 32768,
+      maxOutputTokens: 4096,
+    },
+  },
 ];
 
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
@@ -1034,7 +1018,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'nvidia:nvidia/nemotron-3-super-120b-a12b': { requestsPerDay: 500 },
   'nvidia:nvidia/nemotron-3-ultra-550b-a55b': { requestsPerDay: 300 },
   'nvidia:z-ai/glm-5.3': { requestsPerDay: 300 },
-  'nvidia:moonshotai/kimi-k3': { requestsPerDay: 300 },
   'nvidia:nvidia/nemotron-3.5-lightning-30b-a3b': { requestsPerDay: 500 },
   'nvidia:openai/gpt-oss-20b': { requestsPerDay: 500 },
   // GitHub Models (free tier ~50 req/day per high-tier, 150/day low-tier)
@@ -1046,13 +1029,11 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'cohere:command-r-08-2024': { requestsPerDay: 10 },
   'cohere:command-r7b-12-2024': { requestsPerDay: 10 },
   // Mistral (Experiment tier, generous but 1 RPS)
-  'mistral:mistral-large-latest': { requestsPerDay: 500 },
   'mistral:mistral-medium-latest': { requestsPerDay: 500 },
   'mistral:mistral-small-latest': { requestsPerDay: 1000 },
   'mistral:codestral-latest': { requestsPerDay: 500 },
   'mistral:ministral-8b-latest': { requestsPerDay: 1000 },
   'mistral:ministral-3b-latest': { requestsPerDay: 1000 },
-  'mistral:pixtral-large-latest': { requestsPerDay: 300 },
   // AUTO-ADDED limits
   'openrouter:google/gemma-4-26b-a4b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:google/gemma-4-31b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
@@ -1081,6 +1062,9 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'openrouter:nex-agi/nex-n2.5-pro:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:inclusionai/ling-3.0-flash-fin:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'cerebras:qwen-3.8-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  // AUTO-ADDED limits
+  'openrouter:nvidia/nemotron-3.5-super-vl:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
+  'gemini:gemini-4-argon': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 };
 
 export interface RateLimitConfig {
