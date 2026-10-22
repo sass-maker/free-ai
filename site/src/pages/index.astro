@@ -142,13 +142,19 @@ const rb = '}';
 
       @media(max-width:768px){
         .nav{padding:0 1.25rem}
-        .nav-links,.nav-right{display:none}
+        .nav-right{display:none}
         .hero{padding:8rem 1.25rem 4rem}
         .stat-bar{gap:1.5rem;flex-wrap:wrap}
         .features-grid{grid-template-columns:1fr}
         .code-section{grid-template-columns:1fr;gap:2rem;padding-bottom:4rem}
         .footer{flex-direction:column;gap:2rem}
         .footer-links{gap:1.5rem}
+      }
+      @media(max-width:640px){
+        .nav{height:auto;min-height:56px;padding-block:.5rem}
+        .nav-left{width:100%;flex-direction:column;align-items:flex-start;gap:.25rem}
+        .nav-links{width:100%;flex-wrap:wrap}
+        .nav-links a{min-height:44px;padding:.35rem .5rem}
       }
       @media(prefers-reduced-motion:reduce){
         html{scroll-behavior:auto}
