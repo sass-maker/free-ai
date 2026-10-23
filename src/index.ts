@@ -533,6 +533,8 @@ const routingLedgerResponseSchema = z.object({
   ok: z.literal(true),
   generated_at: z.string(),
   days: z.number(),
+  window_start: z.string().optional(),
+  window_end_exclusive: z.string().optional(),
   project_id: z.string().optional(),
   privacy: z.object({
     stores_prompt_text: z.literal(false),
@@ -3297,10 +3299,79 @@ const routingLedgerRoute = createRoute({
   method: 'get',
   path: '/v1/routing/ledger',
   request: {
-    query: z.object({
-      project_id: z.string().optional(),
-      days: z.coerce.number().int().min(1).max(90).default(7),
-    }),
+    query: z
+      .object({
+        project_id: z.string().optional(),
+        days: z.coerce.number().int().min(1).max(90).optional(),
+        start_date: z.string().optional(),
+        end_date: z.string().optional(),
+      })
+      .superRefine((query, context) => {
+        const hasStart = query.start_date !== undefined;
+        const hasEnd = query.end_date !== undefined;
+        const hasDateRange = hasStart || hasEnd;
+
+        if (hasStart !== hasEnd) {
+          context.addIssue({
+            code: 'custom',
+            path: [hasStart ? 'end_date' : 'start_date'],
+            message: 'start_date and end_date must be provided together',
+          });
+        }
+
+        if (hasDateRange && query.days !== undefined) {
+          context.addIssue({
+            code: 'custom',
+            path: ['days'],
+            message: 'days cannot be combined with start_date or end_date',
+          });
+        }
+
+        if (query.start_date === undefined || query.end_date === undefined) return;
+
+        const isUtcDate = (value: string) => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+          const parsed = new Date(`${value}T00:00:00.000Z`);
+          return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+        };
+
+        if (!isUtcDate(query.start_date)) {
+          context.addIssue({
+            code: 'custom',
+            path: ['start_date'],
+            message: 'start_date must be a valid UTC calendar date in YYYY-MM-DD format',
+          });
+        }
+        if (!isUtcDate(query.end_date)) {
+          context.addIssue({
+            code: 'custom',
+            path: ['end_date'],
+            message: 'end_date must be a valid UTC calendar date in YYYY-MM-DD format',
+          });
+        }
+        if (!isUtcDate(query.start_date) || !isUtcDate(query.end_date)) return;
+
+        if (query.end_date <= query.start_date) {
+          context.addIssue({
+            code: 'custom',
+            path: ['end_date'],
+            message: 'end_date must be after start_date and is exclusive',
+          });
+          return;
+        }
+
+        const rangeDays =
+          (Date.parse(`${query.end_date}T00:00:00.000Z`) -
+            Date.parse(`${query.start_date}T00:00:00.000Z`)) /
+          86_400_000;
+        if (rangeDays > 90) {
+          context.addIssue({
+            code: 'custom',
+            path: ['end_date'],
+            message: 'date range cannot exceed 90 UTC calendar days',
+          });
+        }
+      }),
   },
   responses: {
     200: {
@@ -3312,17 +3383,28 @@ const routingLedgerRoute = createRoute({
 
 app.openapi(routingLedgerRoute, async (c) => {
   const query = c.req.valid('query');
+  const rangeDays =
+    query.start_date && query.end_date
+      ? (Date.parse(`${query.end_date}T00:00:00.000Z`) -
+          Date.parse(`${query.start_date}T00:00:00.000Z`)) /
+        86_400_000
+      : undefined;
+  const days = rangeDays ?? query.days ?? 7;
   try {
     const payload = await queryRoutingLedger(c.env.GATEWAY_DB, {
-      days: query.days,
+      days,
       project_id: query.project_id,
+      start_date: query.start_date,
+      end_date: query.end_date,
     });
     return c.json(payload);
   } catch {
     return c.json({
       ok: true as const,
       generated_at: new Date().toISOString(),
-      days: query.days,
+      days,
+      window_start: query.start_date,
+      window_end_exclusive: query.end_date,
       project_id: query.project_id,
       privacy: {
         stores_prompt_text: false as const,

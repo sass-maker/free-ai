@@ -149,6 +149,85 @@ describe('GET /v1/routing/ledger', () => {
     expect(body.summary.total_requests).toBe(2);
     expect(prepare).toHaveBeenCalled();
   });
+
+  it('filters an exact UTC date range with an exclusive end date', async () => {
+    const queries: string[] = [];
+    const binds: unknown[][] = [];
+    const prepare = vi.fn((sql: string) => {
+      queries.push(sql);
+      return {
+        bind: vi.fn(function (this: unknown, ...args: unknown[]) {
+          binds.push(args);
+          return this;
+        }),
+        first: vi.fn(async () => ({
+          total_requests: 226,
+          successful_requests: 212,
+          failed_requests: 14,
+          sum_latency_ms: 1_000,
+          sum_attempts: 240,
+          with_fallback: 14,
+        })),
+        all: vi.fn(async () => ({ results: [] })),
+      };
+    });
+
+    const { env } = makeTestEnv();
+    env.GATEWAY_DB.prepare = prepare as unknown as D1Database['prepare'];
+
+    const res = await app.fetch(
+      ledgerRequest('project_id=open-historia&start_date=2026-10-22&end_date=2026-10-23'),
+      env,
+      makeCtx()
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      days: 1,
+      window_start: '2026-10-22',
+      window_end_exclusive: '2026-10-23',
+      project_id: 'open-historia',
+      summary: {
+        total_requests: 226,
+        successful_requests: 212,
+        failed_requests: 14,
+      },
+    });
+    expect(queries.every((sql) => sql.includes('date >= ? AND date < ?'))).toBe(true);
+    expect(
+      binds.every(
+        (args) =>
+          args[0] === '2026-10-22' && args[1] === '2026-10-23' && args[2] === 'open-historia'
+      )
+    ).toBe(true);
+  });
+
+  it.each([
+    ['start_date=2026-10-22', 'start_date and end_date must be provided together'],
+    [
+      'days=1&start_date=2026-10-22&end_date=2026-10-23',
+      'days cannot be combined with start_date or end_date',
+    ],
+    [
+      'start_date=2026-02-30&end_date=2026-03-01',
+      'start_date must be a valid UTC calendar date in YYYY-MM-DD format',
+    ],
+    [
+      'start_date=2026-10-23&end_date=2026-10-23',
+      'end_date must be after start_date and is exclusive',
+    ],
+    ['start_date=2026-01-01&end_date=2026-04-02', 'date range cannot exceed 90 UTC calendar days'],
+  ])('rejects invalid date-window parameters: %s', async (query, message) => {
+    const prepare = vi.fn();
+    const { env } = makeTestEnv();
+    env.GATEWAY_DB.prepare = prepare as unknown as D1Database['prepare'];
+
+    const res = await app.fetch(ledgerRequest(query), env, makeCtx());
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain(message);
+    expect(prepare).not.toHaveBeenCalled();
+  });
 });
 
 describe('chat completions routing ledger smoke', () => {

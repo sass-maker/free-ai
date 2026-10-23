@@ -48,6 +48,8 @@ export interface RoutingLedgerResponse {
   ok: true;
   generated_at: string;
   days: number;
+  window_start?: string;
+  window_end_exclusive?: string;
   project_id?: string;
   privacy: {
     stores_prompt_text: false;
@@ -284,11 +286,22 @@ async function fetchAggregateQuery<T extends RollupRow>(
 
 export async function queryRoutingLedger(
   db: D1Database,
-  options: { days: number; project_id?: string }
+  options: {
+    days: number;
+    project_id?: string;
+    start_date?: string;
+    end_date?: string;
+  }
 ): Promise<RoutingLedgerResponse> {
   const days = options.days;
-  const filters = [`date >= date('now', ?)`];
-  const params: unknown[] = [`-${days} days`];
+  const filters =
+    options.start_date && options.end_date
+      ? ['date >= ? AND date < ?']
+      : [`date >= date('now', ?)`];
+  const params: unknown[] =
+    options.start_date && options.end_date
+      ? [options.start_date, options.end_date]
+      : [`-${days} days`];
 
   if (options.project_id) {
     filters.push('project_id = ?');
@@ -401,6 +414,8 @@ export async function queryRoutingLedger(
     ok: true,
     generated_at: new Date().toISOString(),
     days,
+    window_start: options.start_date,
+    window_end_exclusive: options.end_date,
     project_id: options.project_id,
     privacy: {
       stores_prompt_text: false,
