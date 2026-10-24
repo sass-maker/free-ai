@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 
 import app from '../src/index';
 import {
@@ -45,6 +47,68 @@ function chatRequest(body: Record<string, unknown> = {}) {
 
 function ledgerRequest(query = 'days=7') {
   return new Request(`https://gateway.test/v1/routing/ledger?${query}`);
+}
+
+type LedgerFixtureRow = {
+  date: string;
+  projectId: string;
+  outcome: 'ok' | 'error';
+  requestCount: number;
+  latencyMs: number;
+  attempts: number;
+  withFallback: number;
+};
+
+function makeSqliteLedgerD1(rows: LedgerFixtureRow[] = []) {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(
+    readFileSync(new URL('../migrations/0006_routing_ledger.sql', import.meta.url), 'utf8')
+  );
+  const insert = sqlite.prepare(
+    `INSERT INTO routing_ledger_rollup (
+      date, project_id, prompt_class, outcome, chosen_provider, chosen_model,
+      fallback_signature, quota_signature, request_count, sum_latency_ms, sum_attempts, with_fallback
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  for (const row of rows) {
+    const provider = row.outcome === 'ok' ? 'groq' : 'cohere';
+    insert.run(
+      row.date,
+      row.projectId,
+      'text',
+      row.outcome,
+      provider,
+      'model',
+      `${provider}/model:${row.outcome === 'ok' ? 'ok' : 'failed'}`,
+      'all_ok',
+      row.requestCount,
+      row.latencyMs,
+      row.attempts,
+      row.withFallback
+    );
+  }
+
+  const db = {
+    prepare(query: string) {
+      const statement = sqlite.prepare(query);
+      let boundValues: unknown[] = [];
+      const bound = {
+        bind(...values: unknown[]) {
+          boundValues = values;
+          return bound;
+        },
+        async first<T = unknown>() {
+          return statement.get(...(boundValues as never[])) as T | undefined;
+        },
+        async all<T = unknown>() {
+          return { results: statement.all(...(boundValues as never[])) as T[] };
+        },
+      };
+      return bound;
+    },
+  };
+
+  return { db: db as unknown as D1Database, close: () => sqlite.close() };
 }
 
 describe('routing ledger helpers', () => {
@@ -148,6 +212,153 @@ describe('GET /v1/routing/ledger', () => {
     expect(body.privacy).toEqual({ stores_prompt_text: false, stores_request_ids: false });
     expect(body.summary.total_requests).toBe(2);
     expect(prepare).toHaveBeenCalled();
+  });
+
+  it('filters an exact UTC date range with an exclusive end date', async () => {
+    const sqlite = makeSqliteLedgerD1([
+      {
+        date: '2026-10-21',
+        projectId: 'open-historia',
+        outcome: 'ok',
+        requestCount: 9,
+        latencyMs: 900,
+        attempts: 9,
+        withFallback: 0,
+      },
+      {
+        date: '2026-10-22',
+        projectId: 'open-historia',
+        outcome: 'ok',
+        requestCount: 2,
+        latencyMs: 200,
+        attempts: 3,
+        withFallback: 1,
+      },
+      {
+        date: '2026-10-22',
+        projectId: 'open-historia',
+        outcome: 'error',
+        requestCount: 1,
+        latencyMs: 500,
+        attempts: 2,
+        withFallback: 1,
+      },
+      {
+        date: '2026-10-23',
+        projectId: 'open-historia',
+        outcome: 'ok',
+        requestCount: 7,
+        latencyMs: 700,
+        attempts: 7,
+        withFallback: 0,
+      },
+      {
+        date: '2026-10-22',
+        projectId: 'another-project',
+        outcome: 'ok',
+        requestCount: 5,
+        latencyMs: 500,
+        attempts: 5,
+        withFallback: 0,
+      },
+    ]);
+
+    const { env } = makeTestEnv();
+    env.GATEWAY_DB = sqlite.db;
+
+    try {
+      const res = await app.fetch(
+        ledgerRequest('project_id=open-historia&start_date=2026-10-22&end_date=2026-10-23'),
+        env,
+        makeCtx()
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        days: 1,
+        window_start: '2026-10-22',
+        window_end_exclusive: '2026-10-23',
+        project_id: 'open-historia',
+        summary: {
+          total_requests: 3,
+          successful_requests: 2,
+          failed_requests: 1,
+        },
+      });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('returns unavailable when a ledger query fails instead of reporting zero traffic', async () => {
+    const { env } = makeTestEnv();
+    env.GATEWAY_DB.prepare = vi.fn(() => {
+      throw new Error('D1 unavailable: do not expose this detail');
+    }) as unknown as D1Database['prepare'];
+
+    const res = await app.fetch(
+      ledgerRequest('start_date=2026-10-22&end_date=2026-10-23'),
+      env,
+      makeCtx()
+    );
+
+    expect(res.status).toBe(503);
+    const body = await res.text();
+    expect(JSON.parse(body)).toEqual({ ok: false, error: 'routing_ledger_unavailable' });
+    expect(body).not.toContain('do not expose this detail');
+  });
+
+  it('returns zero totals for a real empty exact-window cohort', async () => {
+    const sqlite = makeSqliteLedgerD1();
+    const { env } = makeTestEnv();
+    env.GATEWAY_DB = sqlite.db;
+
+    try {
+      const res = await app.fetch(
+        ledgerRequest('start_date=2026-10-22&end_date=2026-10-23'),
+        env,
+        makeCtx()
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        ok: true,
+        summary: {
+          total_requests: 0,
+          successful_requests: 0,
+          failed_requests: 0,
+        },
+      });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it.each([
+    ['start_date=2026-10-22', 'start_date and end_date must be provided together'],
+    [
+      'days=1&start_date=2026-10-22&end_date=2026-10-23',
+      'days cannot be combined with start_date or end_date',
+    ],
+    [
+      'start_date=2026-02-30&end_date=2026-03-01',
+      'start_date must be a valid UTC calendar date in YYYY-MM-DD format',
+    ],
+    [
+      'start_date=2026-10-23&end_date=2026-10-23',
+      'end_date must be after start_date and is exclusive',
+    ],
+    ['start_date=2026-01-01&end_date=2026-04-02', 'date range cannot exceed 90 UTC calendar days'],
+  ])('rejects invalid date-window parameters: %s', async (query, message) => {
+    const prepare = vi.fn();
+    const { env } = makeTestEnv();
+    env.GATEWAY_DB.prepare = prepare as unknown as D1Database['prepare'];
+
+    const res = await app.fetch(ledgerRequest(query), env, makeCtx());
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain(message);
+    expect(prepare).not.toHaveBeenCalled();
   });
 });
 
