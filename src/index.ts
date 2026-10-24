@@ -563,6 +563,10 @@ const routingLedgerResponseSchema = z.object({
     })
   ),
 });
+const routingLedgerUnavailableSchema = z.object({
+  ok: z.literal(false),
+  error: z.literal('routing_ledger_unavailable'),
+});
 
 const benchmarkOptimizerSchema = z.object({
   ok: z.literal(true),
@@ -3378,6 +3382,10 @@ const routingLedgerRoute = createRoute({
       description: 'Anonymous routing experiment ledger (no prompt text)',
       content: { 'application/json': { schema: routingLedgerResponseSchema } },
     },
+    503: {
+      description: 'Routing ledger data is temporarily unavailable',
+      content: { 'application/json': { schema: routingLedgerUnavailableSchema } },
+    },
   },
 });
 
@@ -3397,34 +3405,15 @@ app.openapi(routingLedgerRoute, async (c) => {
       start_date: query.start_date,
       end_date: query.end_date,
     });
-    return c.json(payload);
+    return c.json(payload, 200);
   } catch {
-    return c.json({
-      ok: true as const,
-      generated_at: new Date().toISOString(),
-      days,
-      window_start: query.start_date,
-      window_end_exclusive: query.end_date,
-      project_id: query.project_id,
-      privacy: {
-        stores_prompt_text: false as const,
-        stores_request_ids: false as const,
+    return c.json(
+      {
+        ok: false as const,
+        error: 'routing_ledger_unavailable' as const,
       },
-      summary: {
-        total_requests: 0,
-        successful_requests: 0,
-        failed_requests: 0,
-        success_rate: 0,
-        avg_latency_ms: 0,
-        avg_attempts: 0,
-        fallback_rate: 0,
-      },
-      by_prompt_class: [],
-      by_outcome: [],
-      by_model: [],
-      by_quota_signature: [],
-      top_fallback_signatures: [],
-    });
+      503
+    );
   }
 });
 
