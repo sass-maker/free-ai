@@ -529,6 +529,14 @@ const routingLedgerBreakdownSchema = z.object({
   fallback_rate: z.number(),
 });
 
+const providerAttemptOutcomesSchema = z.object({
+  provider: z.string(),
+  recorded_attempts: z.number(),
+  successful_attempts: z.number(),
+  failed_attempts: z.number(),
+  unknown_outcome_attempts: z.number(),
+});
+
 const routingLedgerResponseSchema = z.object({
   ok: z.literal(true),
   generated_at: z.string(),
@@ -548,6 +556,16 @@ const routingLedgerResponseSchema = z.object({
     avg_latency_ms: z.number(),
     avg_attempts: z.number(),
     fallback_rate: z.number(),
+  }),
+  upstream_attempts: z.object({
+    coverage: z.enum(['empty', 'complete', 'incomplete']),
+    reported_attempts: z.number(),
+    recorded_attempts: z.number(),
+    successful_attempts: z.number(),
+    failed_attempts: z.number(),
+    unknown_outcome_attempts: z.number(),
+    unreconciled_requests: z.number(),
+    by_provider: z.array(providerAttemptOutcomesSchema),
   }),
   by_prompt_class: z.array(routingLedgerBreakdownSchema),
   by_outcome: z.array(routingLedgerBreakdownSchema),

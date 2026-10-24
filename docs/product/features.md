@@ -29,7 +29,15 @@ Blume at `/docs/`). For the public product overview see [`../../README.md`](../.
   degraded flags.
 - `GET /v1/routing/config` — routing configuration.
 - `GET /v1/routing/ledger` — anonymous routing experiment ledger
-  (`routing_ledger_rollup` D1).
+  (`routing_ledger_rollup` D1). `upstream_attempts` counts recorded successful,
+  failed and unknown outcomes by provider across all matching signatures, while
+  `top_fallback_signatures` remains a top-20 display. Coverage is `empty`,
+  `complete` or `incomplete`: each signature must reconcile its stored attempt
+  sum, and legacy missing outcomes remain unknown. The legacy reported attempt
+  total may include a minimum-one sentinel when no provider was attempted.
+  Request, recorded upstream-attempt and completed consumer-work denominators
+  are separate; a gateway success does not establish completed consumer work.
+  Existing project and UTC-window filters apply to every aggregate.
 - `GET /v1/provider-quotas` — provider quota poller status.
 - `GET /v1/analytics` — aggregate volume/success by provider, model, project, day.
 - `GET /v1/stats/providers` — provider stats for landing proof strip.

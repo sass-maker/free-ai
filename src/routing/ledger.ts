@@ -44,6 +44,25 @@ interface RoutingLedgerBreakdownRow {
   fallback_rate: number;
 }
 
+interface ProviderAttemptOutcomes {
+  provider: string;
+  recorded_attempts: number;
+  successful_attempts: number;
+  failed_attempts: number;
+  unknown_outcome_attempts: number;
+}
+
+interface RoutingAttemptOutcomes {
+  coverage: 'empty' | 'complete' | 'incomplete';
+  reported_attempts: number;
+  recorded_attempts: number;
+  successful_attempts: number;
+  failed_attempts: number;
+  unknown_outcome_attempts: number;
+  unreconciled_requests: number;
+  by_provider: ProviderAttemptOutcomes[];
+}
+
 export interface RoutingLedgerResponse {
   ok: true;
   generated_at: string;
@@ -64,6 +83,7 @@ export interface RoutingLedgerResponse {
     avg_attempts: number;
     fallback_rate: number;
   };
+  upstream_attempts: RoutingAttemptOutcomes;
   by_prompt_class: RoutingLedgerBreakdownRow[];
   by_outcome: RoutingLedgerBreakdownRow[];
   by_model: RoutingLedgerBreakdownRow[];
@@ -284,6 +304,76 @@ async function fetchAggregateQuery<T extends RollupRow>(
   return result.results ?? [];
 }
 
+const attemptSignaturesSql = `CASE
+  WHEN fallback_signature IN ('none', '') THEN '[]'
+  ELSE '[' || REPLACE(json_quote(fallback_signature), '>', '","') || ']'
+END`;
+
+async function queryAttemptOutcomes(
+  db: D1Database,
+  where: string,
+  params: unknown[],
+  totalRequests: number,
+  reportedAttempts: number
+): Promise<RoutingAttemptOutcomes> {
+  const coverage = await db
+    .prepare(`SELECT
+    SUM(CASE WHEN sum_attempts != request_count * json_array_length(${attemptSignaturesSql})
+      THEN request_count ELSE 0 END) AS unreconciled_requests
+    FROM routing_ledger_rollup ${where}`)
+    .bind(...params)
+    .first<{ unreconciled_requests: number | null }>();
+  const result = await db
+    .prepare(`WITH hops AS (
+    SELECT request_count, hop.value AS value
+    FROM routing_ledger_rollup, json_each(${attemptSignaturesSql}) AS hop ${where}
+  ), classified AS (
+    SELECT request_count,
+      CASE WHEN instr(value, '/') > 1 THEN substr(value, 1, instr(value, '/') - 1)
+        ELSE '(unknown)' END AS provider,
+      CASE WHEN instr(value, '/') > 1 AND length(value) > instr(value, '/') + 3 AND substr(value, -3) = ':ok' THEN 'ok'
+        WHEN instr(value, '/') > 1 AND length(value) > instr(value, '/') + 7 AND substr(value, -7) = ':failed' THEN 'failed'
+        ELSE 'unknown' END AS outcome
+    FROM hops
+  ) SELECT provider, SUM(request_count) AS recorded_attempts,
+    SUM(CASE WHEN outcome = 'ok' THEN request_count ELSE 0 END) AS successful_attempts,
+    SUM(CASE WHEN outcome = 'failed' THEN request_count ELSE 0 END) AS failed_attempts,
+    SUM(CASE WHEN outcome = 'unknown' THEN request_count ELSE 0 END) AS unknown_outcome_attempts
+    FROM classified GROUP BY provider ORDER BY recorded_attempts DESC, provider`)
+    .bind(...params)
+    .all<ProviderAttemptOutcomes>();
+  const byProvider = result.results ?? [];
+  const totals = byProvider.reduce(
+    (sum, row) => ({
+      recorded_attempts: sum.recorded_attempts + row.recorded_attempts,
+      successful_attempts: sum.successful_attempts + row.successful_attempts,
+      failed_attempts: sum.failed_attempts + row.failed_attempts,
+      unknown_outcome_attempts: sum.unknown_outcome_attempts + row.unknown_outcome_attempts,
+    }),
+    {
+      recorded_attempts: 0,
+      successful_attempts: 0,
+      failed_attempts: 0,
+      unknown_outcome_attempts: 0,
+    }
+  );
+  const unreconciledRequests = coverage?.unreconciled_requests ?? 0;
+  return {
+    coverage:
+      totalRequests === 0
+        ? 'empty'
+        : unreconciledRequests === 0 &&
+            totals.recorded_attempts === reportedAttempts &&
+            totals.unknown_outcome_attempts === 0
+          ? 'complete'
+          : 'incomplete',
+    reported_attempts: reportedAttempts,
+    ...totals,
+    unreconciled_requests: unreconciledRequests,
+    by_provider: byProvider,
+  };
+}
+
 export async function queryRoutingLedger(
   db: D1Database,
   options: {
@@ -409,6 +499,13 @@ export async function queryRoutingLedger(
   const sumLatency = totals?.sum_latency_ms ?? 0;
   const sumAttempts = totals?.sum_attempts ?? 0;
   const withFallback = totals?.with_fallback ?? 0;
+  const upstreamAttempts = await queryAttemptOutcomes(
+    db,
+    where,
+    params,
+    totalRequests,
+    sumAttempts
+  );
 
   return {
     ok: true,
@@ -430,6 +527,7 @@ export async function queryRoutingLedger(
       avg_attempts: totalRequests > 0 ? sumAttempts / totalRequests : 0,
       fallback_rate: totalRequests > 0 ? withFallback / totalRequests : 0,
     },
+    upstream_attempts: upstreamAttempts,
     by_prompt_class: byPromptClass.map((row) =>
       rowFromAggregate(row, row.prompt_class, row.successful_requests)
     ),

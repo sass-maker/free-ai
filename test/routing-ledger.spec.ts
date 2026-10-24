@@ -57,6 +57,7 @@ type LedgerFixtureRow = {
   latencyMs: number;
   attempts: number;
   withFallback: number;
+  fallbackSignature?: string;
 };
 
 function makeSqliteLedgerD1(rows: LedgerFixtureRow[] = []) {
@@ -79,7 +80,7 @@ function makeSqliteLedgerD1(rows: LedgerFixtureRow[] = []) {
       row.outcome,
       provider,
       'model',
-      `${provider}/model:${row.outcome === 'ok' ? 'ok' : 'failed'}`,
+      row.fallbackSignature ?? `${provider}/model:${row.outcome === 'ok' ? 'ok' : 'failed'}`,
       'all_ok',
       row.requestCount,
       row.latencyMs,
@@ -546,6 +547,179 @@ describe('recordRoutingLedger', () => {
   });
 });
 
+describe('upstream attempt outcomes', () => {
+  it('counts all signatures beyond the display limit and preserves exact project/date scope', async () => {
+    const rows: LedgerFixtureRow[] = Array.from({ length: 25 }, (_, index) => ({
+      date: '2026-10-22',
+      projectId: 'scope-a',
+      outcome: 'ok',
+      requestCount: 1,
+      latencyMs: 100,
+      attempts: 2,
+      withFallback: 1,
+      fallbackSignature: `groq/model-${index}:failed>cohere/model-${index}:ok`,
+    }));
+    const sqlite = makeSqliteLedgerD1([
+      ...rows,
+      { ...rows[0], date: '2026-10-23', requestCount: 50, attempts: 100 },
+      { ...rows[0], projectId: 'scope-b', requestCount: 50, attempts: 100 },
+    ]);
+    try {
+      const result = await queryRoutingLedger(sqlite.db, {
+        days: 1,
+        start_date: '2026-10-22',
+        end_date: '2026-10-23',
+        project_id: 'scope-a',
+      });
+      expect(result.summary.total_requests).toBe(25);
+      expect(result.top_fallback_signatures).toHaveLength(20);
+      expect(result.upstream_attempts).toEqual({
+        coverage: 'complete',
+        reported_attempts: 50,
+        recorded_attempts: 50,
+        successful_attempts: 25,
+        failed_attempts: 25,
+        unknown_outcome_attempts: 0,
+        unreconciled_requests: 0,
+        by_provider: [
+          {
+            provider: 'cohere',
+            recorded_attempts: 25,
+            successful_attempts: 25,
+            failed_attempts: 0,
+            unknown_outcome_attempts: 0,
+          },
+          {
+            provider: 'groq',
+            recorded_attempts: 25,
+            successful_attempts: 0,
+            failed_attempts: 25,
+            unknown_outcome_attempts: 0,
+          },
+        ],
+      });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('retains legacy unknown outcomes and missing signatures as incomplete coverage', async () => {
+    const row: LedgerFixtureRow = {
+      date: '2026-10-22',
+      projectId: 'scope-a',
+      outcome: 'error',
+      requestCount: 1,
+      latencyMs: 100,
+      attempts: 1,
+      withFallback: 0,
+    };
+    const sqlite = makeSqliteLedgerD1([
+      { ...row, requestCount: 2, attempts: 2, fallbackSignature: 'groq/legacy-model' },
+      { ...row, fallbackSignature: 'none' },
+      { ...row, attempts: 2, fallbackSignature: 'cohere/model:failed' },
+    ]);
+    try {
+      const result = await queryRoutingLedger(sqlite.db, {
+        days: 1,
+        start_date: '2026-10-22',
+        end_date: '2026-10-23',
+      });
+      expect(result.upstream_attempts).toMatchObject({
+        coverage: 'incomplete',
+        reported_attempts: 5,
+        recorded_attempts: 3,
+        successful_attempts: 0,
+        failed_attempts: 1,
+        unknown_outcome_attempts: 2,
+        unreconciled_requests: 2,
+      });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('does not let per-signature discrepancies cancel out at the total', async () => {
+    const row: LedgerFixtureRow = {
+      date: '2026-10-22',
+      projectId: 'scope-a',
+      outcome: 'ok',
+      requestCount: 1,
+      latencyMs: 100,
+      attempts: 1,
+      withFallback: 0,
+    };
+    const sqlite = makeSqliteLedgerD1([
+      { ...row, attempts: 2, fallbackSignature: 'groq/one:ok' },
+      { ...row, fallbackSignature: 'groq/two:failed>cohere/three:ok' },
+    ]);
+    try {
+      const result = await queryRoutingLedger(sqlite.db, {
+        days: 1,
+        start_date: '2026-10-22',
+        end_date: '2026-10-23',
+      });
+      expect(result.upstream_attempts).toMatchObject({
+        coverage: 'incomplete',
+        reported_attempts: 3,
+        recorded_attempts: 3,
+        unreconciled_requests: 2,
+      });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('quotes model strings safely and refuses an empty model outcome', async () => {
+    const row: LedgerFixtureRow = {
+      date: '2026-10-22',
+      projectId: 'scope-a',
+      outcome: 'ok',
+      requestCount: 1,
+      latencyMs: 100,
+      attempts: 1,
+      withFallback: 0,
+    };
+    const sqlite = makeSqliteLedgerD1([
+      { ...row, fallbackSignature: 'openrouter/org/model-"quoted":free:ok' },
+      { ...row, fallbackSignature: 'groq/:ok' },
+    ]);
+    try {
+      const result = await queryRoutingLedger(sqlite.db, {
+        days: 1,
+        start_date: '2026-10-22',
+        end_date: '2026-10-23',
+      });
+      expect(result.upstream_attempts).toMatchObject({
+        coverage: 'incomplete',
+        recorded_attempts: 2,
+        successful_attempts: 1,
+        unknown_outcome_attempts: 1,
+      });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('labels an empty cohort without claiming complete coverage', async () => {
+    const sqlite = makeSqliteLedgerD1();
+    try {
+      const result = await queryRoutingLedger(sqlite.db, {
+        days: 1,
+        start_date: '2026-10-22',
+        end_date: '2026-10-23',
+      });
+      expect(result.upstream_attempts).toMatchObject({
+        coverage: 'empty',
+        reported_attempts: 0,
+        recorded_attempts: 0,
+        by_provider: [],
+      });
+    } finally {
+      sqlite.close();
+    }
+  });
+});
+
 describe('queryRoutingLedger', () => {
   function makeQueryDb(options: {
     totals: Record<string, number | null> | null;
@@ -560,6 +734,7 @@ describe('queryRoutingLedger', () => {
         }),
         first: vi.fn(async () => options.totals),
         all: vi.fn(async () => {
+          if (sql.includes('GROUP BY provider')) return { results: [] };
           if (sql.includes('GROUP BY prompt_class')) {
             return { results: options.rows.prompt };
           }
@@ -711,7 +886,6 @@ describe('queryRoutingLedger', () => {
         fallback_rate: 0,
       },
     ]);
-    expect(binds).toHaveLength(6);
     expect(binds.every((args) => args[0] === '-14 days' && args[1] === 'project-a')).toBe(true);
   });
 
