@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import app from '../src/index';
 import { makeCtx, makeTestEnv } from './helpers/env';
@@ -20,6 +20,116 @@ function chatRequest(headers: HeadersInit = {}, bodyOverrides: Record<string, un
 }
 
 describe('/v1 authentication', () => {
+  it('requires the gateway key for Vectorize budget status', async () => {
+    const configured = makeTestEnv({ GATEWAY_API_KEY: 'secret-key' });
+    const deniedFetch = vi.fn(async () => Response.json({}));
+    Object.assign(configured.env, {
+      NEURON_BUDGET: {
+        idFromName: () => ({}),
+        get: () => ({ fetch: deniedFetch }),
+      },
+    });
+    const unauthorized = await app.fetch(
+      new Request('https://gateway.test/v1/budget/vectorize'),
+      configured.env,
+      makeCtx()
+    );
+
+    expect(unauthorized.status).toBe(401);
+    expect(deniedFetch).not.toHaveBeenCalled();
+    await expect(unauthorized.json()).resolves.toMatchObject({
+      error: { code: 'invalid_api_key' },
+    });
+
+    const unconfigured = makeTestEnv({ GATEWAY_API_KEY: '' });
+    Object.assign(unconfigured.env, {
+      NEURON_BUDGET: {
+        idFromName: () => ({}),
+        get: () => ({ fetch: deniedFetch }),
+      },
+    });
+    const unavailable = await app.fetch(
+      new Request('https://gateway.test/v1/budget/vectorize'),
+      unconfigured.env,
+      makeCtx()
+    );
+
+    expect(unavailable.status).toBe(503);
+    expect(deniedFetch).not.toHaveBeenCalled();
+    await expect(unavailable.json()).resolves.toMatchObject({
+      error: { code: 'auth_not_configured' },
+    });
+  });
+
+  it('returns aggregate Vectorize budget status to an authenticated gateway client', async () => {
+    const { env } = makeTestEnv({ GATEWAY_API_KEY: 'secret-key' });
+    const budgetFetch = vi.fn(async () =>
+      Response.json({
+        monthKey: '2026-10',
+        query: {
+          state: 'available',
+          initialized: false,
+          source: 'verified_monthly_baseline',
+          used: 35_000_000,
+          cap: 45_000_000,
+          remaining: 10_000_000,
+          baselineVerified: true,
+        },
+        storage: {
+          state: 'available',
+          initialized: false,
+          source: 'verified_monthly_baseline',
+          used: 30_000_000,
+          cap: 200_000_000,
+          remaining: 170_000_000,
+          baselineVerified: true,
+        },
+      })
+    );
+    const authenticatedEnv = Object.assign(env, {
+      NEURON_BUDGET: {
+        idFromName: () => ({}),
+        get: () => ({ fetch: budgetFetch }),
+      },
+    });
+    const response = await app.fetch(
+      new Request('https://gateway.test/v1/budget/vectorize', {
+        headers: { authorization: 'Bearer secret-key' },
+      }),
+      authenticatedEnv,
+      makeCtx()
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expect(response.json()).resolves.toMatchObject({
+      monthKey: '2026-10',
+      query: { used: 35_000_000, remaining: 10_000_000, initialized: false },
+      storage: { used: 30_000_000, remaining: 170_000_000, initialized: false },
+    });
+    expect(budgetFetch).toHaveBeenCalledWith('https://internal.local/vectorize-usage');
+  });
+
+  it('marks unavailable Vectorize budget status as non-cacheable', async () => {
+    const { env } = makeTestEnv({ GATEWAY_API_KEY: 'secret-key' });
+    const authenticatedEnv = Object.assign(env, {
+      NEURON_BUDGET: {
+        idFromName: () => ({}),
+        get: () => ({ fetch: vi.fn(async () => new Response('unavailable', { status: 503 })) }),
+      },
+    });
+    const response = await app.fetch(
+      new Request('https://gateway.test/v1/budget/vectorize', {
+        headers: { authorization: 'Bearer secret-key' },
+      }),
+      authenticatedEnv,
+      makeCtx()
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
   it('fails closed on token-spending routes when GATEWAY_API_KEY is missing', async () => {
     const { env } = makeTestEnv({ GATEWAY_API_KEY: '' });
     const res = await app.fetch(chatRequest(), env, makeCtx());

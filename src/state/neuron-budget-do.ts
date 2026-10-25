@@ -29,7 +29,7 @@ const STORAGE_KEY = 'budget';
 const VECTORIZE_STORAGE_KEY = 'vectorize-budget';
 const VECTORIZE_GROWTH_KEY = 'vectorize-storage-budget';
 /** Gross stored dimensions: at $0.05/100M, at most $0.10 per full month. */
-const VECTORIZE_STORED_CAP = 200_000_000;
+export const VECTORIZE_STORED_CAP = 200_000_000;
 /** Oct 8 account inventory: 28,764,928 dimensions, rounded up conservatively. */
 const VERIFIED_STORAGE_BASELINES: Readonly<Record<string, number>> = { '2026-10': 30_000_000 };
 /** Daily Neuron cap. 500 buffer below the 10k/day free-tier quota. */
@@ -37,7 +37,7 @@ const DAILY_NEURON_CAP = 9500;
 /** Reserve today's prior unguarded usage before shared consumers are enabled. */
 const VERIFIED_DAILY_BASELINES: Readonly<Record<string, number>> = { '2026-10-02': 250 };
 /** Leave headroom below the 50M queried-dimension paid allowance. */
-const MONTHLY_VECTORIZE_CAP = 45_000_000;
+export const MONTHLY_VECTORIZE_CAP = 45_000_000;
 /**
  * Oct 2026 estimate from the reviewed read-only provider receipt. This seeds
  * admitted queried dimensions; it is not an account-wide billing cap or a
@@ -55,6 +55,22 @@ const json = (value: unknown, status = 200): Response =>
       'cache-control': 'no-store',
     },
   });
+
+type VectorizeLedgerStatus = {
+  state: 'available' | 'uninitialized' | 'stale' | 'invalid' | 'baseline_unavailable';
+  initialized: boolean;
+  source: 'ledger' | 'verified_monthly_baseline' | null;
+  used: number | null;
+  cap: number;
+  remaining: number | null;
+  baselineVerified: boolean;
+};
+
+type VectorizeBudgetStatus = {
+  monthKey: string;
+  query: VectorizeLedgerStatus;
+  storage: VectorizeLedgerStatus;
+};
 
 function utcDayKey(now: number = Date.now()): string {
   return new Date(now).toISOString().slice(0, 10);
@@ -94,7 +110,11 @@ function readVectorizeState(
   return state as VectorizeState;
 }
 
-function isPreviousVectorizePeriod(value: unknown, monthKey: string): boolean {
+function isPreviousVectorizePeriod(
+  value: unknown,
+  monthKey: string,
+  cap = MONTHLY_VECTORIZE_CAP
+): boolean {
   if (!value || typeof value !== 'object') return false;
   const state = value as Partial<VectorizeState>;
   return (
@@ -104,7 +124,7 @@ function isPreviousVectorizePeriod(value: unknown, monthKey: string): boolean {
     state.baselineVerified === true &&
     Number.isSafeInteger(state.used) &&
     (state.used as number) >= 0 &&
-    (state.used as number) <= MONTHLY_VECTORIZE_CAP
+    (state.used as number) <= cap
   );
 }
 
@@ -149,17 +169,7 @@ export class NeuronBudgetDO {
     monthKey: string
   ): Promise<VectorizeState | null> {
     const stored = await txn.get<unknown>(VECTORIZE_STORAGE_KEY);
-    let state = readVectorizeState(stored, monthKey);
-    const baseline = VERIFIED_VECTORIZE_BASELINES[monthKey];
-    if (
-      !state &&
-      (stored === undefined || isPreviousVectorizePeriod(stored, monthKey)) &&
-      Number.isSafeInteger(baseline)
-    ) {
-      state = { monthKey, used: baseline, baselineVerified: true };
-    } else if (state && Number.isSafeInteger(baseline) && baseline > state.used) {
-      state = { ...state, used: baseline };
-    }
+    const state = effectiveQueryState(stored, monthKey);
     if (state) await txn.put(VECTORIZE_STORAGE_KEY, state);
     return state;
   }
@@ -168,14 +178,35 @@ export class NeuronBudgetDO {
     txn: DurableObjectTransaction,
     monthKey: string
   ): Promise<VectorizeState | null> {
-    const baseline = VERIFIED_STORAGE_BASELINES[monthKey];
-    if (!Number.isSafeInteger(baseline)) return null;
     const stored = await txn.get<unknown>(VECTORIZE_GROWTH_KEY);
-    const state =
-      stored === undefined
-        ? { monthKey, used: baseline, baselineVerified: true as const }
-        : readVectorizeState(stored, monthKey, VECTORIZE_STORED_CAP);
-    return state ? { ...state, used: Math.max(state.used, baseline) } : null;
+    return effectiveStorageState(stored, monthKey);
+  }
+
+  private async vectorizeUsageStatus(now: number): Promise<VectorizeBudgetStatus> {
+    const monthKey = utcMonthKey(now);
+    return this.ctx.storage.transaction(async (txn) => {
+      const storedQuery = await txn.get<unknown>(VECTORIZE_STORAGE_KEY);
+      const storedStorage = await txn.get<unknown>(VECTORIZE_GROWTH_KEY);
+      return {
+        monthKey,
+        query: vectorizeLedgerStatus({
+          stored: storedQuery,
+          monthKey,
+          cap: MONTHLY_VECTORIZE_CAP,
+          baseline: VERIFIED_VECTORIZE_BASELINES[monthKey],
+          allowPriorMonthProjection: true,
+          effective: effectiveQueryState(storedQuery, monthKey),
+        }),
+        storage: vectorizeLedgerStatus({
+          stored: storedStorage,
+          monthKey,
+          cap: VECTORIZE_STORED_CAP,
+          baseline: VERIFIED_STORAGE_BASELINES[monthKey],
+          allowPriorMonthProjection: false,
+          effective: effectiveStorageState(storedStorage, monthKey),
+        }),
+      };
+    });
   }
 
   private async reserveVectorize(
@@ -309,10 +340,95 @@ export class NeuronBudgetDO {
       });
     }
 
+    if (path === '/vectorize-usage') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+      return json(await this.vectorizeUsageStatus(now));
+    }
+
     if (path === '/try-debit-vectorize' || path === '/try-debit-vectorize-storage') {
       return this.reserveVectorize(request, now, path === '/try-debit-vectorize-storage');
     }
 
     return json({ error: 'Not found' }, 404);
   }
+}
+
+function effectiveQueryState(stored: unknown, monthKey: string): VectorizeState | null {
+  let state = readVectorizeState(stored, monthKey);
+  const baseline = VERIFIED_VECTORIZE_BASELINES[monthKey];
+  if (
+    !state &&
+    (stored === undefined || isPreviousVectorizePeriod(stored, monthKey)) &&
+    Number.isSafeInteger(baseline)
+  ) {
+    state = { monthKey, used: baseline, baselineVerified: true };
+  } else if (state && Number.isSafeInteger(baseline) && baseline > state.used) {
+    state = { ...state, used: baseline };
+  }
+  return state;
+}
+
+function effectiveStorageState(stored: unknown, monthKey: string): VectorizeState | null {
+  const baseline = VERIFIED_STORAGE_BASELINES[monthKey];
+  if (!Number.isSafeInteger(baseline)) return null;
+  const state =
+    stored === undefined
+      ? { monthKey, used: baseline, baselineVerified: true as const }
+      : readVectorizeState(stored, monthKey, VECTORIZE_STORED_CAP);
+  return state ? { ...state, used: Math.max(state.used, baseline) } : null;
+}
+
+function vectorizeLedgerStatus({
+  stored,
+  monthKey,
+  cap,
+  baseline,
+  allowPriorMonthProjection,
+  effective,
+}: {
+  stored: unknown;
+  monthKey: string;
+  cap: number;
+  baseline: number | undefined;
+  allowPriorMonthProjection: boolean;
+  effective: VectorizeState | null;
+}): VectorizeLedgerStatus {
+  const canProjectBaseline =
+    Number.isSafeInteger(baseline) &&
+    (stored === undefined ||
+      (allowPriorMonthProjection && isPreviousVectorizePeriod(stored, monthKey)));
+  const used = effective?.used ?? null;
+  const storedState = readVectorizeState(stored, monthKey, cap);
+  const initialized = storedState !== null;
+  const baselineFloorApplied =
+    effective !== null && storedState !== null && effective.used > storedState.used;
+  const state: VectorizeLedgerStatus['state'] = effective
+    ? 'available'
+    : unavailableVectorizeLedgerState(stored, monthKey, cap, baseline, initialized);
+
+  return {
+    state,
+    initialized,
+    source: effective
+      ? (canProjectBaseline && !initialized) || baselineFloorApplied
+        ? 'verified_monthly_baseline'
+        : 'ledger'
+      : null,
+    used,
+    cap,
+    remaining: used === null ? null : cap - used,
+    baselineVerified: effective?.baselineVerified === true,
+  };
+}
+
+function unavailableVectorizeLedgerState(
+  stored: unknown,
+  monthKey: string,
+  cap: number,
+  baseline: number | undefined,
+  initialized: boolean
+): VectorizeLedgerStatus['state'] {
+  if (stored === undefined) return 'uninitialized';
+  if (isPreviousVectorizePeriod(stored, monthKey, cap)) return 'stale';
+  return initialized && !Number.isSafeInteger(baseline) ? 'baseline_unavailable' : 'invalid';
 }

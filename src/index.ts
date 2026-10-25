@@ -91,6 +91,7 @@ import {
   buildBudgetExhaustedResponse,
   estimateNeuronCost,
   getNeuronUsage,
+  getVectorizeBudgetUsage,
   tryDebitNeurons,
 } from './state/neuron-budget';
 import { NeuronBudgetDO } from './state/neuron-budget-do';
@@ -3577,6 +3578,24 @@ app.get('/v1/budget', async (c) => {
     );
   }
   return c.json(usage);
+});
+
+app.get('/v1/budget/vectorize', async (c) => {
+  const usage = await getVectorizeBudgetUsage(c.env);
+  if (!usage) {
+    return c.json(
+      {
+        error: {
+          message: 'Vectorize budget status is unavailable',
+          type: 'service_unavailable',
+          code: 'vectorize_budget_status_unavailable',
+        },
+      },
+      503,
+      { 'Cache-Control': 'no-store' }
+    );
+  }
+  return c.json(usage, 200, { 'Cache-Control': 'no-store' });
 });
 
 app.doc('/openapi.json', {

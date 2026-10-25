@@ -106,6 +106,25 @@ retried, check `classifyError()` keyword matching in `src/router/classify-error.
    `x-gateway-internal: 1` header (unreachable from the public internet) for
    debugging without a DO namespace wipe.
 
+## Vectorize admission blocked
+
+Read both shared Vectorize admission ledgers without reserving capacity:
+
+```bash
+curl --fail-with-body -sS "$GW/v1/budget/vectorize" \
+  -H "Authorization: Bearer $GATEWAY_API_KEY" | jq
+```
+
+This route requires the existing gateway API key. `available` reports effective
+admission values. `initialized` indicates whether a valid current-month ledger
+exists; `source: verified_monthly_baseline` identifies either a first-time
+projection or a baseline floor applied to an existing ledger. `baselineVerified`
+is true exactly when `state` is `available`; it is false for all other states.
+`uninitialized`, `stale`, `invalid`, or `baseline_unavailable` states have null
+usage and remaining values. The route only reads budget state; it does not
+reserve capacity or authorize a write. Keep storage growth blocked when its
+effective budget is unavailable.
+
 ## tsconfig / typecheck suddenly broken
 
 The tsconfig was previously broken (no `include`, no workers types,

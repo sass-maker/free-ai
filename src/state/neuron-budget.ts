@@ -1,5 +1,6 @@
 /** Conservative Workers AI reservations and the global budget client. */
 import type { ChatMessage, Env } from '../types';
+import { MONTHLY_VECTORIZE_CAP, VECTORIZE_STORED_CAP } from './neuron-budget-do';
 
 const DO_ORIGIN = 'https://internal.local';
 const DAILY_NEURON_CAP = 9500;
@@ -161,6 +162,76 @@ export async function getNeuronUsage(
     )
       return null;
     return result as { used: number; remaining: number; cap: number; dayKey: string };
+  } catch {
+    return null;
+  }
+}
+
+interface VectorizeBudgetLedgerUsage {
+  state: 'available' | 'uninitialized' | 'stale' | 'invalid' | 'baseline_unavailable';
+  initialized: boolean;
+  source: 'ledger' | 'verified_monthly_baseline' | null;
+  used: number | null;
+  cap: number;
+  remaining: number | null;
+  baselineVerified: boolean;
+}
+
+export interface VectorizeBudgetUsage {
+  monthKey: string;
+  query: VectorizeBudgetLedgerUsage;
+  storage: VectorizeBudgetLedgerUsage;
+}
+
+function isVectorizeLedgerUsage(value: unknown, cap: number): value is VectorizeBudgetLedgerUsage {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Partial<VectorizeBudgetLedgerUsage>;
+  const available = row.state === 'available';
+  return (
+    ['available', 'uninitialized', 'stale', 'invalid', 'baseline_unavailable'].includes(
+      row.state as string
+    ) &&
+    typeof row.initialized === 'boolean' &&
+    (row.source === 'ledger' ||
+      row.source === 'verified_monthly_baseline' ||
+      row.source === null) &&
+    row.cap === cap &&
+    typeof row.baselineVerified === 'boolean' &&
+    hasValidVectorizeLedgerAmounts(row, cap, available)
+  );
+}
+
+function hasValidVectorizeLedgerAmounts(
+  row: Partial<VectorizeBudgetLedgerUsage>,
+  cap: number,
+  available: boolean
+): boolean {
+  const usedIsValid =
+    row.used === null ||
+    (Number.isSafeInteger(row.used) && (row.used as number) >= 0 && (row.used as number) <= cap);
+  return (
+    usedIsValid &&
+    (available
+      ? Number.isSafeInteger(row.used) && row.remaining === cap - (row.used as number)
+      : row.used === null && row.remaining === null)
+  );
+}
+
+export async function getVectorizeBudgetUsage(env: Env): Promise<VectorizeBudgetUsage | null> {
+  try {
+    const stub = getBudgetStub(env);
+    if (!stub) return null;
+    const response = await stub.fetch(`${DO_ORIGIN}/vectorize-usage`);
+    if (!response.ok) return null;
+    const result = (await response.json()) as Partial<VectorizeBudgetUsage>;
+    if (
+      typeof result.monthKey !== 'string' ||
+      !/^\d{4}-(0[1-9]|1[0-2])$/.test(result.monthKey) ||
+      !isVectorizeLedgerUsage(result.query, MONTHLY_VECTORIZE_CAP) ||
+      !isVectorizeLedgerUsage(result.storage, VECTORIZE_STORED_CAP)
+    )
+      return null;
+    return result as VectorizeBudgetUsage;
   } catch {
     return null;
   }
