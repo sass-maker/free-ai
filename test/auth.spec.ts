@@ -42,6 +42,12 @@ describe('/v1 authentication', () => {
     });
 
     const unconfigured = makeTestEnv({ GATEWAY_API_KEY: '' });
+    Object.assign(unconfigured.env, {
+      NEURON_BUDGET: {
+        idFromName: () => ({}),
+        get: () => ({ fetch: deniedFetch }),
+      },
+    });
     const unavailable = await app.fetch(
       new Request('https://gateway.test/v1/budget/vectorize'),
       unconfigured.env,

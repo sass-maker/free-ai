@@ -110,7 +110,11 @@ function readVectorizeState(
   return state as VectorizeState;
 }
 
-function isPreviousVectorizePeriod(value: unknown, monthKey: string): boolean {
+function isPreviousVectorizePeriod(
+  value: unknown,
+  monthKey: string,
+  cap = MONTHLY_VECTORIZE_CAP
+): boolean {
   if (!value || typeof value !== 'object') return false;
   const state = value as Partial<VectorizeState>;
   return (
@@ -120,7 +124,7 @@ function isPreviousVectorizePeriod(value: unknown, monthKey: string): boolean {
     state.baselineVerified === true &&
     Number.isSafeInteger(state.used) &&
     (state.used as number) >= 0 &&
-    (state.used as number) <= MONTHLY_VECTORIZE_CAP
+    (state.used as number) <= cap
   );
 }
 
@@ -401,19 +405,11 @@ function vectorizeLedgerStatus({
   const storedState = readVectorizeState(stored, monthKey, cap);
   const baselineFloorApplied =
     effective !== null && storedState !== null && effective.used > storedState.used;
-  const storedMonthKey =
-    stored && typeof stored === 'object' && 'monthKey' in stored
-      ? (stored as { monthKey?: unknown }).monthKey
-      : undefined;
-  const hasStaleMonthKey =
-    typeof storedMonthKey === 'string' &&
-    /^\d{4}-(0[1-9]|1[0-2])$/.test(storedMonthKey) &&
-    storedMonthKey !== monthKey;
   const state: VectorizeLedgerStatus['state'] = effective
     ? 'available'
     : stored === undefined
       ? 'uninitialized'
-      : hasStaleMonthKey
+      : isPreviousVectorizePeriod(stored, monthKey, cap)
         ? 'stale'
         : initialized && !Number.isSafeInteger(baseline)
           ? 'baseline_unavailable'

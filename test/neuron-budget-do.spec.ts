@@ -443,6 +443,37 @@ describe('NeuronBudgetDO', () => {
     }
   });
 
+  it('labels malformed prior-month ledgers invalid instead of stale', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+    try {
+      const { state, values, puts } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-09',
+        used: Number.NaN,
+        baselineVerified: false,
+      });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-09',
+        used: Number.NaN,
+        baselineVerified: false,
+      });
+      const budget = new NeuronBudgetDO(state);
+
+      const response = await budget.fetch(new Request('https://internal.local/vectorize-usage'));
+
+      await expect(response.json()).resolves.toMatchObject({
+        query: { state: 'invalid', used: null, remaining: null, baselineVerified: false },
+        storage: { state: 'invalid', used: null, remaining: null, baselineVerified: false },
+      });
+      expect(puts).toEqual([]);
+      expect(state.storage.put).not.toHaveBeenCalled();
+      expect(state.storage.delete).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('accepts only GET for the read-only Vectorize status transport', async () => {
     const { state, puts } = makeState();
     const budget = new NeuronBudgetDO(state);

@@ -119,10 +119,10 @@ This route requires the existing gateway API key. `available` reports effective
 admission values. `initialized` indicates whether a valid current-month ledger
 exists; `source: verified_monthly_baseline` identifies either a first-time
 projection or a baseline floor applied to an existing ledger. `baselineVerified`
-reflects the effective admission state marker and is false when state is invalid
-or stale. `uninitialized`, `stale`, `invalid`, or `baseline_unavailable` states
-have null usage and remaining values. The route only reads budget state; it does
-not reserve capacity or authorize a write. Keep storage growth blocked when its
+is true exactly when `state` is `available`; it is false for all other states.
+`uninitialized`, `stale`, `invalid`, or `baseline_unavailable` states have null
+usage and remaining values. The route only reads budget state; it does not
+reserve capacity or authorize a write. Keep storage growth blocked when its
 effective budget is unavailable.
 
 ## tsconfig / typecheck suddenly broken
