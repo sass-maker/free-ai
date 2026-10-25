@@ -398,6 +398,9 @@ function vectorizeLedgerStatus({
     (stored === undefined ||
       (allowPriorMonthProjection && isPreviousVectorizePeriod(stored, monthKey)));
   const used = effective?.used ?? null;
+  const storedState = readVectorizeState(stored, monthKey, cap);
+  const baselineFloorApplied =
+    effective !== null && storedState !== null && effective.used > storedState.used;
   const storedMonthKey =
     stored && typeof stored === 'object' && 'monthKey' in stored
       ? (stored as { monthKey?: unknown }).monthKey
@@ -419,12 +422,14 @@ function vectorizeLedgerStatus({
   return {
     state,
     initialized,
-    source: effective ? (canProjectBaseline && !initialized ? 'verified_monthly_baseline' : 'ledger') : null,
+    source: effective
+      ? (canProjectBaseline && !initialized) || baselineFloorApplied
+        ? 'verified_monthly_baseline'
+        : 'ledger'
+      : null,
     used,
     cap,
     remaining: used === null ? null : cap - used,
-    baselineVerified:
-      Number.isSafeInteger(baseline) ||
-      (stored !== undefined && readVectorizeState(stored, monthKey, cap)?.baselineVerified === true),
+    baselineVerified: effective?.baselineVerified === true,
   };
 }

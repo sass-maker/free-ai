@@ -116,11 +116,14 @@ curl --fail-with-body -sS "$GW/v1/budget/vectorize" \
 ```
 
 This route requires the existing gateway API key. `available` reports effective
-admission values; `initialized: false` means the values are a projection from a
-verified monthly baseline and have not been persisted. `uninitialized`, `stale`,
-`invalid`, or `baseline_unavailable` states have null usage and remaining values.
-The route only reads budget state; it does not reserve capacity or authorize a
-write. Keep storage growth blocked when its effective budget is unavailable.
+admission values. `initialized` indicates whether a valid current-month ledger
+exists; `source: verified_monthly_baseline` identifies either a first-time
+projection or a baseline floor applied to an existing ledger. `baselineVerified`
+reflects the effective admission state marker and is false when state is invalid
+or stale. `uninitialized`, `stale`, `invalid`, or `baseline_unavailable` states
+have null usage and remaining values. The route only reads budget state; it does
+not reserve capacity or authorize a write. Keep storage growth blocked when its
+effective budget is unavailable.
 
 ## tsconfig / typecheck suddenly broken
 

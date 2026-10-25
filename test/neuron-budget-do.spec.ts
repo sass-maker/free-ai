@@ -248,6 +248,57 @@ describe('NeuronBudgetDO', () => {
     }
   });
 
+  it('labels a verified baseline floor on initialized ledgers without persisting the floor', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+    try {
+      const { state, values, puts } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-10',
+        used: 1_000_000,
+        baselineVerified: true,
+      });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-10',
+        used: 1_000_000,
+        baselineVerified: true,
+      });
+      const budget = new NeuronBudgetDO(state);
+
+      const response = await budget.fetch(new Request('https://internal.local/vectorize-usage'));
+
+      await expect(response.json()).resolves.toMatchObject({
+        query: {
+          initialized: true,
+          source: 'verified_monthly_baseline',
+          used: 35_000_000,
+          baselineVerified: true,
+        },
+        storage: {
+          initialized: true,
+          source: 'verified_monthly_baseline',
+          used: 30_000_000,
+          baselineVerified: true,
+        },
+      });
+      expect(puts).toEqual([]);
+      expect(values.get('vectorize-budget')).toEqual({
+        monthKey: '2026-10',
+        used: 1_000_000,
+        baselineVerified: true,
+      });
+      expect(values.get('vectorize-storage-budget')).toEqual({
+        monthKey: '2026-10',
+        used: 1_000_000,
+        baselineVerified: true,
+      });
+      expect(state.storage.put).not.toHaveBeenCalled();
+      expect(state.storage.delete).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('projects the verified query baseline but leaves stale storage unavailable', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
@@ -285,7 +336,7 @@ describe('NeuronBudgetDO', () => {
           used: null,
           cap: 200_000_000,
           remaining: null,
-          baselineVerified: true,
+          baselineVerified: false,
         },
       });
       expect(puts).toEqual([]);
@@ -372,7 +423,7 @@ describe('NeuronBudgetDO', () => {
           used: null,
           cap: 45_000_000,
           remaining: null,
-          baselineVerified: true,
+          baselineVerified: false,
         },
         storage: {
           state: 'invalid',
@@ -381,7 +432,7 @@ describe('NeuronBudgetDO', () => {
           used: null,
           cap: 200_000_000,
           remaining: null,
-          baselineVerified: true,
+          baselineVerified: false,
         },
       });
       expect(puts).toEqual([]);
