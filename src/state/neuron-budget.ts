@@ -195,7 +195,9 @@ function isVectorizeLedgerUsage(value: unknown, cap: number): value is Vectorize
       row.state as string
     ) &&
     typeof row.initialized === 'boolean' &&
-    (row.source === 'ledger' || row.source === 'verified_monthly_baseline' || row.source === null) &&
+    (row.source === 'ledger' ||
+      row.source === 'verified_monthly_baseline' ||
+      row.source === null) &&
     row.cap === cap &&
     typeof row.baselineVerified === 'boolean' &&
     usedIsValid &&
