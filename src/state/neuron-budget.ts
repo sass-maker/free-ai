@@ -167,7 +167,7 @@ export async function getNeuronUsage(
   }
 }
 
-export interface VectorizeBudgetLedgerUsage {
+interface VectorizeBudgetLedgerUsage {
   state: 'available' | 'uninitialized' | 'stale' | 'invalid' | 'baseline_unavailable';
   initialized: boolean;
   source: 'ledger' | 'verified_monthly_baseline' | null;
@@ -187,9 +187,6 @@ function isVectorizeLedgerUsage(value: unknown, cap: number): value is Vectorize
   if (!value || typeof value !== 'object') return false;
   const row = value as Partial<VectorizeBudgetLedgerUsage>;
   const available = row.state === 'available';
-  const usedIsValid =
-    row.used === null ||
-    (Number.isSafeInteger(row.used) && (row.used as number) >= 0 && (row.used as number) <= cap);
   return (
     ['available', 'uninitialized', 'stale', 'invalid', 'baseline_unavailable'].includes(
       row.state as string
@@ -200,6 +197,19 @@ function isVectorizeLedgerUsage(value: unknown, cap: number): value is Vectorize
       row.source === null) &&
     row.cap === cap &&
     typeof row.baselineVerified === 'boolean' &&
+    hasValidVectorizeLedgerAmounts(row, cap, available)
+  );
+}
+
+function hasValidVectorizeLedgerAmounts(
+  row: Partial<VectorizeBudgetLedgerUsage>,
+  cap: number,
+  available: boolean
+): boolean {
+  const usedIsValid =
+    row.used === null ||
+    (Number.isSafeInteger(row.used) && (row.used as number) >= 0 && (row.used as number) <= cap);
+  return (
     usedIsValid &&
     (available
       ? Number.isSafeInteger(row.used) && row.remaining === cap - (row.used as number)

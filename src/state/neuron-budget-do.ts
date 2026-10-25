@@ -196,7 +196,6 @@ export class NeuronBudgetDO {
           baseline: VERIFIED_VECTORIZE_BASELINES[monthKey],
           allowPriorMonthProjection: true,
           effective: effectiveQueryState(storedQuery, monthKey),
-          initialized: readVectorizeState(storedQuery, monthKey) !== null,
         }),
         storage: vectorizeLedgerStatus({
           stored: storedStorage,
@@ -205,7 +204,6 @@ export class NeuronBudgetDO {
           baseline: VERIFIED_STORAGE_BASELINES[monthKey],
           allowPriorMonthProjection: false,
           effective: effectiveStorageState(storedStorage, monthKey),
-          initialized: readVectorizeState(storedStorage, monthKey, VECTORIZE_STORED_CAP) !== null,
         }),
       };
     });
@@ -387,7 +385,6 @@ function vectorizeLedgerStatus({
   baseline,
   allowPriorMonthProjection,
   effective,
-  initialized,
 }: {
   stored: unknown;
   monthKey: string;
@@ -395,7 +392,6 @@ function vectorizeLedgerStatus({
   baseline: number | undefined;
   allowPriorMonthProjection: boolean;
   effective: VectorizeState | null;
-  initialized: boolean;
 }): VectorizeLedgerStatus {
   const canProjectBaseline =
     Number.isSafeInteger(baseline) &&
@@ -403,17 +399,12 @@ function vectorizeLedgerStatus({
       (allowPriorMonthProjection && isPreviousVectorizePeriod(stored, monthKey)));
   const used = effective?.used ?? null;
   const storedState = readVectorizeState(stored, monthKey, cap);
+  const initialized = storedState !== null;
   const baselineFloorApplied =
     effective !== null && storedState !== null && effective.used > storedState.used;
   const state: VectorizeLedgerStatus['state'] = effective
     ? 'available'
-    : stored === undefined
-      ? 'uninitialized'
-      : isPreviousVectorizePeriod(stored, monthKey, cap)
-        ? 'stale'
-        : initialized && !Number.isSafeInteger(baseline)
-          ? 'baseline_unavailable'
-          : 'invalid';
+    : unavailableVectorizeLedgerState(stored, monthKey, cap, baseline, initialized);
 
   return {
     state,
@@ -428,4 +419,16 @@ function vectorizeLedgerStatus({
     remaining: used === null ? null : cap - used,
     baselineVerified: effective?.baselineVerified === true,
   };
+}
+
+function unavailableVectorizeLedgerState(
+  stored: unknown,
+  monthKey: string,
+  cap: number,
+  baseline: number | undefined,
+  initialized: boolean
+): VectorizeLedgerStatus['state'] {
+  if (stored === undefined) return 'uninitialized';
+  if (isPreviousVectorizePeriod(stored, monthKey, cap)) return 'stale';
+  return initialized && !Number.isSafeInteger(baseline) ? 'baseline_unavailable' : 'invalid';
 }
