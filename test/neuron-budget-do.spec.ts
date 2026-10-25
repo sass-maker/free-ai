@@ -50,6 +50,9 @@ function makeState() {
       put: vi.fn(async (key: string, value: unknown) => {
         values.set(key, value);
       }),
+      delete: vi.fn(async (key: string) => {
+        values.delete(key);
+      }),
       transaction,
     },
   } as unknown as DurableObjectState;
@@ -156,6 +159,251 @@ describe('NeuronBudgetDO', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('reports initialized Vectorize ledgers without writing either value', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+    try {
+      const { state, values, puts } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-10',
+        used: 39_000_000,
+        baselineVerified: true,
+      });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-10',
+        used: 75_000_000,
+        baselineVerified: true,
+      });
+      const budget = new NeuronBudgetDO(state);
+
+      const response = await budget.fetch(new Request('https://internal.local/vectorize-usage'));
+
+      await expect(response.json()).resolves.toEqual({
+        monthKey: '2026-10',
+        query: {
+          state: 'available',
+          initialized: true,
+          source: 'ledger',
+          used: 39_000_000,
+          cap: 45_000_000,
+          remaining: 6_000_000,
+          baselineVerified: true,
+        },
+        storage: {
+          state: 'available',
+          initialized: true,
+          source: 'ledger',
+          used: 75_000_000,
+          cap: 200_000_000,
+          remaining: 125_000_000,
+          baselineVerified: true,
+        },
+      });
+      expect(puts).toEqual([]);
+      expect(state.storage.put).not.toHaveBeenCalled();
+      expect(state.storage.delete).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('projects verified baselines for missing ledgers without initializing them', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+    try {
+      const { state, values, puts } = makeState();
+      const budget = new NeuronBudgetDO(state);
+
+      const response = await budget.fetch(new Request('https://internal.local/vectorize-usage'));
+
+      await expect(response.json()).resolves.toEqual({
+        monthKey: '2026-10',
+        query: {
+          state: 'available',
+          initialized: false,
+          source: 'verified_monthly_baseline',
+          used: 35_000_000,
+          cap: 45_000_000,
+          remaining: 10_000_000,
+          baselineVerified: true,
+        },
+        storage: {
+          state: 'available',
+          initialized: false,
+          source: 'verified_monthly_baseline',
+          used: 30_000_000,
+          cap: 200_000_000,
+          remaining: 170_000_000,
+          baselineVerified: true,
+        },
+      });
+      expect(values.size).toBe(0);
+      expect(puts).toEqual([]);
+      expect(state.storage.put).not.toHaveBeenCalled();
+      expect(state.storage.delete).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('projects the verified query baseline but leaves stale storage unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+    try {
+      const { state, values, puts } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-09',
+        used: 41_000_000,
+        baselineVerified: true,
+      });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-09',
+        used: 75_000_000,
+        baselineVerified: true,
+      });
+      const budget = new NeuronBudgetDO(state);
+
+      const response = await budget.fetch(new Request('https://internal.local/vectorize-usage'));
+
+      await expect(response.json()).resolves.toEqual({
+        monthKey: '2026-10',
+        query: {
+          state: 'available',
+          initialized: false,
+          source: 'verified_monthly_baseline',
+          used: 35_000_000,
+          cap: 45_000_000,
+          remaining: 10_000_000,
+          baselineVerified: true,
+        },
+        storage: {
+          state: 'stale',
+          initialized: false,
+          source: null,
+          used: null,
+          cap: 200_000_000,
+          remaining: null,
+          baselineVerified: true,
+        },
+      });
+      expect(puts).toEqual([]);
+      expect(state.storage.put).not.toHaveBeenCalled();
+      expect(state.storage.delete).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves both ledgers unknown without a verified month baseline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-01T00:00:00Z'));
+    try {
+      const { state, values, puts } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-10',
+        used: 41_000_000,
+        baselineVerified: true,
+      });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-10',
+        used: 75_000_000,
+        baselineVerified: true,
+      });
+      const budget = new NeuronBudgetDO(state);
+
+      const response = await budget.fetch(new Request('https://internal.local/vectorize-usage'));
+
+      await expect(response.json()).resolves.toEqual({
+        monthKey: '2026-11',
+        query: {
+          state: 'stale',
+          initialized: false,
+          source: null,
+          used: null,
+          cap: 45_000_000,
+          remaining: null,
+          baselineVerified: false,
+        },
+        storage: {
+          state: 'stale',
+          initialized: false,
+          source: null,
+          used: null,
+          cap: 200_000_000,
+          remaining: null,
+          baselineVerified: false,
+        },
+      });
+      expect(puts).toEqual([]);
+      expect(state.storage.put).not.toHaveBeenCalled();
+      expect(state.storage.delete).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('returns unknown values for malformed current-month ledgers without repairing them', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+    try {
+      const { state, values, puts } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-10',
+        used: Number.NaN,
+        baselineVerified: true,
+      });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-10',
+        used: Number.NaN,
+        baselineVerified: true,
+      });
+      const budget = new NeuronBudgetDO(state);
+
+      const response = await budget.fetch(new Request('https://internal.local/vectorize-usage'));
+
+      await expect(response.json()).resolves.toEqual({
+        monthKey: '2026-10',
+        query: {
+          state: 'invalid',
+          initialized: false,
+          source: null,
+          used: null,
+          cap: 45_000_000,
+          remaining: null,
+          baselineVerified: true,
+        },
+        storage: {
+          state: 'invalid',
+          initialized: false,
+          source: null,
+          used: null,
+          cap: 200_000_000,
+          remaining: null,
+          baselineVerified: true,
+        },
+      });
+      expect(puts).toEqual([]);
+      expect(state.storage.put).not.toHaveBeenCalled();
+      expect(state.storage.delete).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('accepts only GET for the read-only Vectorize status transport', async () => {
+    const { state, puts } = makeState();
+    const budget = new NeuronBudgetDO(state);
+
+    const response = await budget.fetch(
+      new Request('https://internal.local/vectorize-usage', { method: 'POST' })
+    );
+
+    expect(response.status).toBe(405);
+    expect(puts).toEqual([]);
+    expect(state.storage.put).not.toHaveBeenCalled();
+    expect(state.storage.delete).not.toHaveBeenCalled();
   });
   it('atomically admits only reservations that fit from a cold daily budget', async () => {
     const { state } = makeState();
