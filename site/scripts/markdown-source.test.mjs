@@ -139,3 +139,14 @@ test('unknown negotiated pages cannot fall through to the SPA HTML fallback', as
     null
   );
 });
+
+test('unknown negotiated double-slash paths retain the site canonical origin', async () => {
+  const response = await handleAgentEdge(
+    new Request(`${origin}//evil.example/page`, {
+      headers: { Accept: 'text/markdown' },
+    }),
+    assets()
+  );
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get('Content-Location'), `${origin}//evil.example/page`);
+});

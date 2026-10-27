@@ -464,7 +464,9 @@ export async function handleAgentEdge(request, assets, loadMarkdown) {
   if (!assets?.fetch) return null;
   const response = await publicMarkdownResponse(request, assets, loadMarkdown, path);
   if (unknownMarkdownPage(request, path, response)) {
-    const canonical = new URL(path, AGENT_SURFACE.url).href;
+    const fallback = new URL(AGENT_SURFACE.url);
+    fallback.pathname = path;
+    const canonical = fallback.href;
     const missing = markdownResponse(
       '# Not found\n\nNo public Markdown page exists at this path.\n',
       request,
