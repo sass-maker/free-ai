@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noEqualsToNull: Shared generated transport intentionally treats null and undefined alike. */
 // Generated from sass-maker/saas-maker tooling/lib/agent-surfaces; use sync-agent-readability.mjs.
 /**
  * @typedef {{

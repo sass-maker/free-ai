@@ -7,9 +7,9 @@ function sourceFixtureAssets() {
   const routes = ['/about/', '/status/'].map((path) => ({
     path,
     url: origin + path,
-    md: origin + path.replace(/\/$/, '') + '.md',
+    md: `${origin}${path.replace(/\/$/, '')}.md`,
     title: path === '/about/' ? 'About Free AI' : 'Gateway Status',
-    assetPath: path.replace(/\/$/, '') + '.md',
+    assetPath: `${path.replace(/\/$/, '')}.md`,
   }));
   const documents = new Map([
     [
@@ -19,7 +19,7 @@ function sourceFixtureAssets() {
     ['/api/md/_catalog', JSON.stringify(routes)],
     [
       '/about.md',
-      '# About Free AI\n\nCanonical: ' + origin + '/about/\n\nPublic gateway information.\n',
+      `# About Free AI\n\nCanonical: ${origin}/about/\n\nPublic gateway information.\n`,
     ],
   ]);
   return {
