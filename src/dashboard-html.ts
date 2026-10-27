@@ -1,3 +1,4 @@
+import { loadDashboardResponses, REPLAY_EXAMPLE } from './public-view-data';
 // Dashboard HTML served at /dashboard, /live, /v1/dashboard.
 // See src/index.ts for route registration. Uses Chart.js via CDN.
 
@@ -332,13 +333,7 @@ export const DASHBOARD_HTML = `<!doctype html>
         <input id="replayProject" aria-label="Replay project ID" placeholder="project_id" value="replay-lab" />
         <input id="replayApiKey" aria-label="Replay API key" type="password" placeholder="API key for replay" autocomplete="off" />
         <button id="replayBtn">Replay</button>
-        <textarea id="replayPayload" aria-label="Replay request payload" spellcheck="false">{
-  "messages": [
-    { "role": "user", "content": "Reply with one short diagnostic sentence." }
-  ],
-  "temperature": 0.2,
-  "max_tokens": 64
-}</textarea>
+        <textarea id="replayPayload" aria-label="Replay request payload" spellcheck="false">${REPLAY_EXAMPLE}</textarea>
       </div>
       <pre class="lab-result mono" id="replayResult">No replay run yet.</pre>
     </div>
@@ -509,12 +504,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
 
   async function fetchData(signal) {
-    const [healthRes, statsRes, routingRes, analyticsRes] = await Promise.all([
-      fetch('/health', { signal }),
-      fetch('/v1/stats/providers', { signal }).catch(() => null),
-      fetch('/v1/routing/status', { signal }).catch(() => null),
-      fetch('/v1/analytics?days=' + state.days + '&group_by=' + analyticsGroupParam(), { signal }),
-    ]);
+    const [healthRes, statsRes, routingRes, analyticsRes] = await (${loadDashboardResponses.toString()})((path) => fetch(path, { signal }), state.days, analyticsGroupParam());
 
     if (!healthRes.ok) {
       throw new Error('Health ' + healthRes.status + ': ' + (await healthRes.text()).slice(0, 200));

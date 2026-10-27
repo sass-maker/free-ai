@@ -1,3 +1,10 @@
+import {
+  loadHealthView,
+  loadModelView,
+  modelStatus,
+  statusOf,
+  capabilityText,
+} from './public-view-data';
 export const OPERATOR_HEALTH_HTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -125,14 +132,7 @@ const pct = (n) => Number.isFinite(Number(n)) ? (Number(n) * 100).toFixed(1) + '
 const ms = (n) => Number(n || 0) > 0 ? Math.round(Number(n)) + ' ms' : '-';
 const esc = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
-function modelStatus(model) {
-  const now = Date.now();
-  if (Number(model.cooldown_until || 0) > now) return ['cooldown', 'err'];
-  if (Number(model.headroom || 0) <= 0) return ['exhausted', 'err'];
-  if (Number(model.attempts || 0) === 0) return ['standby', ''];
-  if (Number(model.success_rate || 0) < 0.75 || Number(model.avg_latency_ms || 0) > 5000) return ['degraded', 'warn'];
-  return ['healthy', 'ok'];
-}
+const modelStatus = ${modelStatus.toString()};
 
 async function readJson(path) {
   const res = await fetch(path, { headers: { accept: 'application/json' } });
@@ -143,12 +143,7 @@ async function readJson(path) {
 async function load() {
   $('error').className = 'banner';
   try {
-    const [health, routing, providerStats, ledger] = await Promise.all([
-      readJson('/health'),
-      readJson('/v1/routing/status').catch(() => null),
-      readJson('/v1/stats/providers').catch(() => null),
-      readJson('/v1/routing/ledger?days=7').catch(() => null),
-    ]);
+    const [health, routing, providerStats, ledger] = await (${loadHealthView.toString()})(readJson);
     render(health, routing, providerStats, ledger);
     $('updated').textContent = 'Updated ' + new Date().toLocaleString();
   } catch (err) {
@@ -332,25 +327,9 @@ const pct = (n) => Number.isFinite(Number(n)) ? (Number(n) * 100).toFixed(1) + '
 const esc = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state = { models: [] };
 
-function statusOf(model) {
-  const now = Date.now();
-  if (model.automatic_routing === false) return ['manual only', 'warn'];
-  if (Number(model.cooldown_until || 0) > now) return ['cooldown', 'err'];
-  if (Number(model.headroom || 0) <= 0) return ['exhausted', 'err'];
-  if (!model.enabled || Number(model.success_rate || 0) < 0.75) return ['degraded', 'warn'];
-  return ['ready', 'ok'];
-}
+const statusOf = ${statusOf.toString()};
 
-function capabilityText(model) {
-  const caps = [];
-  if (model.supports_streaming) caps.push('streaming');
-  if (model.tool_calling) caps.push('tools');
-  if (model.json_mode) caps.push('json');
-  if (model.vision) caps.push('vision');
-  if (model.native_reasoning) caps.push('native reasoning');
-  caps.push(model.reasoning + ' reasoning');
-  return caps;
-}
+const capabilityText = ${capabilityText.toString()};
 
 function readFilters() {
   return {
@@ -401,10 +380,11 @@ function render() {
 
 async function load() {
   try {
-    const res = await fetch('/v1/models', { headers: { accept: 'application/json' } });
-    if (!res.ok) throw new Error('/v1/models returned ' + res.status);
-    const body = await res.json();
-    state.models = (body.data || []).slice().sort((a, b) => a.provider.localeCompare(b.provider) || a.id.localeCompare(b.id));
+    state.models = await (${loadModelView.toString()})(async (path) => {
+      const res = await fetch(path, { headers: { accept: 'application/json' } });
+      if (!res.ok) throw new Error(path + ' returned ' + res.status);
+      return res.json();
+    });
     const providers = Array.from(new Set(state.models.map((model) => model.provider))).sort();
     $('provider').innerHTML = '<option value="">All providers</option>' + providers.map((provider) => '<option value="' + esc(provider) + '">' + esc(provider) + '</option>').join('');
     $('updated').textContent = 'Updated ' + new Date().toLocaleString();

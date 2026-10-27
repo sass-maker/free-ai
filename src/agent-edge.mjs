@@ -1,3 +1,7 @@
+import { wantsMarkdown, markdownResponse } from './lib/agent-surfaces/http.mjs';
+import { discoveryLinkHeader } from './lib/agent-surfaces/handler.mjs';
+import runtimePages from './public-runtime-pages.json' with { type: 'json' };
+import { createStaticAssetHandler } from './lib/agent-surfaces/adapters/static-assets.mjs';
 /**
  * Portable agent-edge handler — copy or generate into each product.
  * Spec: fleet-ops/docs/agent-indexing-standard.md
@@ -289,66 +293,6 @@ const OPENAPI_SPEC = {
   },
 };
 
-function jsonError(status, code, message, path) {
-  return new Response(JSON.stringify({ error: { code, message, path } }), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-      'access-control-allow-origin': '*',
-    },
-  });
-}
-
-function markdown404(pathname, origin) {
-  const body = `# 404 — Not Found
-
-\`${pathname}\` does not exist on ${origin}.
-
-## Where to look next
-
-- [Home](${origin}/)
-- [Sitemap](${origin}/sitemap.xml)
-- [Agent index](${origin}/llms.txt)
-- [Full agent brief](${origin}/llms-full.txt)
-- [Agent catalog (JSON)](${origin}/api/ai)
-`;
-  return new Response(body, {
-    status: 404,
-    headers: {
-      'content-type': 'text/markdown; charset=utf-8',
-      'cache-control': 'no-store',
-      'x-content-type-options': 'nosniff',
-    },
-  });
-}
-
-function wantsMarkdown(request) {
-  const accept = (request.headers.get('accept') || '').toLowerCase();
-  if (!accept.includes('text/markdown')) return false;
-  if (!accept.includes('text/html')) return true;
-  return accept.indexOf('text/markdown') < accept.indexOf('text/html');
-}
-
-function staticAgentResponse(path) {
-  if (path === '/openapi.json' || path === '/openapi.yaml') {
-    return new Response(JSON.stringify(OPENAPI_SPEC, null, 2), {
-      status: 200,
-      headers: {
-        'content-type': 'application/json; charset=utf-8',
-        'access-control-allow-origin': '*',
-        'cache-control': 'public, max-age=3600',
-      },
-    });
-  }
-  if (path === '/llms.txt') return text(AGENT_SURFACE.llmsTxt, 'text/plain; charset=utf-8');
-  if (path === '/llms-full.txt' && AGENT_SURFACE.llmsFullTxt) {
-    return text(AGENT_SURFACE.llmsFullTxt, 'text/plain; charset=utf-8');
-  }
-  if (path === '/index.md') return text(AGENT_SURFACE.indexMd, 'text/markdown; charset=utf-8');
-  return null;
-}
-
 function agentCatalog(origin) {
   return {
     ...AGENT_SURFACE.catalog,
@@ -370,52 +314,10 @@ function agentCatalog(origin) {
   };
 }
 
-function negotiatedMarkdown(request, path, origin) {
-  if (!wantsMarkdown(request)) return null;
-  if (path === '/') {
-    return text(AGENT_SURFACE.indexMd, 'text/markdown; charset=utf-8', {
-      Link: '</index.md>; rel="alternate"; type="text/markdown"',
-      Vary: 'Accept, Accept-Encoding',
-    });
-  }
-  if (!path.includes('.') && !path.startsWith('/api/')) return markdown404(path, origin);
-  return null;
-}
-
-/**
- * @param {Request} request
- * @returns {Response | null}
- */
-export function handleAgentEdge(request) {
-  if (request.method !== 'GET' && request.method !== 'HEAD') return null;
-  const url = new URL(request.url);
-  const path = url.pathname === '' ? '/' : url.pathname;
-
-  const staticResponse = staticAgentResponse(path);
-  if (staticResponse) return staticResponse;
-  if (path === '/api/ai') return json(agentCatalog(url.origin));
-
-  if (path.startsWith('/api/') && path !== '/api/ai') {
-    return jsonError(404, 'not_found', `Unknown API path: ${path}`, path);
-  }
-  return negotiatedMarkdown(request, path, url.origin);
-}
-
 function rebindOrigin(value, origin) {
   if (!value) return value;
   const source = new URL(String(value), AGENT_SURFACE.url);
   return `${origin}${source.pathname}${source.search}${source.hash}`;
-}
-
-function text(body, type, extra = {}) {
-  return new Response(body, {
-    status: 200,
-    headers: {
-      'Content-Type': type,
-      'Cache-Control': 'public, max-age=300',
-      ...extra,
-    },
-  });
 }
 
 function json(data) {
@@ -426,4 +328,126 @@ function json(data) {
       'Cache-Control': 'public, max-age=300',
     },
   });
+}
+
+const livePaths = new Set([
+  '/',
+  '/index.md',
+  '/api/md',
+  '/api/md/',
+  '/status',
+  '/status/',
+  '/status.md',
+  '/api/md/status',
+  '/api/md/status/',
+  ...runtimePages.flatMap((page) => [
+    page.path,
+    `${page.path}/`,
+    `${page.path}.md`,
+    `/api/md${page.path}`,
+    `/api/md${page.path}/`,
+    ...(page.aliases || []),
+  ]),
+]);
+const publicHandlers = new WeakMap();
+export async function handleAgentEdge(request, assets, loadMarkdown) {
+  const path = new URL(request.url).pathname;
+  // Keep the legacy YAML-named JSON discovery endpoint; /openapi.json is
+  // owned by the runtime API registry and bypasses this handler.
+  if (path === '/openapi.yaml' && ['GET', 'HEAD'].includes(request.method)) {
+    const response = json(OPENAPI_SPEC);
+    return request.method === 'HEAD' ? new Response(null, { headers: response.headers }) : response;
+  }
+  if (
+    path.startsWith('/api/') &&
+    path !== '/api/ai' &&
+    path !== '/api/md' &&
+    !path.startsWith('/api/md/')
+  ) {
+    return new Response(
+      JSON.stringify({ error: { code: 'not_found', message: `Unknown API path: ${path}`, path } }),
+      {
+        status: 404,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'Access-Control-Allow-Origin': '*',
+        },
+      }
+    );
+  }
+  if (path === '/api/ai' && ['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+    if (request.method === 'OPTIONS')
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+        },
+      });
+    const catalog = agentCatalog(new URL(request.url).origin);
+    if (assets?.fetch) {
+      const response = await assets.fetch(new Request(new URL('/api/md/_catalog', request.url)));
+      if (response.ok) {
+        const routes = await response.json();
+        if (Array.isArray(routes))
+          catalog.surfaces = routes.map((route) => ({
+            id:
+              route.path === '/' ? 'home' : route.path.replace(/^\/|\/$/g, '').replaceAll('/', '-'),
+            url: route.url,
+            md: route.md,
+            description: route.description,
+            kind: route.kind || 'static',
+          }));
+      }
+    }
+    const response = json(catalog);
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    return request.method === 'HEAD' ? new Response(null, { headers: response.headers }) : response;
+  }
+  if (!assets?.fetch) return null;
+  // Request-bound live loaders carry this request's execution context. Do not
+  // retain them in the asset cache across Worker requests.
+  let handler =
+    loadMarkdown && livePaths.has(path)
+      ? createStaticAssetHandler({ loadMarkdown, publicReservedPaths: ['/dashboard'] })
+      : publicHandlers.get(assets);
+  if (!handler) {
+    handler = createStaticAssetHandler({ publicReservedPaths: ['/dashboard'] });
+    publicHandlers.set(assets, handler);
+  }
+  const response = await handler(request, assets);
+  if (
+    response &&
+    (['/', '/index.md', '/api/md', '/api/md/'].includes(path) ||
+      /(?:^|\/)(?:status|dashboard|live|models|health|benchmark)(?:\.md|\/)?$/.test(path))
+  ) {
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('CDN-Cache-Control', 'no-store');
+    response.headers.set('Cloudflare-CDN-Cache-Control', 'no-store');
+  }
+  if (
+    !response &&
+    ['GET', 'HEAD'].includes(request.method) &&
+    wantsMarkdown(request) &&
+    !/^\/(?:api|v1|admin|auth|dashboard|_astro|_next|\.well-known)(?:\/|$)/.test(path) &&
+    !/\.(?:css|m?js|map|json|xml|txt|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|mp[34]|webm|pdf|zip|wasm)$/i.test(
+      path
+    )
+  ) {
+    const canonical = new URL(path, AGENT_SURFACE.url).href;
+    const missing = markdownResponse(
+      '# Not found\n\nNo public Markdown page exists at this path.\n',
+      request,
+      {
+        'Content-Location': canonical,
+        Link: `<${canonical}>; rel="canonical", ${discoveryLinkHeader(AGENT_SURFACE.url)}`,
+        'Cache-Control': 'no-store',
+        'CDN-Cache-Control': 'no-store',
+        'Cloudflare-CDN-Cache-Control': 'no-store',
+      }
+    );
+    return new Response(missing.body, { status: 404, headers: missing.headers });
+  }
+  return response;
 }

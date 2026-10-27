@@ -3,7 +3,7 @@ import { AGENT_SURFACE, handleAgentEdge } from '../src/agent-edge.mjs';
 
 describe('agent surface catalog', () => {
   it('catalogs every canonical public HTML page with a same-origin Markdown target', async () => {
-    const response = handleAgentEdge(
+    const response = await handleAgentEdge(
       new Request('https://preview.example.com/api/ai', {
         headers: { accept: 'application/json' },
       })
@@ -41,21 +41,9 @@ describe('agent surface catalog', () => {
     expect(sitemapSurfaces.filter((surface) => surface.sitemap === false)).toEqual([]);
   });
 
-  it('serves the canonical index Markdown and leaves generated page alternates alone', async () => {
-    const index = handleAgentEdge(
-      new Request('https://ai-gateway.sassmaker.com/index.md', {
-        headers: { accept: 'text/markdown' },
-      })
-    );
-    expect(index?.status).toBe(200);
-    expect(index?.headers.get('content-type')).toContain('text/markdown');
-    await expect(index?.text()).resolves.toContain('# Free AI');
+  it('requires build-registered assets rather than serving a stale homepage brief', async () => {
     expect(
-      handleAgentEdge(
-        new Request('https://ai-gateway.sassmaker.com/authentication.md', {
-          headers: { accept: 'text/markdown' },
-        })
-      )
+      await handleAgentEdge(new Request('https://ai-gateway.sassmaker.com/index.md'))
     ).toBeNull();
   });
 });

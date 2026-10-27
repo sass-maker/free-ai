@@ -1,8 +1,7 @@
 ---
-const title = 'Gateway Status — Live Model & Provider Health';
-const description =
-  'Live model registry and provider health: model scores, request counts, success rates, and quota status.';
-const gw = 'https://ai-gateway.sassmaker.com';
+import { publicPageMeta } from '../data/public-content.mjs';
+const { title, description } = publicPageMeta.status;
+const gw = publicPageMeta.origin;
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
@@ -249,6 +248,7 @@ const jsonLd = {
 
     <script>
       import { normalizeProviderStats, summarizeProviderStats } from '../lib/provider-stats';
+      import { loadPublicStatus } from '../lib/public-status';
 
       const REFRESH_MS = 30000;
       let timer = null;
@@ -418,10 +418,7 @@ const jsonLd = {
         text.textContent = 'Fetching…';
 
         try {
-          const [models, providers] = await Promise.all([
-            fetchJson('/v1/models'),
-            fetchJson('/v1/stats/providers'),
-          ]);
+          const { models, providers } = await loadPublicStatus(fetchJson);
 
           renderModels(models);
           renderProviders(providers);

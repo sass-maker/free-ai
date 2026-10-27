@@ -1,0 +1,6 @@
+[
+  {"path":"/dashboard","title":"Free AI — Live","description":"Public aggregate gateway traffic, routing readiness, provider quotas and model health. Default view: seven days, grouped by provider.","aliases":["/live","/live.md","/api/md/live"],"htmlAliases":["/live","/v1/dashboard"]},
+  {"path":"/models","title":"Free AI - Model Catalog","description":"Public model catalog with routing status, capabilities, context limits, health and evaluation metadata.","htmlAliases":["/v1/models"]},
+  {"path":"/health","title":"Free AI - Health","description":"Public gateway readiness, fallback order, provider quotas, seven-day routing ledger and model health.","htmlAliases":[]},
+  {"path":"/benchmark","title":"Free AI - Benchmark & Cost Optimizer","description":"Fixture-backed model benchmark matrix, workload recommendations and public experiment fixtures. Browser-local snapshots and experiment mutations are excluded.","htmlAliases":["/v1/benchmark"]}
+]

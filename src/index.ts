@@ -14,6 +14,10 @@ import pLimit from 'p-limit';
 import pRetry, { AbortError } from 'p-retry';
 
 import { handleAgentEdge } from './agent-edge.mjs';
+import { renderStatusMarkdown } from './public-status-markdown';
+import { renderRuntimeMarkdown } from './public-runtime-markdown';
+import { identity } from '../site/src/data/site-identity.mjs';
+import { publicProof } from '../site/src/lib/public-proof';
 import {
   getModelKey,
   getModelRegistry,
@@ -128,11 +132,65 @@ app.use(
   })
 );
 
+// Public HTML advertises the same global machine-readable documents.
+app.use('*', async (c, next) => {
+  await next();
+  if (c.res.headers.get('Content-Type')?.includes('text/html')) {
+    const links = ['llms.txt', 'llms-full.txt', 'ai.txt']
+      .map((name) => `<${identity.url}/${name}>; rel="describedby"`)
+      .join(', ');
+    c.header('Link', [c.res.headers.get('Link'), links].filter(Boolean).join(', '));
+    const vary = new Set(
+      (c.res.headers.get('Vary') || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    );
+    if (!vary.has('*')) vary.add('Accept');
+    c.header('Vary', vary.has('*') ? '*' : [...vary].join(', '));
+  }
+});
+
 // Fleet agent indexing (GEO) — discoverable product brief for AI crawlers
 app.use('*', async (c, next) => {
   // The runtime API registry is authoritative; agent indexing must not replace it.
   if (new URL(c.req.url).pathname === '/openapi.json') return next();
-  const agent = handleAgentEdge(c.req.raw);
+  const agent = await handleAgentEdge(c.req.raw, c.env.ASSETS, async (path) => {
+    const readPublic = async (sourcePath: string) => {
+      const response = await app.fetch(
+        new Request(new URL(sourcePath, identity.url), {
+          headers: { Accept: 'application/json' },
+        }),
+        c.env,
+        c.executionCtx
+      );
+      return response;
+    };
+    const fetchJson = async (sourcePath: string) => {
+      const response = await readPublic(sourcePath);
+      if (!response.ok) throw new Error('Public status source unavailable');
+      return response.json();
+    };
+    const runtime = await renderRuntimeMarkdown(path, readPublic);
+    if (runtime !== undefined) return runtime;
+    if (path.replace(/\/$/, '') === '/status') return renderStatusMarkdown(fetchJson);
+    if (path !== '/' || !c.env.ASSETS) return undefined;
+    const response = await c.env.ASSETS.fetch(new Request(new URL('/index.md', identity.url)));
+    if (!response.ok || !response.headers.get('content-type')?.includes('text/markdown'))
+      throw new Error('Homepage source unavailable');
+    const body = await response.text();
+    // Same anonymous public aggregate and estimate as the visible proof strip.
+    const proof = publicProof(await fetchJson('/v1/stats/providers').catch(() => null));
+    return body
+      .replace(
+        'Build-time snapshot: live request count unavailable.',
+        proof?.requests ?? 'Live request count unavailable.'
+      )
+      .replace(
+        'Build-time snapshot: live savings estimate unavailable.',
+        proof?.savings ?? 'Live savings estimate unavailable.'
+      );
+  });
   if (agent) return agent;
   return next();
 });

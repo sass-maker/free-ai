@@ -1,3 +1,4 @@
+import { identity, organizationJsonLd } from './src/data/site-identity.mjs';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
@@ -6,6 +7,7 @@ const socialImage = `${origin}/icon.svg`;
 const structuredData = {
   '@context': 'https://schema.org',
   '@graph': [
+    organizationJsonLd,
     {
       '@type': 'Organization',
       '@id': 'https://sassmaker.com/#org',
@@ -16,10 +18,9 @@ const structuredData = {
     {
       '@type': 'WebSite',
       '@id': `${origin}/#website`,
-      name: 'sass-maker / AI Gateway',
+      name: identity.name,
       url: origin,
-      description:
-        'OpenAI-compatible AI gateway routing across free-tier providers with health-aware selection.',
+      description: identity.summary,
       publisher: { '@id': 'https://sassmaker.com/#org' },
     },
   ],

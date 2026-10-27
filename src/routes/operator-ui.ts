@@ -3,6 +3,7 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import { BENCHMARK_COST_OPTIMIZER_HTML } from '../benchmark-cost-optimizer-html';
 import { DASHBOARD_HTML } from '../dashboard-html';
 import { MODEL_CATALOG_HTML, OPERATOR_HEALTH_HTML } from '../operator-ui-html';
+import { publicRuntimeHtml } from '../public-runtime-html';
 import type { Env } from '../types';
 
 type GatewayApp = OpenAPIHono<{ Bindings: Env }>;
@@ -29,7 +30,7 @@ export function registerOperatorUiRoutes(app: GatewayApp): void {
   app.use('/v1/models', async (context, next) => {
     if (context.req.method === 'GET' && wantsBrowserHtml(context)) {
       setDashboardHeaders(context);
-      return context.html(MODEL_CATALOG_HTML);
+      return context.html(publicRuntimeHtml(MODEL_CATALOG_HTML, '/models', context.req.path));
     }
 
     await next();
@@ -38,7 +39,7 @@ export function registerOperatorUiRoutes(app: GatewayApp): void {
   app.use('/models', async (context, next) => {
     if (context.req.method === 'GET' && wantsBrowserHtml(context)) {
       setDashboardHeaders(context);
-      return context.html(MODEL_CATALOG_HTML);
+      return context.html(publicRuntimeHtml(MODEL_CATALOG_HTML, '/models', context.req.path));
     }
 
     await next();
@@ -48,32 +49,36 @@ export function registerOperatorUiRoutes(app: GatewayApp): void {
 
   app.get('/dashboard', (context) => {
     setDashboardHeaders(context);
-    return context.html(DASHBOARD_HTML);
+    return context.html(publicRuntimeHtml(DASHBOARD_HTML, '/dashboard', context.req.path));
   });
   app.get('/dashboard/', (context) => context.redirect('/dashboard'));
   app.get('/live', (context) => {
     setDashboardHeaders(context);
-    return context.html(DASHBOARD_HTML);
+    return context.html(publicRuntimeHtml(DASHBOARD_HTML, '/dashboard', context.req.path));
   });
   app.get('/v1/dashboard', (context) => {
     setDashboardHeaders(context);
-    return context.html(DASHBOARD_HTML);
+    return context.html(publicRuntimeHtml(DASHBOARD_HTML, '/dashboard', context.req.path));
   });
 
   app.get('/benchmark', (context) => {
     setDashboardHeaders(context);
-    return context.html(BENCHMARK_COST_OPTIMIZER_HTML);
+    return context.html(
+      publicRuntimeHtml(BENCHMARK_COST_OPTIMIZER_HTML, '/benchmark', context.req.path)
+    );
   });
   app.get('/benchmark/', (context) => context.redirect('/benchmark'));
   app.get('/v1/benchmark', (context) => {
     setDashboardHeaders(context);
-    return context.html(BENCHMARK_COST_OPTIMIZER_HTML);
+    return context.html(
+      publicRuntimeHtml(BENCHMARK_COST_OPTIMIZER_HTML, '/benchmark', context.req.path)
+    );
   });
 
   app.use('/health', async (context, next) => {
     if (context.req.method === 'GET' && wantsBrowserHtml(context)) {
       setDashboardHeaders(context);
-      return context.html(OPERATOR_HEALTH_HTML);
+      return context.html(publicRuntimeHtml(OPERATOR_HEALTH_HTML, '/health', context.req.path));
     }
 
     await next();
@@ -82,7 +87,7 @@ export function registerOperatorUiRoutes(app: GatewayApp): void {
   app.get('/health/', (context) => {
     if (wantsBrowserHtml(context)) {
       setDashboardHeaders(context);
-      return context.html(OPERATOR_HEALTH_HTML);
+      return context.html(publicRuntimeHtml(OPERATOR_HEALTH_HTML, '/health', context.req.path));
     }
 
     return context.redirect('/health');

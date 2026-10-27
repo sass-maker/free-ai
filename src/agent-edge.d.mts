@@ -36,4 +36,8 @@ export declare const AGENT_SURFACE: {
   };
 };
 
-export declare function handleAgentEdge(request: Request): Response | null;
+export declare function handleAgentEdge(
+  request: Request,
+  assets?: { fetch: (request: Request) => Promise<Response> },
+  loadMarkdown?: (path: string) => Promise<string | undefined>
+): Promise<Response | null>;

@@ -1,9 +1,120 @@
+# Keep in sync with ai.txt and llms.txt.
+
 User-agent: *
 Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: GPTBot
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: Google-Extended
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: Applebot-Extended
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: CCBot
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: Bytespider
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: OAI-SearchBot
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: ChatGPT-User
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: Claude-SearchBot
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: Claude-User
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
+
+User-agent: Perplexity-User
+Allow: /
+Allow: /api/md/
+Allow: /api/ai$
+Disallow: /api/
+Disallow: /v1/
+Disallow: /admin
+Disallow: /auth
 
 Sitemap: https://ai-gateway.sassmaker.com/sitemap.xml
-# Agent indexing
-Allow: /llms.txt
-Allow: /index.md
-Allow: /api/ai
-Allow: /llms-full.txt
