@@ -1,3 +1,4 @@
+import { loadBenchmarkView } from './public-view-data';
 export const BENCHMARK_COST_OPTIMIZER_HTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -222,9 +223,11 @@ export const BENCHMARK_COST_OPTIMIZER_HTML = `<!doctype html>
   async function load() {
     $('error').classList.remove('show');
     $('error').textContent = '';
-    const res = await fetch('/v1/benchmark/optimizer');
-    if (!res.ok) throw new Error('Benchmark API ' + res.status);
-    const data = await res.json();
+    const data = await (${loadBenchmarkView.toString()})(async (path) => {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error('Benchmark API ' + res.status);
+      return res.json();
+    });
     const candidates = data.candidates || [];
     const avgSuccess = candidates.length
       ? candidates.reduce((s, c) => s + c.success_rate, 0) / candidates.length

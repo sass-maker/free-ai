@@ -1,0 +1,76 @@
+
+      <div class="code-intro afu d2">
+        <div class="section-label">Quick Start</div>
+        <h2>Up and running in one curl</h2>
+        <p>
+          Point your existing OpenAI SDK or curl commands at the gateway.
+          Set <code>model: "auto"</code>
+          and the gateway handles provider selection, retries, and failover.
+        </p>
+        <p style="font-size:.78rem;color:var(--text-muted);margin-top:-.5rem">
+          Heads up: this aggregates free provider tiers — best-effort, no SLA.
+          Per-IP limit is ~10 burst / ~20 rpm, each model has a daily cap, and the gateway returns <code>503</code> only when every capable model is rate-limited — rate-limit windows reset within minutes.
+          For production throughput, pin a model and bring your own keys.
+        </p>
+        <a class="btn btn-primary" href="/getting-started/" style="margin-top: 0.5rem;">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h12v10H2z"/><path d="M2 6h12"/></svg>
+          Full API reference
+        </a>
+      </div>
+      <div class="code-window afu d4">
+        <div class="code-toolbar">
+          <span class="code-dot"></span>
+          <span class="code-dot"></span>
+          <span class="code-dot"></span>
+          <span class="code-tab active" data-panel="curl">terminal</span>
+          <span class="code-tab" data-panel="sdk">openai sdk</span>
+        </div>
+        <div id="panel-curl" class="code-body"><span class="cm"># 1. Check which providers are live right now (no key needed)</span>
+<span class="cmd">curl</span> <span class="url">__ORIGIN__/v1/routing/status</span>
+
+<span class="cm"># 2. Send your first chat completion</span>
+<span class="cmd">curl</span> <span class="url">__ORIGIN__/v1/chat/completions</span> \
+  <span class="fl">-H</span> <span class="str">"Authorization: Bearer $KEY"</span> \
+  <span class="fl">-H</span> <span class="str">"Content-Type: application/json"</span> \
+  <span class="fl">-d</span> <span class="str">'{
+  <span class="key">"model"</span>: <span class="val">"auto"</span>,
+  <span class="key">"project_id"</span>: <span class="val">"my_project"</span>,
+  <span class="key">"messages"</span>: [{
+    <span class="key">"role"</span>: <span class="val">"user"</span>,
+    <span class="key">"content"</span>: <span class="val">"Hello!"</span>
+  }]
+}'</span>
+
+<span class="cm"># Embeddings</span>
+<span class="cmd">curl</span> <span class="url">__ORIGIN__/v1/embeddings</span> \
+  <span class="fl">-H</span> <span class="str">"Authorization: Bearer $KEY"</span> \
+  <span class="fl">-H</span> <span class="str">"Content-Type: application/json"</span> \
+  <span class="fl">-d</span> <span class="str">'{
+  <span class="key">"model"</span>: <span class="val">"@cf/baai/bge-base-en-v1.5"</span>,
+  <span class="key">"project_id"</span>: <span class="val">"my_project"</span>,
+  <span class="key">"input"</span>: <span class="val">"Hello world"</span>
+}'</span></div>
+        <div id="panel-sdk" class="code-body" style="display:none"><span class="cm">// npm install openai  (already installed if you use OpenAI SDK)</span>
+<span class="key">import</span> <span class="val">OpenAI</span> <span class="key">from</span> <span class="str">'openai'</span>;
+
+<span class="key">const</span> <span class="val">client</span> = <span class="key">new</span> <span class="val">OpenAI</span>({
+  <span class="key">baseURL</span>: <span class="str">'__ORIGIN__/v1'</span>,
+  <span class="key">apiKey</span>: process.env.<span class="val">GATEWAY_API_KEY</span>,
+});
+
+<span class="cm">// Chat completion — same params as OpenAI</span>
+<span class="key">const</span> <span class="val">chat</span> = <span class="key">await</span> client.chat.completions.<span class="cmd">create</span>({
+  <span class="key">model</span>: <span class="str">'auto'</span>,
+  <span class="key">project_id</span>: <span class="str">'my_project'</span>,
+  <span class="key">messages</span>: [{ <span class="key">role</span>: <span class="str">'user'</span>, <span class="key">content</span>: <span class="str">'Hello!'</span> }],
+});
+console.<span class="cmd">log</span>(chat.choices[0].message.content);
+
+<span class="cm">// Embeddings</span>
+<span class="key">const</span> <span class="val">emb</span> = <span class="key">await</span> client.embeddings.<span class="cmd">create</span>({
+  <span class="key">model</span>: <span class="str">'gemini-embedding-001'</span>,
+  <span class="key">project_id</span>: <span class="str">'my_project'</span>,
+  <span class="key">input</span>: <span class="str">'Hello world'</span>,
+});
+console.<span class="cmd">log</span>(emb.data[0].embedding.length + <span class="str">' dims'</span>);</div>
+      </div>

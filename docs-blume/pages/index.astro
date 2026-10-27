@@ -1,12 +1,5 @@
 ---
-const pages = [
-  ['getting-started', 'Getting started', 'Connect an OpenAI-compatible client to the gateway.'],
-  ['chat-completions', 'Chat completions', 'Generate text with streaming, tools, JSON mode, and vision.'],
-  ['responses-api', 'Responses API', 'Use the OpenAI Responses format through the gateway.'],
-  ['decisions', 'Decision APIs', 'Answer typed questions and compare engines on one frozen input.'],
-  ['models', 'Models', 'Browse routing capabilities and available model families.'],
-  ['authentication', 'Authentication', 'Authenticate protected requests with a gateway key.'],
-];
+import { docsPages as pages, docsIntro, docsOutro } from '../../site/src/data/docs-index.mjs';
 ---
 <!doctype html>
 <html lang="en">
@@ -14,6 +7,7 @@ const pages = [
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>AI Gateway API Docs</title>
+    <link rel="canonical" href="https://ai-gateway.sassmaker.com/docs/" />
     <meta
       name="description"
       content="OpenAI-compatible API documentation for the Free AI Gateway."
@@ -45,9 +39,9 @@ const pages = [
       <div class="eyebrow">Free AI Gateway</div>
       <h1>API documentation</h1>
       <p>
-        An OpenAI-compatible gateway across free-tier providers. Start with
+        {docsIntro}
         <a class="docs-link" href="/docs/getting-started"><code>/docs/getting-started</code></a>
-        or jump directly to an API reference below.
+        {docsOutro}
       </p>
       <section class="grid" aria-label="Documentation sections">
         {pages.map(([slug, title, description]) => (

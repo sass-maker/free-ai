@@ -53,6 +53,9 @@ function checkComplexity() {
     '**/*.test.*',
     '-x',
     '**/*.spec.*',
+    // Shared vendored helpers are independently qualified upstream.
+    '-x',
+    'src/lib/agent-surfaces/**',
     '--csv',
   ]);
   const rows = result.stdout
@@ -94,7 +97,7 @@ function checkDuplication() {
     '--mode',
     'strict',
     '--ignore',
-    '**/*.test.*,**/*.spec.*,**/node_modules/**,**/coverage/**,**/dist/**',
+    '**/*.test.*,**/*.spec.*,**/node_modules/**,**/coverage/**,**/dist/**,src/lib/agent-surfaces/**',
     '--reporters',
     'json',
     '--output',

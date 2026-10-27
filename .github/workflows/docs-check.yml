@@ -62,7 +62,7 @@ jobs:
         run: pnpm --filter @sass-maker/ai-gateway-docs build
 
       - name: Install Blume docs tooling
-        run: npm --prefix docs-blume ci --ignore-scripts
+        run: pnpm --dir docs-blume install --frozen-lockfile --ignore-scripts
 
       - name: Blume build (presentation smoke)
         run: pnpm docs:build

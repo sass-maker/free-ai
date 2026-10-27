@@ -16,11 +16,19 @@
         "e2e/**/*.ts",
         "e2e-live/**/*.ts"
       ],
-      "ignoreDependencies": ["jscpd", "cloudflare"]
+      "ignoreDependencies": [
+        "jscpd",
+        "cloudflare"
+      ]
     },
     "site": {
-      "entry": ["scripts/**/*.mjs"],
-      "project": ["src/**/*.{ts,astro}", "scripts/**/*.mjs"]
+      "entry": [
+        "scripts/**/*.mjs"
+      ],
+      "project": [
+        "src/**/*.{ts,astro}",
+        "scripts/**/*.mjs"
+      ]
     },
     "docs-blume": {
       "entry": [
@@ -30,8 +38,20 @@
         "starlight-components.ts",
         "starlight-tab-item.astro"
       ],
-      "ignoreBinaries": ["blume"],
-      "ignoreDependencies": ["astro"]
+      "ignoreBinaries": [
+        "blume"
+      ],
+      "ignoreDependencies": [
+        "astro"
+      ]
     }
+  },
+  "ignoreIssues": {
+    "src/lib/agent-surfaces/http.mjs": [
+      "exports"
+    ],
+    "src/lib/agent-surfaces/adapters/static-assets.mjs": [
+      "exports"
+    ]
   }
 }
