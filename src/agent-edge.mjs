@@ -350,6 +350,88 @@ const livePaths = new Set([
   ]),
 ]);
 const publicHandlers = new WeakMap();
+function validCatalogRoute(route) {
+  return (
+    typeof route.path === 'string' && typeof route.url === 'string' && typeof route.md === 'string'
+  );
+}
+
+function catalogSurface(route) {
+  return {
+    id: route.path === '/' ? 'home' : route.path.replace(/^\/|\/$/g, '').replaceAll('/', '-'),
+    url: route.url,
+    md: route.md,
+    description: route.description,
+    kind: route.kind || 'static',
+  };
+}
+
+async function extendPublicCatalog(catalog, request, assets) {
+  if (!assets?.fetch) return;
+  try {
+    const response = await assets.fetch(new Request(new URL('/api/md/_catalog', request.url)));
+    if (!response.ok || response.headers.get('content-type')?.includes('text/html')) return;
+    const routes = await response.json();
+    if (Array.isArray(routes) && routes.every(validCatalogRoute)) {
+      catalog.surfaces = routes.map(catalogSurface);
+    }
+  } catch {
+    // Static-asset SPA fallbacks or unavailable metadata retain the public built-in catalog.
+  }
+}
+
+function unknownMarkdownPage(request, path, response) {
+  return (
+    !response &&
+    ['GET', 'HEAD'].includes(request.method) &&
+    wantsMarkdown(request) &&
+    !/^\/(?:api|v1|admin|auth|dashboard|_astro|_next|\.well-known)(?:\/|$)/.test(path) &&
+    !/\.(?:css|m?js|map|json|xml|txt|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|mp[34]|webm|pdf|zip|wasm)$/i.test(
+      path
+    )
+  );
+}
+
+async function publicCatalogResponse(request, assets) {
+  if (request.method === 'OPTIONS')
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      },
+    });
+  const catalog = agentCatalog(new URL(request.url).origin);
+  await extendPublicCatalog(catalog, request, assets);
+  const response = json(catalog);
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  return request.method === 'HEAD' ? new Response(null, { headers: response.headers }) : response;
+}
+
+async function publicMarkdownResponse(request, assets, loadMarkdown, path) {
+  // Request-bound live loaders carry this request's execution context. Do not
+  // retain them in the asset cache across Worker requests.
+  let handler =
+    loadMarkdown && livePaths.has(path)
+      ? createStaticAssetHandler({ loadMarkdown, publicReservedPaths: ['/dashboard'] })
+      : publicHandlers.get(assets);
+  if (!handler) {
+    handler = createStaticAssetHandler({ publicReservedPaths: ['/dashboard'] });
+    publicHandlers.set(assets, handler);
+  }
+  const response = await handler(request, assets);
+  if (
+    response &&
+    (['/', '/index.md', '/api/md', '/api/md/'].includes(path) ||
+      /(?:^|\/)(?:status|dashboard|live|models|health|benchmark)(?:\.md|\/)?$/.test(path))
+  ) {
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('CDN-Cache-Control', 'no-store');
+    response.headers.set('Cloudflare-CDN-Cache-Control', 'no-store');
+  }
+  return response;
+}
+
 export async function handleAgentEdge(request, assets, loadMarkdown) {
   const path = new URL(request.url).pathname;
   // Keep the legacy YAML-named JSON discovery endpoint; /openapi.json is
@@ -377,78 +459,11 @@ export async function handleAgentEdge(request, assets, loadMarkdown) {
     );
   }
   if (path === '/api/ai' && ['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
-    if (request.method === 'OPTIONS')
-      return new Response(null, {
-        status: 204,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-        },
-      });
-    const catalog = agentCatalog(new URL(request.url).origin);
-    if (assets?.fetch) {
-      try {
-        const response = await assets.fetch(new Request(new URL('/api/md/_catalog', request.url)));
-        if (response.ok && !response.headers.get('content-type')?.includes('text/html')) {
-          const routes = await response.json();
-          if (
-            Array.isArray(routes) &&
-            routes.every(
-              (route) =>
-                typeof route.path === 'string' &&
-                typeof route.url === 'string' &&
-                typeof route.md === 'string'
-            )
-          )
-            catalog.surfaces = routes.map((route) => ({
-              id:
-                route.path === '/'
-                  ? 'home'
-                  : route.path.replace(/^\/|\/$/g, '').replaceAll('/', '-'),
-              url: route.url,
-              md: route.md,
-              description: route.description,
-              kind: route.kind || 'static',
-            }));
-        }
-      } catch {
-        // Static-asset SPA fallbacks or unavailable metadata retain the public built-in catalog.
-      }
-    }
-    const response = json(catalog);
-    response.headers.set('Access-Control-Allow-Origin', '*');
-    return request.method === 'HEAD' ? new Response(null, { headers: response.headers }) : response;
+    return publicCatalogResponse(request, assets);
   }
   if (!assets?.fetch) return null;
-  // Request-bound live loaders carry this request's execution context. Do not
-  // retain them in the asset cache across Worker requests.
-  let handler =
-    loadMarkdown && livePaths.has(path)
-      ? createStaticAssetHandler({ loadMarkdown, publicReservedPaths: ['/dashboard'] })
-      : publicHandlers.get(assets);
-  if (!handler) {
-    handler = createStaticAssetHandler({ publicReservedPaths: ['/dashboard'] });
-    publicHandlers.set(assets, handler);
-  }
-  const response = await handler(request, assets);
-  if (
-    response &&
-    (['/', '/index.md', '/api/md', '/api/md/'].includes(path) ||
-      /(?:^|\/)(?:status|dashboard|live|models|health|benchmark)(?:\.md|\/)?$/.test(path))
-  ) {
-    response.headers.set('Cache-Control', 'no-store');
-    response.headers.set('CDN-Cache-Control', 'no-store');
-    response.headers.set('Cloudflare-CDN-Cache-Control', 'no-store');
-  }
-  if (
-    !response &&
-    ['GET', 'HEAD'].includes(request.method) &&
-    wantsMarkdown(request) &&
-    !/^\/(?:api|v1|admin|auth|dashboard|_astro|_next|\.well-known)(?:\/|$)/.test(path) &&
-    !/\.(?:css|m?js|map|json|xml|txt|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|mp[34]|webm|pdf|zip|wasm)$/i.test(
-      path
-    )
-  ) {
+  const response = await publicMarkdownResponse(request, assets, loadMarkdown, path);
+  if (unknownMarkdownPage(request, path, response)) {
     const canonical = new URL(path, AGENT_SURFACE.url).href;
     const missing = markdownResponse(
       '# Not found\n\nNo public Markdown page exists at this path.\n',
