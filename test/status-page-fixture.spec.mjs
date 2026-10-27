@@ -9,8 +9,11 @@ it('renders measured and unknown metrics and recovers after a failed refresh', a
   const source = readFileSync('site/src/pages/status.astro', 'utf8');
   const view = source.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
   const helpers = readFileSync('site/src/lib/provider-stats.ts', 'utf8');
+  const loader = readFileSync('site/src/lib/public-status.ts', 'utf8');
   const script = ts.transpileModule(
-    helpers.replace(/^export /gm, '') + view.replace(/import .*?from .*?;/, ''),
+    helpers.replace(/^export /gm, '') +
+      loader.replace(/^export /gm, '') +
+      view.replace(/import .*?from .*?;/g, ''),
     { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }
   ).outputText;
   let state = 'populated';

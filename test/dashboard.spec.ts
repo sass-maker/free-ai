@@ -51,7 +51,8 @@ describe('Dashboard HTML routes', () => {
       '<th>Samples</th><th>Upstream success</th><th>Avg</th><th>P90</th><th>P99</th>'
     );
     expect(html).toContain('Usage analytics are public');
-    expect(html).toContain("'/v1/analytics?days=' + state.days + '&group_by='");
+    expect(html).toContain('/v1/analytics?days=');
+    expect(html).toContain('&group_by=');
     expect(html).toContain('/v1/routing/status');
     expect(html).toContain('Provider quota status');
     expect(html).toContain('quota exhausted');

@@ -387,18 +387,32 @@ export async function handleAgentEdge(request, assets, loadMarkdown) {
       });
     const catalog = agentCatalog(new URL(request.url).origin);
     if (assets?.fetch) {
-      const response = await assets.fetch(new Request(new URL('/api/md/_catalog', request.url)));
-      if (response.ok) {
-        const routes = await response.json();
-        if (Array.isArray(routes))
-          catalog.surfaces = routes.map((route) => ({
-            id:
-              route.path === '/' ? 'home' : route.path.replace(/^\/|\/$/g, '').replaceAll('/', '-'),
-            url: route.url,
-            md: route.md,
-            description: route.description,
-            kind: route.kind || 'static',
-          }));
+      try {
+        const response = await assets.fetch(new Request(new URL('/api/md/_catalog', request.url)));
+        if (response.ok && !response.headers.get('content-type')?.includes('text/html')) {
+          const routes = await response.json();
+          if (
+            Array.isArray(routes) &&
+            routes.every(
+              (route) =>
+                typeof route.path === 'string' &&
+                typeof route.url === 'string' &&
+                typeof route.md === 'string'
+            )
+          )
+            catalog.surfaces = routes.map((route) => ({
+              id:
+                route.path === '/'
+                  ? 'home'
+                  : route.path.replace(/^\/|\/$/g, '').replaceAll('/', '-'),
+              url: route.url,
+              md: route.md,
+              description: route.description,
+              kind: route.kind || 'static',
+            }));
+        }
+      } catch {
+        // Static-asset SPA fallbacks or unavailable metadata retain the public built-in catalog.
       }
     }
     const response = json(catalog);

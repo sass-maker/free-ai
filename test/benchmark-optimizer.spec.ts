@@ -60,7 +60,7 @@ describe('Benchmark cost optimizer prototype', () => {
     expect(html).toContain('Model benchmark matrix');
     expect(html).toContain('Recommended route by workload');
     expect(html).toContain('Experiment ledger');
-    expect(html).toContain("fetch('/v1/benchmark/optimizer')");
+    expect(html).toMatch(/readJson\(['"]\/v1\/benchmark\/optimizer['"]\)/);
     expect(html).toContain("fetch('/v1/benchmark/experiments'");
   });
 

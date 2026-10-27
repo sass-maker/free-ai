@@ -1,4 +1,5 @@
-import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import baseline from './public-runtime-body-baseline.json';
 import { DASHBOARD_HTML } from '../src/dashboard-html';
 import { OPERATOR_HEALTH_HTML, MODEL_CATALOG_HTML } from '../src/operator-ui-html';
 import { BENCHMARK_COST_OPTIMIZER_HTML } from '../src/benchmark-cost-optimizer-html';
@@ -172,13 +173,10 @@ it('preserves every authored runtime HTML body while sharing its data code', () 
   ] as const;
   const visible = (html: string) =>
     html.slice(html.indexOf('<body>')).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
-  for (const [file, current] of fixtures) {
-    const source = execFileSync('git', ['show', `HEAD:${file}`], { encoding: 'utf8' }).replaceAll(
-      'export const ',
-      'const '
-    );
-    const original = new Function(`${source}; return { ${Object.keys(current).join(',')} };`)();
+  for (const [, current] of fixtures) {
     for (const [name, html] of Object.entries(current))
-      expect(visible(html), name).toBe(visible(original[name]));
+      expect(createHash('sha256').update(visible(html)).digest('hex'), name).toBe(
+        baseline.hashes[name as keyof typeof baseline.hashes]
+      );
   }
 });

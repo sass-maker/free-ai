@@ -40,7 +40,7 @@ describe('Operator browser UI routes', () => {
     const html = await res.text();
     expect(html).toContain('<title>Free AI - Health</title>');
     expect(html).toContain('Gateway Health');
-    expect(html).toContain("readJson('/health')");
+    expect(html).toMatch(/readJson\(['"]\/health['"]\)/);
     expect(html).toContain('/v1/routing/status');
     expect(html).toContain('/v1/routing/ledger?days=7');
     expect(html).toContain('href="/benchmark"');
@@ -147,7 +147,7 @@ describe('Operator browser UI routes', () => {
       expect(html).toContain('Search model, provider, capability');
       expect(html).toContain('Manual only');
       expect(html).toContain('automatic_routing');
-      expect(html).toContain("fetch('/v1/models'");
+      expect(html).toMatch(/readJson\(['"]\/v1\/models['"]\)/);
     }
   );
 

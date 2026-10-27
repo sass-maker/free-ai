@@ -156,7 +156,7 @@ export async function finalizeMarkdown() {
     `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${routes.map((r) => `<url><loc>${r.url}</loc></url>`).join('')}</urlset>`
   );
   console.log(
-    `Public source coverage: ${routes.length} HTML / ${routes.length} Markdown routes; runtime public views registered; HTML/API aliases canonicalized.`
+    `Public source registry: ${routes.length} Markdown routes; runtime public views registered; HTML/API aliases canonicalized.`
   );
 }
 await finalizeMarkdown();
