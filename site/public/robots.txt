@@ -8,6 +8,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: GPTBot
 Allow: /
@@ -17,6 +18,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: ClaudeBot
 Allow: /
@@ -26,6 +28,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: Google-Extended
 Allow: /
@@ -35,6 +38,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: Applebot-Extended
 Allow: /
@@ -44,6 +48,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: CCBot
 Allow: /
@@ -53,6 +58,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: Bytespider
 Allow: /
@@ -62,6 +68,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: OAI-SearchBot
 Allow: /
@@ -71,6 +78,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: ChatGPT-User
 Allow: /
@@ -80,6 +88,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: Claude-SearchBot
 Allow: /
@@ -89,6 +98,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: Claude-User
 Allow: /
@@ -98,6 +108,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: PerplexityBot
 Allow: /
@@ -107,6 +118,7 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 User-agent: Perplexity-User
 Allow: /
@@ -116,5 +128,6 @@ Disallow: /api/
 Disallow: /v1/
 Disallow: /admin
 Disallow: /auth
+Allow: /authentication/
 
 Sitemap: https://ai-gateway.sassmaker.com/sitemap.xml
