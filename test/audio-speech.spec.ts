@@ -50,7 +50,7 @@ describe('POST /v1/audio/speech', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns audio bytes on happy path (Workers AI melotts)', async () => {
+  it('returns audio bytes on happy path (Workers AI Aura 2)', async () => {
     const audio = new Uint8Array([0xff, 0xfb, 0x90, 0x44]).buffer;
     mocks.workersAiTtsMock.mockResolvedValueOnce({ audio, contentType: 'audio/mpeg' });
 

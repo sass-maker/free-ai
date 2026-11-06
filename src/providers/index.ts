@@ -128,11 +128,7 @@ export const ttsProviderCallers: Record<
   AudioTtsProvider,
   (input: UnifiedTtsInput) => Promise<UnifiedTtsOutput>
 > = {
-  workers_ai: (input) =>
-    callWorkersAiTts({
-      ...input,
-      response_format: input.response_format === 'flac' ? 'mp3' : input.response_format,
-    }),
+  workers_ai: (input) => callWorkersAiTts(input),
   groq: (input) => callGroqTts(input),
 };
 

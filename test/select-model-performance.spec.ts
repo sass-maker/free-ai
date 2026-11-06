@@ -46,18 +46,18 @@ function digest(value: unknown): string {
 
 describe('model selection performance', () => {
   it('model selection scales across the supported registry size', () => {
-    expect(registry).toHaveLength(38);
+    expect(registry).toHaveLength(35);
     const metrics: string[] = [];
     const observedHashes: Record<number, string> = {};
 
-    // Inkling access failures and Nemotron timeouts are quarantined. This shifts the
+    // November 2026 Workers AI retirements remove three chat candidates. This shifts the
     // index-derived synthetic health fixture; these hashes pin the workload.
     const expectedHashes: Record<number, string> = {
-      20: '78b21be55fb24241797eaf0e21b375548d02c655c592496fbb3a47d135b0153a',
-      38: '3f47107074be977f6c0a06c89152965de433a8c83224ce25ffb65c6a770f84cd',
+      20: 'b5ea5f9deba00cade260b9554f202550a5f0bc0b96802eae5041bcf102be9443',
+      35: '1593a0ea79e7bb076cb9114ce4dddc1d4089137b35cc4344c253bf4e88e53aa8',
     };
 
-    for (const size of [20, 38]) {
+    for (const size of [20, 35]) {
       const candidates = registry.slice(0, size);
       const states = new Map(
         candidates.map((candidate, index) => {
