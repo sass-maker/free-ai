@@ -130,7 +130,7 @@ jobs:
           import {writeFile} from 'node:fs/promises';
           import {join} from 'node:path';
           import {execFileSync} from 'node:child_process';
-          const expected = '6007ac0b3e274d5fa5c2fd2abcf27808594ddc34';
+          const expected = '7c74f742b2dfe38ed58f773135d8da42878c9ca0';
           const origin = 'https://ai-gateway.sassmaker.com';
           const model = '@cf/deepgram/aura-2-en';
           const input = 'Cloudflare release check.';
@@ -163,6 +163,9 @@ jobs:
           const catalog = await json(await request('/v1/models'));
           const retired = /@cf\/(?:deepseek-ai\/deepseek-r1-distill-qwen-32b|meta\/llama-3\.2-[13]b-instruct|myshell-ai\/melotts)/;
           assert.equal(retired.test(JSON.stringify(catalog)), false, 'Retiring default remains exposed');
+          const staleExternal = ['thinkingmachines/inkling:free', 'thinkingmachines/inkling-small:free', 'z-ai/glm-5.3', 'nvidia/nemotron-3-super-120b-a12b:free', 'poolside/laguna-xs-2.1:free', 'poolside/laguna-s-2.1:free'];
+          const published = new Set(catalog.data?.map(row => row.id));
+          assert.equal(staleExternal.some(id => published.has(id)), false, 'Stale external model remains exposed');
           const before = await json(await request('/v1/budget'));
           assert.equal(before.cap, 9500); assert.equal(before.dayKey, new Date().toISOString().slice(0, 10));
           assert.ok(before.remaining >= reservation, 'Insufficient bounded qualification budget');
