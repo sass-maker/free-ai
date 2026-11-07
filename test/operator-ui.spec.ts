@@ -76,10 +76,11 @@ describe('Operator browser UI routes', () => {
       enabled: true,
       automatic_routing: false,
     });
-    expect(body.data.find((model) => model.id === 'nvidia-nemotron-3-super-120b')).toMatchObject({
+    expect(body.data.find((model) => model.id === 'nvidia-nemotron-3-ultra-550b')).toMatchObject({
       enabled: true,
       automatic_routing: true,
     });
+    expect(body.data.some((model) => model.id === 'nvidia-nemotron-3-super-120b')).toBe(false);
   });
 
   it('includes embedding models with dimensions and provider availability', async () => {

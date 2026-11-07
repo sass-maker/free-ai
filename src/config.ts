@@ -284,7 +284,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'nvidia/nemotron-3-super-120b-a12b',
     reasoning: 'high',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // NVIDIA free endpoint deprecated; confirmed upstream 404 on 2026-11-07.
     priority: 0.74,
     capabilities: {
       toolCalling: true,

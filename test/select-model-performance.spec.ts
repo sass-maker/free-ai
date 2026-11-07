@@ -46,18 +46,18 @@ function digest(value: unknown): string {
 
 describe('model selection performance', () => {
   it('model selection scales across the supported registry size', () => {
-    expect(registry).toHaveLength(32);
+    expect(registry).toHaveLength(31);
     const metrics: string[] = [];
     const observedHashes: Record<number, string> = {};
 
-    // November 2026 catalog cleanup removes three enabled external candidates, after
-    // the Workers AI retirements. These hashes pin the new index-derived workload.
+    // NVIDIA retired the free Super endpoint after the catalog cleanup. These hashes
+    // pin the remaining 31-candidate, index-derived workload.
     const expectedHashes: Record<number, string> = {
-      20: '8df1b5abf10d0ddb777834e26595d4dee802f193d9d14c220bc2cde9fcfa8b90',
-      32: 'cf0be1aafb4f150e948f6af131cff5672f41550c20459ac47e9d4a2787c5e0f2',
+      20: '8cfe453396d50f9d36c384d92ae605b9f3c51f55f77312cd961fbc81070b0be9',
+      31: '67b2fb8dacb1eb083d5626b860073cc33fabb5fd37809c35f7ee168bda478368',
     };
 
-    for (const size of [20, 32]) {
+    for (const size of [20, 31]) {
       const candidates = registry.slice(0, size);
       const states = new Map(
         candidates.map((candidate, index) => {
