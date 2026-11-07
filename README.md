@@ -129,7 +129,6 @@ Use `model: "auto"` to let the gateway pick the best available model, or specify
 
 | Model ID | Actual Model | Tier | TC | JM | V | CTX | MOT | Daily Limit |
 |----------|-------------|------|:--:|:--:|:-:|----:|----:|------------:|
-| `nvidia-nemotron-3-super-120b` | `nvidia/nemotron-3-super-120b-a12b` | high | Y | Y | | 131k | 8k | 500 |
 | `nvidia-nemotron-3-ultra-550b` | `nvidia/nemotron-3-ultra-550b-a55b` | high | Y | Y | | 131k | 8k | 300 |
 | `nvidia-kimi-k3` | `moonshotai/kimi-k3` | high | | Y | | 131k | 8k | 300 |
 | `nvidia-nemotron-3-5-lightning-30b` | `nvidia/nemotron-3.5-lightning-30b-a3b` | medium | Y | Y | | 131k | 8k | 500 |
