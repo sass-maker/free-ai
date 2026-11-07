@@ -180,7 +180,7 @@ describe('Aura 2 migration', () => {
         env,
         makeCtx()
       );
-      expect(response.status).toBe(format === 'mp3' ? 200 : 502);
+      expect(response.status).toBe(format === 'mp3' ? 200 : 400);
       if (format === 'mp3') {
         expect(response.headers.get('x-gateway-model')).toBe(WORKERS_AI_TTS_MODEL);
         expect((await response.arrayBuffer()).byteLength).toBe(4);
@@ -193,6 +193,58 @@ describe('Aura 2 migration', () => {
       }
     }
   );
+
+  it.each(['speech', 'speech-to-speech'])(
+    'rejects an impossible TTS reservation without a retryable error (%s)',
+    async (route) => {
+      const { env, run, debit } = setup();
+      const text = 'a'.repeat(3000);
+      vi.stubGlobal('fetch', vi.fn(async () => Response.json({ text: 'hello' })));
+      groq.mockResolvedValue({ completion: { choices: [{ message: { content: text } }] } });
+      const form = new FormData();
+      form.append('file', new Blob(['audio'], { type: 'audio/mpeg' }), 'test.mp3');
+      const response = await app.fetch(
+        new Request(`https://gateway.test/v1/audio/${route}`, {
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer test-gateway-key',
+            'x-gateway-project-id': 'test-tts-limit',
+            ...(route === 'speech' ? { 'content-type': 'application/json' } : {}),
+          },
+          body: route === 'speech' ? JSON.stringify({ input: text, model: 'auto' }) : form,
+        }),
+        env,
+        makeCtx()
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.has('retry-after')).toBe(false);
+      expect(await response.json()).toMatchObject({
+        error: { type: 'invalid_request_error', code: 'tts_input_too_large' },
+      });
+      expect(debit).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+    }
+  );
+
+  it('preserves structured budget denial on the speech route', async () => {
+    const { env, run } = setup(false);
+    const response = await app.fetch(
+      new Request('https://gateway.test/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer test-gateway-key',
+          'content-type': 'application/json',
+          'x-gateway-project-id': 'test-tts-budget',
+        },
+        body: JSON.stringify({ input: 'hello', model: 'auto' }),
+      }),
+      env,
+      makeCtx()
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: { code: 'neuron_budget_exhausted' } });
+    expect(run).not.toHaveBeenCalled();
+  });
 
   it('removes retiring defaults without removing similarly named surviving models', () => {
     const { env } = setup();
