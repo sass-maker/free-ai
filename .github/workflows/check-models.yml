@@ -117,6 +117,8 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+      - name: Install audio decoder for qualification
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Qualify source, admission, authentication and real Aura audio
         env:
           GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
