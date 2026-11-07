@@ -50,11 +50,11 @@ describe('model selection performance', () => {
     const metrics: string[] = [];
     const observedHashes: Record<number, string> = {};
 
-    // NVIDIA retired the free Super endpoint after the catalog cleanup. These hashes
-    // pin the remaining 31-candidate, index-derived workload.
+    // Keep the 31-candidate input workload; stalled NVIDIA20B is now manual-only.
+    // The hashes pin the intentional automatic-selection change, not a speed claim.
     const expectedHashes: Record<number, string> = {
-      20: '8cfe453396d50f9d36c384d92ae605b9f3c51f55f77312cd961fbc81070b0be9',
-      31: '67b2fb8dacb1eb083d5626b860073cc33fabb5fd37809c35f7ee168bda478368',
+      20: '4ec5c05333cdce5733418bbcbafead7e51203625fa70edb6573102d1f54edeb7',
+      31: '4745fea717b15082cab318c123e5f9c850af5eac7dd7248af6214e33be023afc',
     };
 
     for (const size of [20, 31]) {
@@ -69,6 +69,7 @@ describe('model selection performance', () => {
       const iterations = 5_000;
 
       const selected = selectCandidates(candidates, states, options);
+      expect(selected.some((candidate) => candidate.id === 'nvidia-gpt-oss-20b')).toBe(false);
       const outputHash = digest(selected.map((candidate) => candidate.id));
       observedHashes[size] = outputHash;
 

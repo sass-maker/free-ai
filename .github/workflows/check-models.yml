@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '0 9 * * 0' # Every Sunday at 09:00 UTC
   workflow_dispatch:
+    inputs:
+      gateway_only:
+        description: "Skip direct provider replays when rechecking gateway capabilities"
+        type: boolean
+        default: false
+      qualify_capacity:
+        description: "Run bounded synthetic inference qualification and provider diagnostics"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,7 +23,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  qualify-capacity:
+    if: github.event_name == 'workflow_dispatch' && inputs.qualify_capacity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Verify diagnostic contracts
+        run: node --test scripts/qualify-inference-capacity.test.mjs
+      - name: Qualify useful inference and diagnose provider deadlines
+        env:
+          GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: node scripts/qualify-inference-capacity.mjs ${{ inputs.gateway_only && '--gateway-only' || '' }} > inference-qualification.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: inference-qualification-${{ github.run_id }}
+          path: inference-qualification.json
+          if-no-files-found: error
+
   check:
+    if: github.event_name != 'workflow_dispatch' || !inputs.qualify_capacity
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
