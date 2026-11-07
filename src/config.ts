@@ -944,7 +944,11 @@ const AUTOMATIC_ROUTING_QUARANTINED_PROVIDERS: ReadonlySet<TextProvider> = new S
   'github_models',
   'zai',
 ]);
-const AUTOMATIC_ROUTING_QUARANTINED_MODELS = new Set<string>([]);
+const AUTOMATIC_ROUTING_QUARANTINED_MODELS = new Set<string>([
+  // 2026-11-07: repeated gateway 15s and direct 25s timeouts before headers,
+  // including a bounded low-effort request. Keep explicit recovery probes.
+  'nvidia:openai/gpt-oss-20b',
+]);
 
 export function isAutomaticRoutingEligible(candidate: ModelCandidate): boolean {
   return (

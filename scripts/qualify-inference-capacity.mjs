@@ -30,9 +30,16 @@ const PROVIDERS = new Set([
 ]);
 const integer = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
 const content = (body) => body?.choices?.[0]?.message?.content;
+function plainJson(body) {
+  const raw = content(body);
+  if (typeof raw !== 'string') throw new Error('missing_content');
+  const text = raw.trim();
+  const unfenced = text.startsWith('```json\n') && text.endsWith('```') ? text.slice(8, -3) : text;
+  return JSON.parse(unfenced);
+}
 export function labelsValid(body) {
   try {
-    return JSON.stringify(JSON.parse(content(body))) === JSON.stringify(LABELS);
+    return JSON.stringify(plainJson(body)) === JSON.stringify(LABELS);
   } catch {
     return false;
   }
@@ -136,6 +143,15 @@ function summarized(response, text, surface, payload, validate) {
     ok: response.status === 200 && (payload.stream ? streamValid(text) : validate(completion)),
     provider: candidates.find((value) => PROVIDERS.has(value)) ?? surface,
     model: payload.model,
+    errorType: [
+      'rate_limit_error',
+      'usage_retriable',
+      'input_nonretriable',
+      'provider_fatal',
+      'safety_refusal',
+    ].includes(body?.error?.type)
+      ? body.error.type
+      : null,
     finishReason: FINISH.has(finish) ? finish : null,
     outputChars: typeof content(completion) === 'string' ? content(completion).length : 0,
     usage: {
@@ -365,7 +381,8 @@ export async function runQualification(env = process.env, options = {}) {
     );
   }
   const burstMs = Date.now() - burstStarted;
-  for (const f of fixtures.slice(9))
+  for (const f of fixtures.slice(9)) {
+    await (options.sleepImpl ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))))(3200);
     gateway.push({
       name: f.name,
       ...(await request(
@@ -377,8 +394,9 @@ export async function runQualification(env = process.env, options = {}) {
         options
       )),
     });
+  }
   const direct = [];
-  for (const f of DIRECT_FIXTURES) {
+  for (const f of options.gatewayOnly ? [] : DIRECT_FIXTURES) {
     const key = env[`${f.provider.toUpperCase()}_API_KEY`];
     if (!key) {
       direct.push({ name: f.name, ok: false, state: 'connection_unavailable' });
@@ -413,7 +431,7 @@ export async function runQualification(env = process.env, options = {}) {
     observedAt: new Date().toISOString(),
     bounds: {
       gatewayRequests: fixtures.length,
-      directRequests: DIRECT_FIXTURES.length,
+      directRequests: options.gatewayOnly ? 0 : DIRECT_FIXTURES.length,
       burstConcurrency: 3,
       normalMaxOutputTokens: 256,
       narrativeMaxOutputTokens: 2048,
@@ -437,7 +455,9 @@ export async function runQualification(env = process.env, options = {}) {
   };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const report = await runQualification();
+  const report = await runQualification(process.env, {
+    gatewayOnly: process.argv.includes('--gateway-only'),
+  });
   console.log(JSON.stringify(report, null, 2));
   if (!report.ok) process.exitCode = 1;
 }

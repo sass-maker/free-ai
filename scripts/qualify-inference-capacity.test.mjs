@@ -169,6 +169,7 @@ test('runner concurrency is at most three and missing direct connections stay un
   const report = await runQualification(
     { GATEWAY_API_KEY: 'key' },
     {
+      sleepImpl: async () => {},
       fetchImpl: async (url, init) => {
         assert.ok(url.startsWith('https://ai-gateway.sassmaker.com/v1/'));
         assert.equal(init.redirect, 'error');
@@ -208,4 +209,20 @@ test('nonstream and replay provider attribution uses allowlisted body metadata',
 test('malformed long quota headers stay bounded', () => {
   const headers = new Headers({ 'x-ratelimit-limit-requests': `${'1'.repeat(200)}!` });
   assert.deepEqual(quotaHeaders(headers), {});
+});
+
+test('plain-answer labels accept a JSON fence without relaxing strict schema fixtures', () => {
+  assert.equal(
+    labelsValid({
+      choices: [{ message: { content: '```json\n["billing","bug","feature"]\n```' } }],
+    }),
+    true
+  );
+  const strict = gatewayFixtures().find((f) => f.name === 'strict-json');
+  assert.equal(
+    strict.validate({
+      choices: [{ message: { content: '```json\n{"labels":["billing","bug","feature"]}\n```' } }],
+    }),
+    false
+  );
 });
