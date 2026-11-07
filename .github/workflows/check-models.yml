@@ -164,7 +164,8 @@ jobs:
           const retired = /@cf\/(?:deepseek-ai\/deepseek-r1-distill-qwen-32b|meta\/llama-3\.2-[13]b-instruct|myshell-ai\/melotts)/;
           assert.equal(retired.test(JSON.stringify(catalog)), false, 'Retiring default remains exposed');
           const staleExternal = ['thinkingmachines/inkling:free', 'thinkingmachines/inkling-small:free', 'z-ai/glm-5.3', 'nvidia/nemotron-3-super-120b-a12b:free', 'poolside/laguna-xs-2.1:free', 'poolside/laguna-s-2.1:free'];
-          const published = new Set(catalog.data?.map(row => row.id));
+          assert.ok(Array.isArray(catalog.data) && catalog.data.length > 0, 'Model catalog unavailable');
+          const published = new Set(catalog.data.flatMap(row => [row.id, row.model]));
           assert.equal(staleExternal.some(id => published.has(id)), false, 'Stale external model remains exposed');
           const before = await json(await request('/v1/budget'));
           assert.equal(before.cap, 9500); assert.equal(before.dayKey, new Date().toISOString().slice(0, 10));
