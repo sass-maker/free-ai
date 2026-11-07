@@ -3,7 +3,7 @@ import type { ChatMessage, Env } from '../types';
 import { MONTHLY_VECTORIZE_CAP, VECTORIZE_STORED_CAP } from './neuron-budget-do';
 
 const DO_ORIGIN = 'https://internal.local';
-const DAILY_NEURON_CAP = 9500;
+export const DAILY_NEURON_CAP = 9500;
 const NEURON_BUFFER = 1.2;
 const MAX_OUTPUT_TOKENS = 8192;
 export const DEFAULT_WORKERS_AI_OUTPUT_TOKENS = 512;
@@ -14,11 +14,8 @@ interface TokenPricing {
 }
 const TEXT_TOKEN_PRICING: Record<string, TokenPricing> = {
   '@cf/meta/llama-3.3-70b-instruct-fp8-fast': { input: 26668, output: 204805 },
-  '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b': { input: 45170, output: 443756 },
   '@cf/meta/llama-3.1-8b-instruct': { input: 25608, output: 75147 },
   '@cf/meta/llama-3-8b-instruct': { input: 25608, output: 75147 },
-  '@cf/meta/llama-3.2-3b-instruct': { input: 4625, output: 30475 },
-  '@cf/meta/llama-3.2-1b-instruct': { input: 2457, output: 18252 },
   '@cf/mistral/mistral-7b-instruct-v0.1': { input: 10000, output: 17300 },
 };
 const EMBEDDING_NEURONS_PER_MILLION_TOKENS: Record<string, number> = {
@@ -62,6 +59,12 @@ export function estimateNeuronCost(
 ): number | null {
   const inputBytes = params?.inputBytes ?? 0;
   if (!Number.isSafeInteger(inputBytes) || inputBytes < 0) return null;
+  // Aura 2: 2727.27 neurons / 1k characters, with the same 20% buffer.
+  // UTF-8 bytes upper-bound character counts, including non-ASCII text.
+  // https://developers.cloudflare.com/workers-ai/platform/pricing/
+  if (model === '@cf/deepgram/aura-2-en') {
+    return inputBytes > 0 ? Math.ceil((inputBytes * 2727.27 * NEURON_BUFFER) / 1000) : null;
+  }
   const inputTokens = Math.max(1, inputBytes);
   const outputTokens = params?.outputTokens ?? DEFAULT_WORKERS_AI_OUTPUT_TOKENS;
   if (!Number.isSafeInteger(outputTokens) || outputTokens < 1 || outputTokens > MAX_OUTPUT_TOKENS)

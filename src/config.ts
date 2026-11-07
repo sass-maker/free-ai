@@ -38,22 +38,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'workers-ai-deepseek-r1-32b',
-    provider: 'workers_ai',
-    model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.9,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: false,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
     id: 'workers-ai-llama-8b',
     provider: 'workers_ai',
     model: '@cf/meta/llama-3.1-8b-instruct',
@@ -83,38 +67,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
       vision: false,
       contextWindow: 8192,
       maxOutputTokens: 2048,
-    },
-  },
-  {
-    id: 'workers-ai-llama-3b',
-    provider: 'workers_ai',
-    model: '@cf/meta/llama-3.2-3b-instruct',
-    reasoning: 'low',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.83,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: false,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
-    id: 'workers-ai-llama-1b',
-    provider: 'workers_ai',
-    model: '@cf/meta/llama-3.2-1b-instruct',
-    reasoning: 'low',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.78,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: false,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 4096,
     },
   },
   {
@@ -985,11 +937,8 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // Workers AI
   'workers_ai:@cf/meta/llama-3.3-70b-instruct-fp8-fast': { requestsPerDay: 200 },
-  'workers_ai:@cf/deepseek-ai/deepseek-r1-distill-qwen-32b': { requestsPerDay: 200 },
   'workers_ai:@cf/meta/llama-3.1-8b-instruct': { requestsPerDay: 500 },
   'workers_ai:@cf/mistral/mistral-7b-instruct-v0.1': { requestsPerDay: 500 },
-  'workers_ai:@cf/meta/llama-3.2-3b-instruct': { requestsPerDay: 800 },
-  'workers_ai:@cf/meta/llama-3.2-1b-instruct': { requestsPerDay: 1000 },
   'workers_ai:@cf/microsoft/phi-2': { requestsPerDay: 800 },
   // Groq
   'groq:openai/gpt-oss-120b': { requestsPerDay: 200 },
@@ -1297,20 +1246,6 @@ const DEFAULT_IMAGE_MODELS: ImageModelCandidate[] = [
     enabled: true,
     priority: 0.78,
   },
-  {
-    id: 'cf-sdxl',
-    provider: 'workers_ai',
-    model: '@cf/stabilityai/stable-diffusion-xl-base-1.0',
-    enabled: true,
-    priority: 0.72,
-  },
-  {
-    id: 'cf-dreamshaper',
-    provider: 'workers_ai',
-    model: '@cf/lykon/dreamshaper-8-lcm',
-    enabled: true,
-    priority: 0.7,
-  },
   // NVIDIA NIM
   {
     id: 'nvidia-flux-schnell',
@@ -1430,12 +1365,12 @@ const DEFAULT_VIDEO_MODELS: VideoModelCandidate[] = [
 
 const DEFAULT_TTS_MODELS: AudioTtsModelCandidate[] = [
   {
-    id: 'cf-melotts',
+    id: 'cf-aura-2-en',
     provider: 'workers_ai',
-    model: '@cf/myshell-ai/melotts',
+    model: '@cf/deepgram/aura-2-en',
     enabled: true,
     priority: 0.7,
-    voices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
+    voices: ['luna', 'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
   },
 ];
 
@@ -1482,8 +1417,6 @@ const DEFAULT_MODALITY_LIMITS: Record<string, ProviderLimitConfig> = {
   'gemini:gemini-3-pro-image': { requestsPerDay: 50 },
   'gemini:gemini-2.5-flash-image': { requestsPerDay: 200 },
   'workers_ai:@cf/black-forest-labs/flux-1-schnell': { requestsPerDay: 500 },
-  'workers_ai:@cf/stabilityai/stable-diffusion-xl-base-1.0': { requestsPerDay: 500 },
-  'workers_ai:@cf/lykon/dreamshaper-8-lcm': { requestsPerDay: 500 },
   'nvidia:black-forest-labs/flux.1-schnell': { requestsPerDay: 200 },
   'nvidia:stabilityai/stable-diffusion-xl': { requestsPerDay: 200 },
   'pollinations:flux': { requestsPerDay: 300 },
@@ -1504,7 +1437,7 @@ const DEFAULT_MODALITY_LIMITS: Record<string, ProviderLimitConfig> = {
   'together:ByteDance-Seed/Seedream-3.0': { requestsPerDay: 20 },
   'together:ByteDance-Seed/Seedream-4.0': { requestsPerDay: 15 },
   // TTS
-  'workers_ai:@cf/myshell-ai/melotts': { requestsPerDay: 500 },
+  'workers_ai:@cf/deepgram/aura-2-en': { requestsPerDay: 500 },
   // STT
   'groq:whisper-large-v3-turbo': { requestsPerDay: 1000 },
   'groq:whisper-large-v3': { requestsPerDay: 500 },

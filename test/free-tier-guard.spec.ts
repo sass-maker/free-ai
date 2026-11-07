@@ -58,7 +58,7 @@ describe('Workers AI free-tier guard', () => {
         callWorkersAi({
           env,
           provider: 'workers_ai',
-          model: '@cf/meta/llama-3.2-1b-instruct',
+          model: '@cf/meta/llama-3.1-8b-instruct',
           messages: [{ role: 'user', content: 'hello' }],
           stream: false,
         })
@@ -91,7 +91,7 @@ describe('Workers AI free-tier guard', () => {
       callWorkersAi({
         env,
         provider: 'workers_ai',
-        model: '@cf/meta/llama-3.2-1b-instruct',
+        model: '@cf/meta/llama-3.1-8b-instruct',
         messages: [{ role: 'user', content: 'hello' }],
         stream: false,
       })
@@ -131,7 +131,7 @@ describe('Workers AI free-tier guard', () => {
       callWorkersAi({
         env,
         provider: 'workers_ai',
-        model: '@cf/meta/llama-3.2-1b-instruct',
+        model: '@cf/meta/llama-3.1-8b-instruct',
         messages: [
           {
             role: 'user',
@@ -164,12 +164,12 @@ describe('Workers AI free-tier guard', () => {
     await callWorkersAi({
       env,
       provider: 'workers_ai',
-      model: '@cf/meta/llama-3.2-1b-instruct',
+      model: '@cf/meta/llama-3.1-8b-instruct',
       messages: [{ role: 'user', content: 'hello' }],
       stream: false,
     });
     expect(run).toHaveBeenCalledWith(
-      '@cf/meta/llama-3.2-1b-instruct',
+      '@cf/meta/llama-3.1-8b-instruct',
       expect.objectContaining({ max_tokens: 512 })
     );
   });
@@ -215,11 +215,11 @@ describe('Workers AI free-tier guard', () => {
   });
 
   it('estimates Workers AI text neurons from conservative byte and output-token bounds', () => {
-    const short = estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
+    const short = estimateNeuronCost('@cf/meta/llama-3.1-8b-instruct', {
       inputBytes: 400,
       outputTokens: 100,
     });
-    const long = estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
+    const long = estimateNeuronCost('@cf/meta/llama-3.1-8b-instruct', {
       inputBytes: 4_000,
       outputTokens: 1_000,
     });
@@ -240,9 +240,9 @@ describe('Workers AI free-tier guard', () => {
   });
 
   it('covers current published text and embedding prices and rejects unknown or unbounded models', () => {
-    expect(estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct') ?? 0).toBeGreaterThanOrEqual(1);
+    expect(estimateNeuronCost('@cf/meta/llama-3.1-8b-instruct') ?? 0).toBeGreaterThanOrEqual(1);
     expect(
-      estimateNeuronCost('@cf/meta/llama-3.2-1b-instruct', {
+      estimateNeuronCost('@cf/meta/llama-3.1-8b-instruct', {
         inputBytes: 0,
         outputTokens: 0,
       })
@@ -420,7 +420,7 @@ describe('Workers AI free-tier guard', () => {
       callWorkersAi({
         env,
         provider: 'workers_ai',
-        model: '@cf/meta/llama-3.2-1b-instruct',
+        model: '@cf/meta/llama-3.1-8b-instruct',
         messages: [{ role: 'user', content: 'hello' }],
         stream: false,
       })
@@ -437,7 +437,7 @@ describe('Workers AI free-tier guard', () => {
       callWorkersAi({
         env,
         provider: 'workers_ai',
-        model: '@cf/meta/llama-3.2-1b-instruct',
+        model: '@cf/meta/llama-3.1-8b-instruct',
         messages: [{ role: 'user', content: 'hello' }],
         stream: false,
       })
@@ -453,7 +453,7 @@ describe('Workers AI free-tier guard', () => {
     const error = await callWorkersAi({
       env,
       provider: 'workers_ai',
-      model: '@cf/meta/llama-3.2-1b-instruct',
+      model: '@cf/meta/llama-3.1-8b-instruct',
       messages: [{ role: 'user', content: 'hello' }],
       stream: false,
     }).then(

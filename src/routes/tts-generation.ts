@@ -3,6 +3,8 @@ import type { Context } from 'hono';
 
 import { getTtsRegistry, hasTtsProviderKey } from '../config';
 import { ttsProviderCallers } from '../providers';
+import { TtsBudgetError, TtsInputError } from '../providers/workers-ai-tts';
+import { buildBudgetExhaustedResponse } from '../state/neuron-budget';
 import type { Env, Provider } from '../types';
 import { getErrorMessage } from '../utils/request';
 import { sortFallbackLast } from './provider-order';
@@ -114,7 +116,7 @@ async function tryTtsCandidate(
     response_format?: 'mp3' | 'wav' | 'opus' | 'flac';
     speed?: number;
   }
-): Promise<{ audio: BodyInit; contentType: string } | { error: string }> {
+): Promise<{ audio: BodyInit; contentType: string } | { error: Error }> {
   try {
     const caller = ttsProviderCallers[candidate.provider as 'groq' | 'workers_ai'];
     const result = await caller({
@@ -127,8 +129,28 @@ async function tryTtsCandidate(
     });
     return result;
   } catch (error) {
-    return { error: getErrorMessage(error) };
+    return { error: error instanceof Error ? error : new Error(getErrorMessage(error)) };
   }
+}
+
+function ttsFailureResponse(context: TtsRouteContext, error: Error): Response {
+  if (error instanceof TtsBudgetError) return buildBudgetExhaustedResponse(error.debit);
+  if (error instanceof TtsInputError) {
+    return context.json(
+      {
+        error: {
+          message: error.message,
+          type: 'invalid_request_error',
+          code: error.code,
+        },
+      },
+      400
+    );
+  }
+  return context.json(
+    { error: { message: `All TTS providers failed: ${error.message}`, type: 'provider_error' } },
+    502
+  );
 }
 
 export function registerTtsGenerationRoute(
@@ -153,7 +175,8 @@ export function registerTtsGenerationRoute(
     }
 
     const sorted = sortFallbackLast(registry, !forcedProvider && requestedLower === 'auto');
-    let lastError = 'Unknown error';
+    let lastError = new Error('Unknown error');
+    let lastProviderError: Error | undefined;
     let chosenProvider: string | undefined;
     let chosenModel: string | undefined;
     let ttsAttempts = 0;
@@ -187,6 +210,7 @@ export function registerTtsGenerationRoute(
         });
       }
       lastError = outcome.error;
+      if (!(outcome.error instanceof TtsInputError)) lastProviderError = outcome.error;
     }
 
     context.executionCtx.waitUntil(
@@ -198,9 +222,7 @@ export function registerTtsGenerationRoute(
         model: chosenModel,
       })
     );
-    return context.json(
-      { error: { message: `All TTS providers failed: ${lastError}`, type: 'provider_error' } },
-      502
-    );
+    // A fallback's narrower options must not mask a provider failure for valid input.
+    return ttsFailureResponse(context, lastProviderError ?? lastError);
   });
 }

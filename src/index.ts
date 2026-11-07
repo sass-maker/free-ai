@@ -72,6 +72,12 @@ import { registerImageGenerationRoute } from './routes/image-generation';
 import { registerOperatorUiRoutes } from './routes/operator-ui';
 import { registerProviderCatalogRoutes } from './routes/provider-catalogs';
 import { sortFallbackLast } from './routes/provider-order';
+import {
+  callWorkersAiTts,
+  TtsBudgetError,
+  TtsInputError,
+  WORKERS_AI_TTS_MODEL,
+} from './providers/workers-ai-tts';
 import { registerTtsGenerationRoute } from './routes/tts-generation';
 import { registerVideoGenerationRoutes } from './routes/video-generation';
 import { buildChatLedgerRecord, queryRoutingLedger, recordRoutingLedger } from './routing/ledger';
@@ -93,10 +99,8 @@ import { HealthStateDO } from './state/health-do';
 import { IpRateLimitDO } from './state/ip-rate-limit-do';
 import {
   buildBudgetExhaustedResponse,
-  estimateNeuronCost,
   getNeuronUsage,
   getVectorizeBudgetUsage,
-  tryDebitNeurons,
 } from './state/neuron-budget';
 import { NeuronBudgetDO } from './state/neuron-budget-do';
 import type {
@@ -2845,26 +2849,14 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
     );
   }
 
-  // Daily Neuron budget gate — fail closed when the cap is hit so we never
-  // exceed the 10k/day Workers AI free tier.
-  const ttsDebit = await tryDebitNeurons(c.env, estimateNeuronCost('@cf/myshell-ai/melotts'));
-  if (!ttsDebit.allowed) {
-    return buildBudgetExhaustedResponse(ttsDebit);
-  }
-
   try {
-    const ttsResult = (await c.env.AI.run('@cf/myshell-ai/melotts', {
-      prompt: llmText,
-      lang: 'en',
-    })) as { audio: string };
+    const ttsResult = await callWorkersAiTts({
+      env: c.env,
+      model: WORKERS_AI_TTS_MODEL,
+      input: llmText,
+    });
 
-    const binaryString = atob(ttsResult.audio);
-    const audioBytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      audioBytes[i] = binaryString.charCodeAt(i);
-    }
-
-    return new Response(audioBytes.buffer as ArrayBuffer, {
+    return new Response(ttsResult.audio, {
       headers: {
         'content-type': 'audio/mpeg',
         'x-transcribed-text': encodeURIComponent(transcribedText),
@@ -2872,6 +2864,25 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
       },
     });
   } catch (ttsErr) {
+    if (ttsErr instanceof TtsBudgetError) return buildBudgetExhaustedResponse(ttsErr.debit);
+    if (ttsErr instanceof TtsInputError) {
+      if (ttsErr.code === 'tts_input_too_large') {
+        return c.json(
+          {
+            error: {
+              message: 'LLM response exceeds the Workers AI TTS input budget',
+              type: 'provider_error',
+              code: 'llm_response_too_long_for_tts',
+            },
+          },
+          502
+        );
+      }
+      return c.json(
+        { error: { message: ttsErr.message, type: 'invalid_request_error', code: ttsErr.code } },
+        400
+      );
+    }
     return c.json(
       {
         error: {
