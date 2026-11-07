@@ -269,6 +269,26 @@ describe('selectCandidates', () => {
     expect(selected.map((candidate) => candidate.id)).toEqual(['a']);
   });
 
+  it('keeps stalled NVIDIA 20B manual-only while preserving explicit recovery probes', () => {
+    const candidates = getModelRegistry({ NVIDIA_API_KEY: 'test-key' } as Env);
+    const stalled = candidates.find(
+      (candidate) => candidate.provider === 'nvidia' && candidate.model === 'openai/gpt-oss-20b'
+    );
+    const healthySibling = candidates.find(
+      (candidate) =>
+        candidate.provider === 'nvidia' && candidate.model === 'nvidia/nemotron-3-ultra-550b-a55b'
+    );
+    expect(stalled?.enabled).toBe(true);
+    expect(isAutomaticRoutingEligible(stalled!)).toBe(false);
+    expect(isAutomaticRoutingEligible(healthySibling!)).toBe(true);
+    const explicit = selectCandidates(candidates, new Map(), {
+      stream: false,
+      now: Date.now(),
+      modelOverride: 'nvidia-gpt-oss-20b',
+    });
+    expect(explicit.map((candidate) => candidate.id)).toEqual(['nvidia-gpt-oss-20b']);
+  });
+
   it('keeps reviewed failing paths out of automatic routing but explicitly probeable', () => {
     const candidates: ModelCandidate[] = [
       registry[0]!,
