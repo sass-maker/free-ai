@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 9 * * 0' # Every Sunday at 09:00 UTC
   workflow_dispatch:
+    inputs:
+      inspect_budget_only:
+        description: 'Read shared Vectorize ledger status without inference or reservations'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,7 +19,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  inspect-budget:
+    if: github.event_name == 'workflow_dispatch' && inputs.inspect_budget_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Read Vectorize admission ledgers
+        env:
+          GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
+        run: |
+          node --input-type=module - <<'NODE'
+          const states = new Set(['available', 'uninitialized', 'stale', 'invalid', 'baseline_unavailable']);
+          const sources = new Set(['ledger', 'verified_monthly_baseline', null]);
+          const ledger = (row) => {
+            if (!row || !states.has(row.state) || !sources.has(row.source)
+              || typeof row.initialized !== 'boolean' || typeof row.baselineVerified !== 'boolean'
+              || !Number.isSafeInteger(row.cap) || row.cap < 0) throw new Error('Invalid ledger metadata');
+            const available = row.state === 'available';
+            if (row.baselineVerified !== available || (available
+              ? !Number.isSafeInteger(row.used) || row.used < 0 || !Number.isSafeInteger(row.remaining) || row.remaining < 0 || row.used + row.remaining !== row.cap
+              : row.used !== null || row.remaining !== null)) throw new Error('Invalid ledger amounts');
+            return Object.fromEntries(['state', 'initialized', 'source', 'used', 'cap', 'remaining', 'baselineVerified'].map(key => [key, row[key]]));
+          };
+          if (!process.env.GATEWAY_API_KEY) throw new Error('Gateway read connection unavailable');
+          const response = await fetch('https://ai-gateway.sassmaker.com/v1/budget/vectorize', {
+            headers: {Authorization: `Bearer ${process.env.GATEWAY_API_KEY}`},
+            redirect: 'error', signal: AbortSignal.timeout(15000),
+          });
+          if (!response.ok) throw new Error(`Budget read returned HTTP ${response.status}`);
+          const report = await response.json();
+          if (report.monthKey !== new Date().toISOString().slice(0, 7)) throw new Error('Budget month is not current');
+          console.log(JSON.stringify({monthKey: report.monthKey, query: ledger(report.query), storage: ledger(report.storage)}));
+          NODE
+
   check:
+    if: github.event_name != 'workflow_dispatch' || !inputs.inspect_budget_only
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
