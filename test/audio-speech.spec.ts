@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import app from '../src/index';
+import { TtsInputError, WORKERS_AI_TTS_MODEL } from '../src/providers/workers-ai-tts';
 import { makeCtx, makeTestEnv } from './helpers/env';
 
 const mocks = vi.hoisted(() => ({
@@ -151,4 +152,49 @@ describe('POST /v1/audio/speech', () => {
     const res = await app.fetch(req, env, makeCtx());
     expect(res.status).toBe(400);
   });
+
+  it.each([false, true])(
+    'preserves provider failure after a fallback rejects its options (input-only=%s)',
+    async (inputOnly) => {
+      const config = await import('../src/config');
+      vi.spyOn(config, 'getTtsRegistry').mockReturnValueOnce([
+        { id: 'groq-tts', provider: 'groq', model: 'groq-tts', enabled: true, priority: 1 },
+        {
+          id: 'cf-aura-2-en',
+          provider: 'workers_ai',
+          model: WORKERS_AI_TTS_MODEL,
+          enabled: true,
+          priority: 0.7,
+        },
+      ]);
+      mocks.groqTtsMock.mockRejectedValueOnce(
+        inputOnly ? new TtsInputError('Unsupported Groq options') : new Error('groq unavailable')
+      );
+      mocks.workersAiTtsMock.mockRejectedValueOnce(new TtsInputError('Aura supports only mp3'));
+      const { env } = makeTestEnv({ WORKERS_AI_ENABLED: 'true', GROQ_API_KEY: 'test-key' });
+      (env as unknown as { AI: unknown }).AI = makeAi();
+      const response = await app.fetch(
+        new Request('https://gateway.test/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: 'Bearer test-gateway-key',
+            'x-gateway-project-id': 'proj-tts-fallback',
+          },
+          body: JSON.stringify({ input: 'hello', response_format: 'wav' }),
+        }),
+        env,
+        makeCtx()
+      );
+      expect(response.status).toBe(inputOnly ? 400 : 502);
+      expect(await response.json()).toMatchObject({
+        error: {
+          type: inputOnly ? 'invalid_request_error' : 'provider_error',
+          message: expect.stringContaining(inputOnly ? 'only mp3' : 'groq unavailable'),
+        },
+      });
+      expect(mocks.groqTtsMock).toHaveBeenCalledOnce();
+      expect(mocks.workersAiTtsMock).toHaveBeenCalledOnce();
+    }
+  );
 });

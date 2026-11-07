@@ -3,7 +3,7 @@ import type { ChatMessage, Env } from '../types';
 import { MONTHLY_VECTORIZE_CAP, VECTORIZE_STORED_CAP } from './neuron-budget-do';
 
 const DO_ORIGIN = 'https://internal.local';
-const DAILY_NEURON_CAP = 9500;
+export const DAILY_NEURON_CAP = 9500;
 const NEURON_BUFFER = 1.2;
 const MAX_OUTPUT_TOKENS = 8192;
 export const DEFAULT_WORKERS_AI_OUTPUT_TOKENS = 512;

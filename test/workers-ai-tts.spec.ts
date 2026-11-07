@@ -5,6 +5,7 @@ import app from '../src/index';
 import {
   callWorkersAiTts,
   TtsBudgetError,
+  TtsInputError,
   WORKERS_AI_TTS_MODEL,
 } from '../src/providers/workers-ai-tts';
 import { estimateNeuronCost } from '../src/state/neuron-budget';
@@ -78,7 +79,7 @@ describe('Aura 2 migration', () => {
     const { env, run, debit } = setup();
     await expect(
       callWorkersAiTts({ env, model: WORKERS_AI_TTS_MODEL, input: 'hello', ...options })
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(TtsInputError);
     expect(debit).not.toHaveBeenCalled();
     expect(run).not.toHaveBeenCalled();
   });
@@ -188,18 +189,29 @@ describe('Aura 2 migration', () => {
       } else {
         expect(run).not.toHaveBeenCalled();
         expect(await response.json()).toMatchObject({
-          error: { message: expect.stringContaining('only mp3') },
+          error: {
+            message: expect.stringContaining('only mp3'),
+            type: 'invalid_request_error',
+            code: 'invalid_tts_options',
+          },
         });
       }
     }
   );
 
-  it.each(['speech', 'speech-to-speech'])(
-    'rejects an impossible TTS reservation without a retryable error (%s)',
-    async (route) => {
+  it.each([
+    { route: 'speech', encoding: 'ASCII', text: 'a'.repeat(3000) },
+    { route: 'speech-to-speech', encoding: 'ASCII', text: 'a'.repeat(3000) },
+    { route: 'speech', encoding: 'UTF-8', text: '🙂'.repeat(1000) },
+    { route: 'speech-to-speech', encoding: 'UTF-8', text: '🙂'.repeat(1000) },
+  ])(
+    'rejects an impossible TTS reservation without a retryable error ($route, $encoding)',
+    async ({ route, text }) => {
       const { env, run, debit } = setup();
-      const text = 'a'.repeat(3000);
-      vi.stubGlobal('fetch', vi.fn(async () => Response.json({ text: 'hello' })));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => Response.json({ text: 'hello' }))
+      );
       groq.mockResolvedValue({ completion: { choices: [{ message: { content: text } }] } });
       const form = new FormData();
       form.append('file', new Blob(['audio'], { type: 'audio/mpeg' }), 'test.mp3');
@@ -226,6 +238,33 @@ describe('Aura 2 migration', () => {
     }
   );
 
+  it.each([{ voice: 'ja' }, { speed: 1.5 }])(
+    'returns a client error for unsupported provider options: %j',
+    async (options) => {
+      const { env, run, debit } = setup();
+      const response = await app.fetch(
+        new Request('https://gateway.test/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer test-gateway-key',
+            'content-type': 'application/json',
+            'x-gateway-project-id': 'test-tts-options',
+          },
+          body: JSON.stringify({ input: 'hello', model: 'auto', ...options }),
+        }),
+        env,
+        makeCtx()
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.has('retry-after')).toBe(false);
+      expect(await response.json()).toMatchObject({
+        error: { type: 'invalid_request_error', code: 'invalid_tts_options' },
+      });
+      expect(debit).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+    }
+  );
+
   it('preserves structured budget denial on the speech route', async () => {
     const { env, run } = setup(false);
     const response = await app.fetch(
@@ -242,6 +281,7 @@ describe('Aura 2 migration', () => {
       makeCtx()
     );
     expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('60');
     expect(await response.json()).toMatchObject({ error: { code: 'neuron_budget_exhausted' } });
     expect(run).not.toHaveBeenCalled();
   });

@@ -72,7 +72,12 @@ import { registerImageGenerationRoute } from './routes/image-generation';
 import { registerOperatorUiRoutes } from './routes/operator-ui';
 import { registerProviderCatalogRoutes } from './routes/provider-catalogs';
 import { sortFallbackLast } from './routes/provider-order';
-import { callWorkersAiTts, TtsBudgetError, WORKERS_AI_TTS_MODEL } from './providers/workers-ai-tts';
+import {
+  callWorkersAiTts,
+  TtsBudgetError,
+  TtsInputError,
+  WORKERS_AI_TTS_MODEL,
+} from './providers/workers-ai-tts';
 import { registerTtsGenerationRoute } from './routes/tts-generation';
 import { registerVideoGenerationRoutes } from './routes/video-generation';
 import { buildChatLedgerRecord, queryRoutingLedger, recordRoutingLedger } from './routing/ledger';
@@ -2860,6 +2865,12 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
     });
   } catch (ttsErr) {
     if (ttsErr instanceof TtsBudgetError) return buildBudgetExhaustedResponse(ttsErr.debit);
+    if (ttsErr instanceof TtsInputError) {
+      return c.json(
+        { error: { message: ttsErr.message, type: 'invalid_request_error', code: ttsErr.code } },
+        400
+      );
+    }
     return c.json(
       {
         error: {
