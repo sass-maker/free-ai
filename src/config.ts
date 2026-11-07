@@ -172,40 +172,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'openrouter-thinkingmachines-inkling-free',
-    provider: 'openrouter',
-    model: 'thinkingmachines/inkling:free',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: false, // Live replay returned 403 on 2026-10-16; requalify before enabling.
-    priority: 0.55,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: false,
-      vision: true,
-      nativeReasoning: true,
-      contextWindow: 262_144,
-      maxOutputTokens: 65_536,
-    },
-  },
-  {
-    id: 'openrouter-thinkingmachines-inkling-small-free',
-    provider: 'openrouter',
-    model: 'thinkingmachines/inkling-small:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: false, // Live replay returned 403 on 2026-10-16; requalify before enabling.
-    priority: 0.45,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: false,
-      vision: true,
-      nativeReasoning: true,
-      contextWindow: 262_144,
-      maxOutputTokens: 65_536,
-    },
-  },
-  {
     id: 'openrouter-dots-studio-dots-3-note-preview-free',
     provider: 'openrouter',
     model: 'dots-studio/dots-3-note-preview:free',
@@ -336,22 +302,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     supportsStreaming: true,
     enabled: true,
     priority: 0.73,
-    capabilities: {
-      toolCalling: true,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 131072,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: 'nvidia-glm-5-3',
-    provider: 'nvidia',
-    model: 'z-ai/glm-5.3',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.72,
     capabilities: {
       toolCalling: true,
       jsonMode: true,
@@ -599,22 +549,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'openrouter-nvidia-nemotron-3-super-120b-a12b-free',
-    provider: 'openrouter',
-    model: 'nvidia/nemotron-3-super-120b-a12b:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
-  {
     id: 'openrouter-openrouter-free',
     provider: 'openrouter',
     model: 'openrouter/free',
@@ -685,22 +619,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
   },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
-  {
-    id: 'openrouter-poolside-laguna-xs-2-1-free',
-    provider: 'openrouter',
-    model: 'poolside/laguna-xs-2.1:free',
-    reasoning: 'medium',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: false,
-      contextWindow: 32768,
-      maxOutputTokens: 4096,
-    },
-  },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
 
@@ -760,23 +678,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
   },
 
   // ── Auto-added by weekly model check (review priority + capabilities) ──
-  {
-    id: 'openrouter-poolside-laguna-s-2-1-free',
-    provider: 'openrouter',
-    model: 'poolside/laguna-s-2.1:free',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: false,
-    priority: 0.5, // AUTO-STAGED — smoke before enabling; then review caps + priority
-    capabilities: {
-      toolCalling: true,
-      jsonMode: false,
-      vision: false,
-      nativeReasoning: true,
-      contextWindow: 262_144,
-      maxOutputTokens: 32_768,
-    },
-  },
 
   // ── Staged provider candidates (disabled until authenticated smoke) ──
   {
@@ -952,8 +853,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
 
   'openrouter:z-ai/glm-5.2:free': { requestsPerDay: 100 },
   'openrouter:nvidia/nemotron-3.5-lightning:free': { requestsPerDay: 100 },
-  'openrouter:thinkingmachines/inkling:free': { requestsPerDay: 100 },
-  'openrouter:thinkingmachines/inkling-small:free': { requestsPerDay: 100 },
   'openrouter:dots-studio/dots-3-note-preview:free': { requestsPerDay: 100 },
   'openrouter:liquid/lfm-2.5-2.6b:free': { requestsPerDay: 100 },
 
@@ -966,7 +865,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // NVIDIA NIM (free tier, ~40 RPM)
   'nvidia:nvidia/nemotron-3-super-120b-a12b': { requestsPerDay: 500 },
   'nvidia:nvidia/nemotron-3-ultra-550b-a55b': { requestsPerDay: 300 },
-  'nvidia:z-ai/glm-5.3': { requestsPerDay: 300 },
   'nvidia:nvidia/nemotron-3.5-lightning-30b-a3b': { requestsPerDay: 500 },
   'nvidia:openai/gpt-oss-20b': { requestsPerDay: 500 },
   // GitHub Models (free tier ~50 req/day per high-tier, 150/day low-tier)
@@ -986,14 +884,12 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // AUTO-ADDED limits
   'openrouter:google/gemma-4-26b-a4b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:google/gemma-4-31b-it:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:nvidia/nemotron-3-super-120b-a12b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:openrouter/free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 
   'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 
   'openrouter:cohere/north-mini-code:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
-  'openrouter:poolside/laguna-xs-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
 
   // AUTO-ADDED limits
 
@@ -1002,7 +898,6 @@ const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   'zai:glm-4.5-flash': { requestsPerDay: 200 }, // AUTO-ADDED — tune
   'zai:glm-4.6v-flash': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   // AUTO-ADDED limits
-  'openrouter:poolside/laguna-s-2.1:free': { requestsPerDay: 100 }, // AUTO-ADDED — tune
   'modelscope:Qwen/Qwen3-32B': { requestsPerDay: 50 },
   // AUTO-ADDED limits
   'groq:qwen/qwen3.8-27b': { requestsPerDay: 100 }, // AUTO-ADDED — tune
