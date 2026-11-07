@@ -228,10 +228,13 @@ describe('Aura 2 migration', () => {
         env,
         makeCtx()
       );
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(route === 'speech' ? 400 : 502);
       expect(response.headers.has('retry-after')).toBe(false);
       expect(await response.json()).toMatchObject({
-        error: { type: 'invalid_request_error', code: 'tts_input_too_large' },
+        error: {
+          type: route === 'speech' ? 'invalid_request_error' : 'provider_error',
+          code: route === 'speech' ? 'tts_input_too_large' : 'llm_response_too_long_for_tts',
+        },
       });
       expect(debit).not.toHaveBeenCalled();
       expect(run).not.toHaveBeenCalled();

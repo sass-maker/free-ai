@@ -133,6 +133,26 @@ async function tryTtsCandidate(
   }
 }
 
+function ttsFailureResponse(context: TtsRouteContext, error: Error): Response {
+  if (error instanceof TtsBudgetError) return buildBudgetExhaustedResponse(error.debit);
+  if (error instanceof TtsInputError) {
+    return context.json(
+      {
+        error: {
+          message: error.message,
+          type: 'invalid_request_error',
+          code: error.code,
+        },
+      },
+      400
+    );
+  }
+  return context.json(
+    { error: { message: `All TTS providers failed: ${error.message}`, type: 'provider_error' } },
+    502
+  );
+}
+
 export function registerTtsGenerationRoute(
   app: GatewayApp,
   recordAnalytics: RecordAnalytics
@@ -203,28 +223,6 @@ export function registerTtsGenerationRoute(
       })
     );
     // A fallback's narrower options must not mask a provider failure for valid input.
-    lastError = lastProviderError ?? lastError;
-    if (lastError instanceof TtsBudgetError) return buildBudgetExhaustedResponse(lastError.debit);
-    if (lastError instanceof TtsInputError) {
-      return context.json(
-        {
-          error: {
-            message: lastError.message,
-            type: 'invalid_request_error',
-            code: lastError.code,
-          },
-        },
-        400
-      );
-    }
-    return context.json(
-      {
-        error: {
-          message: `All TTS providers failed: ${lastError.message}`,
-          type: 'provider_error',
-        },
-      },
-      502
-    );
+    return ttsFailureResponse(context, lastProviderError ?? lastError);
   });
 }

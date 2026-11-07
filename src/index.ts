@@ -2866,6 +2866,18 @@ app.post('/v1/audio/speech-to-speech', async (c) => {
   } catch (ttsErr) {
     if (ttsErr instanceof TtsBudgetError) return buildBudgetExhaustedResponse(ttsErr.debit);
     if (ttsErr instanceof TtsInputError) {
+      if (ttsErr.code === 'tts_input_too_large') {
+        return c.json(
+          {
+            error: {
+              message: 'LLM response exceeds the Workers AI TTS input budget',
+              type: 'provider_error',
+              code: 'llm_response_too_long_for_tts',
+            },
+          },
+          502
+        );
+      }
       return c.json(
         { error: { message: ttsErr.message, type: 'invalid_request_error', code: ttsErr.code } },
         400
