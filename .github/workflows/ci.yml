@@ -32,6 +32,9 @@ jobs:
       - name: Install complexity analyzer
         run: pip install lizard==1.23.0
 
+      - name: Verify inference diagnostic contracts
+        run: node --test scripts/qualify-inference-capacity.test.mjs
+
       - name: Run quality gate
         run: pnpm run quality
 
