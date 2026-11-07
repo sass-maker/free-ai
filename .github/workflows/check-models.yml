@@ -5,6 +5,10 @@ on:
     - cron: '0 9 * * 0' # Every Sunday at 09:00 UTC
   workflow_dispatch:
     inputs:
+      inspect_nvidia_only:
+        description: 'Replay at most four existing NVIDIA chat candidates with eight output tokens'
+        type: boolean
+        default: false
       qualify_cf_release:
         description: 'Qualify deployed CF migration with one budgeted Aura request'
         type: boolean
@@ -24,7 +28,7 @@ concurrency:
 
 jobs:
   inspect-budget:
-    if: github.event_name == 'workflow_dispatch' && inputs.inspect_budget_only && !inputs.qualify_cf_release
+    if: github.event_name == 'workflow_dispatch' && inputs.inspect_budget_only && !inputs.qualify_cf_release && !inputs.inspect_nvidia_only
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
@@ -108,7 +112,7 @@ jobs:
           NODE
 
   qualify-cf-release:
-    if: github.event_name == 'workflow_dispatch' && inputs.qualify_cf_release
+    if: github.event_name == 'workflow_dispatch' && inputs.qualify_cf_release && !inputs.inspect_nvidia_only
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -191,8 +195,43 @@ jobs:
           console.log(JSON.stringify({surface: 'auraQualification', model, bytes: bytes.length, reservation, beforeUsed: before.used, afterUsed: after.used, cap: after.cap, anonymousStatus: anonymous.status, invalidOptionsStatus: invalid.status, decodedStreams: probe.streams}));
           NODE
 
+  inspect-nvidia:
+    if: github.event_name == 'workflow_dispatch' && inputs.inspect_nvidia_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Replay existing NVIDIA candidates once each
+        env:
+          GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
+        run: |
+          node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict';
+          const key = process.env.GATEWAY_API_KEY; assert.ok(key, 'Gateway connection unavailable');
+          const origin = 'https://ai-gateway.sassmaker.com';
+          const read = (path, init = {}) => fetch(origin + path, {...init, redirect: 'error', signal: AbortSignal.timeout(30000)});
+          const response = await read('/v1/models'); assert.equal(response.status, 200);
+          const catalog = await response.json(); assert.ok(Array.isArray(catalog.data));
+          const eligible = new Set(catalog.data.filter(row => row.provider === 'nvidia' && row.type === 'chat' && row.enabled !== false).map(row => row.id));
+          const models = ['nvidia-nemotron-3-super-120b', 'nvidia-nemotron-3-ultra-550b', 'nvidia-nemotron-3-5-lightning-30b', 'nvidia-gpt-oss-20b'];
+          for (const model of models) {
+            if (!eligible.has(model)) {console.log(JSON.stringify({surface: 'nvidiaReplay', model, enabled: false})); continue;}
+            const started = Date.now();
+            try {
+              const replay = await read('/v1/debug/replay', {method: 'POST', headers: {'content-type': 'application/json', Authorization: `Bearer ${key}`}, body: JSON.stringify({provider: 'nvidia', model, project_id: 'scheduled-provider-smoke', messages: [{role: 'user', content: 'Reply OK.'}], max_tokens: 8, stream: false, include_completion: false})});
+              const body = await replay.json();
+              const upstream = body.error?.upstream_status;
+              console.log(JSON.stringify({surface: 'nvidiaReplay', model, enabled: true, status: replay.status, ok: body.ok === true, upstreamStatus: Number.isInteger(upstream) ? upstream : null, latencyMs: Date.now() - started}));
+            } catch {console.log(JSON.stringify({surface: 'nvidiaReplay', model, enabled: true, status: null, ok: false, latencyMs: Date.now() - started}));}
+          }
+          NODE
+
   check:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.inspect_budget_only && !inputs.qualify_cf_release)
+    if: github.event_name != 'workflow_dispatch' || (!inputs.inspect_budget_only && !inputs.qualify_cf_release && !inputs.inspect_nvidia_only)
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
