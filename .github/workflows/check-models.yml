@@ -185,7 +185,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TITLE: '[provider-registry] Catalog drift or coverage gap'
-          HAS_PROBLEM: ${{ steps.catalog.outputs.drift != '0' || steps.catalog.outputs.incomplete != '0' || steps.catalog.outputs.checker_exit == '2' || steps.smoke.outputs.exit != '0' || steps.live-health.outputs.exit != '0' }}
+          # New models are adoption candidates, not failures of the enabled registry.
+          HAS_PROBLEM: ${{ steps.catalog.outputs.stale != '0' || steps.catalog.outputs.incomplete != '0' || steps.catalog.outputs.checker_exit == '2' || steps.smoke.outputs.exit != '0' || steps.live-health.outputs.exit != '0' }}
         shell: bash
         run: |
           node - <<'NODE' > issue-body.md
