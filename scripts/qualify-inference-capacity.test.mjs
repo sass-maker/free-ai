@@ -188,3 +188,24 @@ test('runner concurrency is at most three and missing direct connections stay un
   assert.ok(report.direct.every((row) => row.state === 'connection_unavailable'));
   assert.equal(JSON.stringify(report).includes('GATEWAY_API_KEY'), false);
 });
+
+test('nonstream and replay provider attribution uses allowlisted body metadata', async () => {
+  for (const body of [
+    { ...valid, x_gateway: { provider: 'gemini' } },
+    { ok: true, provider: 'gemini', completion: valid },
+  ]) {
+    const result = await request(
+      'gateway',
+      '/v1/chat/completions',
+      'key',
+      { model: 'auto' },
+      labelsValid,
+      { fetchImpl: async () => Response.json(body) }
+    );
+    assert.equal(result.provider, 'gemini');
+  }
+});
+test('malformed long quota headers stay bounded', () => {
+  const headers = new Headers({ 'x-ratelimit-limit-requests': `${'1'.repeat(200)}!` });
+  assert.deepEqual(quotaHeaders(headers), {});
+});

@@ -22,7 +22,7 @@ jobs:
   qualify-capacity:
     if: github.event_name == 'workflow_dispatch' && inputs.qualify_capacity
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:

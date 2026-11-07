@@ -21,6 +21,12 @@ const PROVIDERS = new Set([
   'cohere',
   'mistral',
   'zai',
+  'cerebras',
+  'sambanova',
+  'github_models',
+  'modelscope',
+  'siliconflow',
+  'together',
 ]);
 const integer = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
 const content = (body) => body?.choices?.[0]?.message?.content;
@@ -64,7 +70,7 @@ export function streamValid(text) {
   let done = false;
   let finished = false;
   try {
-    for (const line of text.split(/\r?\n/)) {
+    for (const line of text.replaceAll('\r', '').split('\n')) {
       if (!line.startsWith('data:')) continue;
       const value = line.slice(5).trim();
       if (value === '[DONE]') {
@@ -96,10 +102,47 @@ export function quotaHeaders(headers) {
   ]) {
     const key = `x-ratelimit-${suffix}`;
     const value = headers.get(key);
-    if (typeof value === 'string' && /^(?:[0-9.]+[a-z]*){1,8}$/.test(value) && value.length <= 80)
-      result[key] = value;
+    if (typeof value === 'string' && /^[0-9.a-z]{1,80}$/.test(value)) result[key] = value;
   }
   return result;
+}
+async function boundedText(response) {
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > 1048576) throw new Error('response_bound');
+      chunks.push(chunk.value);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+function summarized(response, text, surface, payload, validate) {
+  const body = payload.stream ? null : JSON.parse(text);
+  const completion = body?.completion ?? body;
+  const finish = completion?.choices?.[0]?.finish_reason;
+  const candidates = [
+    response.headers.get('x-gateway-provider'),
+    completion?.x_gateway?.provider,
+    body?.provider,
+  ];
+  return {
+    ok: response.status === 200 && (payload.stream ? streamValid(text) : validate(completion)),
+    provider: candidates.find((value) => PROVIDERS.has(value)) ?? surface,
+    model: payload.model,
+    finishReason: FINISH.has(finish) ? finish : null,
+    outputChars: typeof content(completion) === 'string' ? content(completion).length : 0,
+    usage: {
+      promptTokens: integer(completion?.usage?.prompt_tokens),
+      completionTokens: integer(completion?.usage?.completion_tokens),
+    },
+  };
 }
 export async function request(surface, path, key, payload, validate, options = {}) {
   if (
@@ -122,56 +165,27 @@ export async function request(surface, path, key, payload, validate, options = {
       controller.abort();
     }, timeoutMs);
   });
+  const perform = async () => {
+    const response = await (options.fetchImpl ?? fetch)(ORIGINS[surface] + path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify(payload),
+      redirect: 'error',
+      signal: controller.signal,
+    });
+    status = response.status;
+    headerMs = Date.now() - started;
+    if (surface === 'groq') headers = quotaHeaders(response.headers);
+    return summarized(response, await boundedText(response), surface, payload, validate);
+  };
   try {
-    const result = await Promise.race([
-      deadline,
-      (async () => {
-        const response = await (options.fetchImpl ?? fetch)(ORIGINS[surface] + path, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', Authorization: `Bearer ${key}` },
-          body: JSON.stringify(payload),
-          redirect: 'error',
-          signal: controller.signal,
-        });
-        status = response.status;
-        headerMs = Date.now() - started;
-        if (surface === 'groq') headers = quotaHeaders(response.headers);
-        const reader = response.body.getReader();
-        const chunks = [];
-        let size = 0;
-        try {
-          while (true) {
-            const chunk = await reader.read();
-            if (chunk.done) break;
-            size += chunk.value.byteLength;
-            if (size > 1048576) throw new Error('response_bound');
-            chunks.push(chunk.value);
-          }
-        } finally {
-          await reader.cancel().catch(() => {});
-        }
-        const text = Buffer.concat(chunks).toString('utf8');
-        const body = payload.stream ? null : JSON.parse(text);
-        const completion = body?.completion ?? body;
-        const finish = completion?.choices?.[0]?.finish_reason;
-        return {
-          ok:
-            response.status === 200 && (payload.stream ? streamValid(text) : validate(completion)),
-          provider: PROVIDERS.has(response.headers.get('x-gateway-provider'))
-            ? response.headers.get('x-gateway-provider')
-            : surface,
-          model: payload.model,
-          finishReason: FINISH.has(finish) ? finish : null,
-          outputChars: typeof content(completion) === 'string' ? content(completion).length : 0,
-          usage: {
-            promptTokens: integer(completion?.usage?.prompt_tokens),
-            completionTokens: integer(completion?.usage?.completion_tokens),
-          },
-          quotaHeaders: headers,
-        };
-      })(),
-    ]);
-    return { ...result, status, headerMs, totalMs: Date.now() - started };
+    return {
+      ...(await Promise.race([deadline, perform()])),
+      status,
+      headerMs,
+      totalMs: Date.now() - started,
+      quotaHeaders: headers,
+    };
   } catch {
     controller.abort();
     return {
@@ -186,6 +200,7 @@ export async function request(surface, path, key, payload, validate, options = {
     clearTimeout(timer);
   }
 }
+
 const schema = (name, properties, required) => ({
   type: 'json_schema',
   json_schema: {
