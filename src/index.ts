@@ -25,6 +25,7 @@ import {
   getRateLimitConfig,
   getSttRegistry,
   isAutomaticRoutingEligible,
+  isOpenAIModelSelection,
   isWorkersAiEnabled,
 } from './config';
 import {
@@ -200,6 +201,7 @@ app.use('*', async (c, next) => {
 });
 
 const TEXT_PROVIDER_VALUES = [
+  'openai',
   'workers_ai',
   'groq',
   'gemini',
@@ -1597,7 +1599,9 @@ function createChatRetryCallback(
   let nextCandidate = 0;
   const unavailableProviders = new Set<TextProvider>();
   const pinned = Boolean(
-    c.req.header('x-gateway-force-model') || c.req.header('x-gateway-force-provider')
+    c.req.header('x-gateway-force-model') ||
+      c.req.header('x-gateway-force-provider') ||
+      selected.some((candidate) => isOpenAIModelSelection(candidate, normalized.model.trim()))
   );
   const geminiKeys = new GeminiKeyPool(
     c.env.GEMINI_API_KEY,
@@ -1957,11 +1961,16 @@ async function selectChatCandidates(
   | { selected: ModelCandidate[]; quotaStatuses: Map<TextProvider, ProviderQuotaStatus> }
 > {
   const forcedProvider = getForcedTextProvider(c);
-  const forcedModel = c.req.header('x-gateway-force-model') ?? undefined;
-
   let registry = forcedProvider
     ? getModelRegistry(c.env).filter((model) => model.provider === forcedProvider)
     : getModelRegistry(c.env);
+
+  const requestedModelOverride = normalized.model.trim();
+  const forcedModel =
+    c.req.header('x-gateway-force-model') ??
+    (registry.some((candidate) => isOpenAIModelSelection(candidate, requestedModelOverride))
+      ? requestedModelOverride
+      : undefined);
 
   if (registry.length === 0) return { error: chatConfigError(c) };
 

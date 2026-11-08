@@ -20,6 +20,59 @@ import type {
 // ═══════════════════════════════════════════════════════════════════
 
 const DEFAULT_MODELS: ModelCandidate[] = [
+  // OpenAI uses the owner-authorized API credit pool alongside free-tier providers.
+  // GPT-6 tool calling requires Responses; this adapter uses Chat Completions.
+  {
+    id: 'openai-gpt-6.1-sol',
+    provider: 'openai',
+    model: 'gpt-6.1-sol',
+    reasoning: 'high',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.9,
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: true,
+      nativeReasoning: true,
+      contextWindow: 1050000,
+      maxOutputTokens: 128000,
+    },
+  },
+  {
+    id: 'openai-gpt-6-astra',
+    provider: 'openai',
+    model: 'gpt-6-astra',
+    reasoning: 'high',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.9,
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: true,
+      nativeReasoning: true,
+      contextWindow: 1050000,
+      maxOutputTokens: 128000,
+    },
+  },
+  {
+    id: 'openai-gpt-6-luna',
+    provider: 'openai',
+    model: 'gpt-6-luna',
+    reasoning: 'medium',
+    supportsStreaming: true,
+    enabled: true,
+    priority: 0.9,
+    capabilities: {
+      toolCalling: false,
+      jsonMode: true,
+      vision: true,
+      nativeReasoning: true,
+      contextWindow: 1050000,
+      maxOutputTokens: 128000,
+    },
+  },
   // ── Workers AI (free via Cloudflare binding / REST) ─────────────────
   {
     id: 'workers-ai-llama-3.3-70b',
@@ -922,6 +975,7 @@ const DEFAULT_RATE_LIMIT: RateLimitConfig = {
 };
 
 const PROVIDER_KEY_REQUIRED: Record<TextProvider, boolean> = {
+  openai: true,
   workers_ai: true,
   groq: true,
   gemini: true,
@@ -957,6 +1011,10 @@ export function isAutomaticRoutingEligible(candidate: ModelCandidate): boolean {
   );
 }
 
+export function isOpenAIModelSelection(candidate: ModelCandidate, model: string): boolean {
+  return candidate.provider === 'openai' && (candidate.model === model || candidate.id === model);
+}
+
 export function isWorkersAiEnabled(env: Env): boolean {
   return env.WORKERS_AI_ENABLED === 'true';
 }
@@ -974,6 +1032,7 @@ function safeParse<T>(value: string | undefined): T | null {
 }
 
 const SIMPLE_PROVIDER_KEY_CHECKERS: Partial<Record<TextProvider, (env: Env) => boolean>> = {
+  openai: (env) => Boolean(env.OPENAI_API_KEY),
   groq: (env) => Boolean(env.GROQ_API_KEY),
   gemini: (env) => Boolean(env.GEMINI_API_KEY),
   openrouter: (env) => Boolean(env.OPENROUTER_API_KEY),

@@ -1,4 +1,5 @@
 export type TextProvider =
+  | 'openai'
   | 'workers_ai'
   | 'groq'
   | 'gemini'
@@ -218,6 +219,7 @@ export interface Env {
   NEURON_BUDGET?: DurableObjectNamespace;
   HEALTH_KV: KVNamespace;
   GROQ_API_KEY?: string;
+  OPENAI_API_KEY?: string;
   GEMINI_API_KEY?: string;
   VOYAGE_API_KEY?: string;
   MODAL_PROXY_KEY?: string;

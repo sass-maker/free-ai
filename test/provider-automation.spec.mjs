@@ -146,6 +146,7 @@ describe('bounded text-provider smoke', () => {
             { id: 'groq-a', provider: 'groq', type: 'chat', enabled: true },
             { id: 'groq-b', provider: 'groq', type: 'chat', enabled: true },
             { id: 'workers', provider: 'workers_ai', type: 'chat', enabled: true },
+            { id: 'openai-gpt-6-luna', provider: 'openai', type: 'chat', enabled: true },
             { id: 'disabled', provider: 'gemini', type: 'chat', enabled: false },
             { id: 'cerebras-a', provider: 'cerebras', type: 'chat', enabled: true },
           ],
@@ -161,8 +162,8 @@ describe('bounded text-provider smoke', () => {
       fetchImpl,
     });
 
-    expect(report).toMatchObject({ ok: true, providers_checked: 2, max_output_tokens: 8 });
-    expect(replayBodies.map((body) => body.provider)).toEqual(['groq', 'cerebras']);
+    expect(report).toMatchObject({ ok: true, providers_checked: 3, max_output_tokens: 8 });
+    expect(replayBodies.map((body) => body.provider)).toEqual(['groq', 'openai', 'cerebras']);
     expect(replayBodies.every((body) => body.max_tokens === 8)).toBe(true);
     expect(replayBodies.every((body) => body.include_completion === false)).toBe(true);
   });
