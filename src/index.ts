@@ -25,6 +25,7 @@ import {
   getRateLimitConfig,
   getSttRegistry,
   isAutomaticRoutingEligible,
+  isOpenAIModelSelection,
   isWorkersAiEnabled,
 } from './config';
 import {
@@ -1600,9 +1601,7 @@ function createChatRetryCallback(
   const pinned = Boolean(
     c.req.header('x-gateway-force-model') ||
       c.req.header('x-gateway-force-provider') ||
-      (selected[0]?.provider === 'openai' &&
-        normalized.model.trim() &&
-        normalized.model.trim() !== 'auto')
+      selected.some((candidate) => isOpenAIModelSelection(candidate, normalized.model.trim()))
   );
   const geminiKeys = new GeminiKeyPool(
     c.env.GEMINI_API_KEY,
@@ -1969,11 +1968,7 @@ async function selectChatCandidates(
   const requestedModelOverride = normalized.model.trim();
   const forcedModel =
     c.req.header('x-gateway-force-model') ??
-    (registry.some(
-      (candidate) =>
-        candidate.provider === 'openai' &&
-        (candidate.model === requestedModelOverride || candidate.id === requestedModelOverride)
-    )
+    (registry.some((candidate) => isOpenAIModelSelection(candidate, requestedModelOverride))
       ? requestedModelOverride
       : undefined);
 

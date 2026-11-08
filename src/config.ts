@@ -1011,6 +1011,10 @@ export function isAutomaticRoutingEligible(candidate: ModelCandidate): boolean {
   );
 }
 
+export function isOpenAIModelSelection(candidate: ModelCandidate, model: string): boolean {
+  return candidate.provider === 'openai' && (candidate.model === model || candidate.id === model);
+}
+
 export function isWorkersAiEnabled(env: Env): boolean {
   return env.WORKERS_AI_ENABLED === 'true';
 }
