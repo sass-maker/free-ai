@@ -151,6 +151,58 @@ describe('OpenAI provider', () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
+  it.each(['gpt-4o', '', 'groq-gpt-oss-120b'])(
+    'preserves automatic routing for legacy/non-OpenAI body model %s',
+    async (model) => {
+      const upstream = mockUpstream();
+      const env = environment();
+      const response = await app.fetch(chatRequest(model), env, makeCtx());
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ x_gateway: { provider: 'pollinations' } });
+      expect(upstream).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('rejects a reasoning-only completion whose token budget ran out', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          id: 'empty-reasoning',
+          choices: [
+            { index: 0, message: { role: 'assistant', content: '' }, finish_reason: 'length' },
+          ],
+        })
+      )
+    );
+    await expect(
+      callOpenAI({ ...input, env: environment('synthetic-openai-key') })
+    ).rejects.toThrow('OpenAI returned no visible completion');
+  });
+
+  it('preserves a refusal as a final outcome', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          id: 'refusal',
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: null, refusal: 'Cannot help.' },
+              finish_reason: 'stop',
+            },
+          ],
+        })
+      )
+    );
+    const result = await callOpenAI({ ...input, env: environment('synthetic-openai-key') });
+    expect(result.completion?.choices?.[0]?.message).toMatchObject({
+      content: null,
+      refusal: 'Cannot help.',
+    });
+  });
+
   it('falls back to another provider after one exhausted-credit response', async () => {
     const upstream = vi.fn(async (url: unknown) => {
       if (String(url).startsWith('https://api.openai.com/')) {

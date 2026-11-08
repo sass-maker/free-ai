@@ -1600,11 +1600,13 @@ function createChatRetryCallback(
   const pinned = Boolean(
     c.req.header('x-gateway-force-model') ||
       c.req.header('x-gateway-force-provider') ||
-      (normalized.model.trim() && normalized.model.trim() !== 'auto')
+      (selected[0]?.provider === 'openai' &&
+        normalized.model.trim() &&
+        normalized.model.trim() !== 'auto')
   );
   const geminiKeys = new GeminiKeyPool(
     c.env.GEMINI_API_KEY,
-    Boolean(c.req.header('x-gateway-force-model') || normalized.model.trim() !== 'auto')
+    Boolean(c.req.header('x-gateway-force-model'))
   );
   let keyRetryCandidate: ModelCandidate | undefined;
   return async () => {
@@ -1960,15 +1962,20 @@ async function selectChatCandidates(
   | { selected: ModelCandidate[]; quotaStatuses: Map<TextProvider, ProviderQuotaStatus> }
 > {
   const forcedProvider = getForcedTextProvider(c);
-  const forcedModel =
-    c.req.header('x-gateway-force-model') ??
-    (normalized.model.trim() && normalized.model.trim() !== 'auto'
-      ? normalized.model.trim()
-      : undefined);
-
   let registry = forcedProvider
     ? getModelRegistry(c.env).filter((model) => model.provider === forcedProvider)
     : getModelRegistry(c.env);
+
+  const requestedModelOverride = normalized.model.trim();
+  const forcedModel =
+    c.req.header('x-gateway-force-model') ??
+    (registry.some(
+      (candidate) =>
+        candidate.provider === 'openai' &&
+        (candidate.model === requestedModelOverride || candidate.id === requestedModelOverride)
+    )
+      ? requestedModelOverride
+      : undefined);
 
   if (registry.length === 0) return { error: chatConfigError(c) };
 
