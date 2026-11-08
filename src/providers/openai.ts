@@ -47,5 +47,5 @@ export const callOpenAIEmbeddings: ProviderEmbeddingCaller = async (input) => {
   ) {
     throw new MalformedProviderOutputError('OpenAI returned invalid embedding vectors');
   }
-  return result;
+  return { ...result, model: input.model, response: { ...result.response, model: input.model } };
 };
