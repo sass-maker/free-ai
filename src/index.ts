@@ -3001,7 +3001,10 @@ async function buildModelListResponse(env: Env): Promise<ModelListResponse> {
     evaluation_sample_count: 0,
     evaluated_at: null,
     enabled: embeddingCandidateEnabled(env, candidate),
-    automatic_routing: candidate.provider !== 'modal' && embeddingCandidateEnabled(env, candidate),
+    automatic_routing:
+      candidate.provider !== 'modal' &&
+      candidate.provider !== 'openai' &&
+      embeddingCandidateEnabled(env, candidate),
     dimensions: candidate.dimensions,
     supports_dimensions: candidate.supportsDimensions ?? false,
     aliases: candidate.aliases ?? [],

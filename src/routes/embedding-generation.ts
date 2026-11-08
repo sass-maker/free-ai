@@ -32,6 +32,14 @@ export interface EmbeddingCandidate {
 }
 
 export const EMBEDDING_CANDIDATES: EmbeddingCandidate[] = [
+  {
+    provider: 'openai',
+    model: 'openai/text-embedding-3-small',
+    dimensions: 1536,
+    contextWindow: 8192,
+    supportsDimensions: true,
+    priority: 0.94,
+  },
   ...MODAL_EMBEDDING_MODELS.map((candidate) => ({
     provider: 'modal' as const,
     model: candidate.model,
@@ -198,6 +206,7 @@ function workersAiEmbeddingAvailable(env: Env): boolean {
 }
 
 export function embeddingCandidateEnabled(env: Env, candidate: EmbeddingCandidate): boolean {
+  if (candidate.provider === 'openai') return Boolean(env.OPENAI_API_KEY);
   if (candidate.provider === 'modal') return modalEmbeddingsEnabled(env);
   if (candidate.provider === 'gemini') {
     return Boolean(env.GEMINI_API_KEY);
@@ -222,7 +231,7 @@ function getForcedEmbeddingProvider(context: {
     return undefined;
   }
 
-  if (['workers_ai', 'gemini', 'voyage_ai', 'modal'].includes(value)) {
+  if (['workers_ai', 'gemini', 'voyage_ai', 'modal', 'openai'].includes(value)) {
     return value as EmbeddingProvider;
   }
 
@@ -251,6 +260,12 @@ function resolveEmbeddingCandidates(
   const preferredModel = alias ?? requestedModel;
 
   const filtered = EMBEDDING_CANDIDATES.filter((candidate) => {
+    // Never mix OpenAI vectors with the legacy Gemini aliases or fallback spaces.
+    if (
+      (candidate.provider === 'openai' || preferredModel.startsWith('openai/')) &&
+      (candidate.provider !== 'openai' || candidate.model !== preferredModel)
+    )
+      return false;
     // Modal trials are explicit only, and their embedding spaces must stay pinned.
     if (isModalEmbeddingModel(preferredModel)) {
       if (candidate.provider !== 'modal' || candidate.model !== preferredModel) return false;
@@ -508,6 +523,9 @@ function embeddingOptionsError(input: {
   dimensions?: number;
   task?: ModalEmbeddingTask;
 }): string | undefined {
+  if (input.model === 'openai/text-embedding-3-small' && (input.dimensions ?? 1536) > 1536) {
+    return 'OpenAI text-embedding-3-small supports 1 to 1536 dimensions';
+  }
   if (isModalEmbeddingModel(input.model)) {
     try {
       validateModalEmbeddingInput(input);

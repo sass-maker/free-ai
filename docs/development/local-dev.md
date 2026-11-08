@@ -42,7 +42,7 @@ keys simply exclude that provider's models from routing — no error.
 Never commit real keys. `.env`, `.dev.vars`, and `ops/gateway-key-hashes.local.json`
 are gitignored. The pre-push hook scans tracked files for known secret patterns.
 
-OpenAI chat models are `gpt-6.1-sol`, `gpt-6-astra`, and `gpt-6-luna` (also
+OpenAI chat models are `gpt-6.1-sol` and `gpt-6-luna` (also
 selectable with the `openai-` prefix). Streaming, vision, reasoning effort, and
 structured output use the Chat Completions adapter. Tool calling is excluded
 for these models because reasoning with tools requires the Responses API.
@@ -75,3 +75,7 @@ The tsconfig was previously broken (no `include`, no workers types,
 2026-04-25. `e2e-live/` tests are excluded from the main tsconfig because they need
 `@types/node` which conflicts with `@cloudflare/workers-types` globals. If you add
 Node-only tooling, keep it out of the main typecheck path.
+
+OpenAI embeddings use `openai/text-embedding-3-small` with 1536 dimensions by
+default (or request a smaller dimension). This model stays pinned to OpenAI;
+legacy unqualified embedding aliases retain their existing Gemini mapping.

@@ -150,6 +150,7 @@ export async function runOpenAICompatibleEmbeddingsRequest(
   const response = (await client.embeddings.create({
     model: input.model,
     input: input.input.length === 1 ? input.input[0] : input.input,
+    ...(input.encoding_format && { encoding_format: input.encoding_format }),
     // Forward the requested output size so Matryoshka-capable models (e.g.
     // gemini-embedding-001 via output_dimensionality) return that dimension.
     ...(typeof input.dimensions === 'number' ? { dimensions: input.dimensions } : {}),

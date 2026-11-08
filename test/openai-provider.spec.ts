@@ -78,7 +78,7 @@ describe('OpenAI provider', () => {
         .filter((candidate) => candidate.provider === 'openai')
         .map((candidate) => candidate.model)
         .sort()
-    ).toEqual(['gpt-6-astra', 'gpt-6-luna', 'gpt-6.1-sol']);
+    ).toEqual(['gpt-6-luna', 'gpt-6.1-sol']);
   });
 
   it.each(['gpt-6.1-sol', 'openai-gpt-6-luna'])(

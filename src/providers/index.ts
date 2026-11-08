@@ -20,7 +20,7 @@ import { callModelScope } from './modelscope';
 import { callModalEmbeddings } from './modal-embeddings';
 import { callNvidia } from './nvidia';
 import { callNvidiaImages, type NvidiaImageInput, type NvidiaImageOutput } from './nvidia-images';
-import { callOpenAI } from './openai';
+import { callOpenAI, callOpenAIEmbeddings } from './openai';
 import { callOpenRouter } from './openrouter';
 import { callPollinations } from './pollinations';
 import {
@@ -67,6 +67,7 @@ export const providerCallers: Record<TextProvider, ProviderCaller> = {
 };
 
 export const providerEmbeddingCallers: Record<EmbeddingProvider, ProviderEmbeddingCaller> = {
+  openai: callOpenAIEmbeddings,
   workers_ai: callWorkersAiEmbeddings,
   gemini: callGeminiEmbeddings,
   voyage_ai: callVoyageEmbeddings,

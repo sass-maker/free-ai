@@ -40,23 +40,6 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
   {
-    id: 'openai-gpt-6-astra',
-    provider: 'openai',
-    model: 'gpt-6-astra',
-    reasoning: 'high',
-    supportsStreaming: true,
-    enabled: true,
-    priority: 0.9,
-    capabilities: {
-      toolCalling: false,
-      jsonMode: true,
-      vision: true,
-      nativeReasoning: true,
-      contextWindow: 1050000,
-      maxOutputTokens: 128000,
-    },
-  },
-  {
     id: 'openai-gpt-6-luna',
     provider: 'openai',
     model: 'gpt-6-luna',
