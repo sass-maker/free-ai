@@ -27,9 +27,21 @@ const GROQ_REASONING_MODELS = new Set([
 function reasoningOptions(input: ProviderCallInput, provider: TextProvider) {
   if (!input.reasoning_effort || input.reasoning_effort === 'auto') return {};
   const supported =
+    (provider === 'openai' && /^gpt-[56]/.test(input.model)) ||
     (provider === 'gemini' && input.model === 'gemini-3.8-flash') ||
     (provider === 'groq' && GROQ_REASONING_MODELS.has(input.model));
   return supported ? { reasoning_effort: input.reasoning_effort } : {};
+}
+
+function generationOptions(input: ProviderCallInput, provider: TextProvider) {
+  if (provider === 'openai') {
+    return {
+      max_completion_tokens: input.max_tokens,
+      // Reasoning-enabled GPT models reject sampling parameters.
+      ...(!/^gpt-[56]/.test(input.model) && { temperature: input.temperature }),
+    };
+  }
+  return { temperature: input.temperature, max_tokens: input.max_tokens };
 }
 
 function createClient<TProvider extends TextProvider | EmbeddingProvider>(
@@ -90,8 +102,7 @@ export async function runOpenAICompatibleRequest(
     const streamBody = {
       model: input.model,
       messages: input.messages,
-      temperature: input.temperature,
-      max_tokens: input.max_tokens,
+      ...generationOptions(input, config.provider),
       stream: true as const,
       ...reasoning,
       ...(input.tools && { tools: input.tools }),
@@ -114,8 +125,7 @@ export async function runOpenAICompatibleRequest(
   const completionBody = {
     model: input.model,
     messages: input.messages,
-    temperature: input.temperature,
-    max_tokens: input.max_tokens,
+    ...generationOptions(input, config.provider),
     stream: false as const,
     ...reasoning,
     ...(input.tools && { tools: input.tools }),

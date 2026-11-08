@@ -200,6 +200,7 @@ app.use('*', async (c, next) => {
 });
 
 const TEXT_PROVIDER_VALUES = [
+  'openai',
   'workers_ai',
   'groq',
   'gemini',
@@ -1597,11 +1598,13 @@ function createChatRetryCallback(
   let nextCandidate = 0;
   const unavailableProviders = new Set<TextProvider>();
   const pinned = Boolean(
-    c.req.header('x-gateway-force-model') || c.req.header('x-gateway-force-provider')
+    c.req.header('x-gateway-force-model') ||
+      c.req.header('x-gateway-force-provider') ||
+      (normalized.model.trim() && normalized.model.trim() !== 'auto')
   );
   const geminiKeys = new GeminiKeyPool(
     c.env.GEMINI_API_KEY,
-    Boolean(c.req.header('x-gateway-force-model'))
+    Boolean(c.req.header('x-gateway-force-model') || normalized.model.trim() !== 'auto')
   );
   let keyRetryCandidate: ModelCandidate | undefined;
   return async () => {
@@ -1957,7 +1960,11 @@ async function selectChatCandidates(
   | { selected: ModelCandidate[]; quotaStatuses: Map<TextProvider, ProviderQuotaStatus> }
 > {
   const forcedProvider = getForcedTextProvider(c);
-  const forcedModel = c.req.header('x-gateway-force-model') ?? undefined;
+  const forcedModel =
+    c.req.header('x-gateway-force-model') ??
+    (normalized.model.trim() && normalized.model.trim() !== 'auto'
+      ? normalized.model.trim()
+      : undefined);
 
   let registry = forcedProvider
     ? getModelRegistry(c.env).filter((model) => model.provider === forcedProvider)

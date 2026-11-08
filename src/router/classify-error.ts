@@ -148,7 +148,19 @@ export function isMalformedProviderOutput(error: unknown): boolean {
 /** These statuses concern the gateway's upstream account, not the caller's credentials. */
 export function isProviderAccountFailure(error: unknown): boolean {
   const status = getUpstreamStatus(error);
-  return status === 401 || status === 402 || status === 403 || isUpstreamKeyRejected(error);
+  return (
+    status === 401 ||
+    status === 402 ||
+    status === 403 ||
+    isCreditBalanceExhausted(error) ||
+    isUpstreamKeyRejected(error)
+  );
+}
+
+function isCreditBalanceExhausted(error: unknown): boolean {
+  if (getUpstreamStatus(error) !== 429) return false;
+  const code = (error as { code?: unknown }).code;
+  return code === 'credit_balance_exhausted' || code === 'insufficient_quota';
 }
 
 /** No further attempt on this provider can succeed within the current request. */
@@ -186,6 +198,9 @@ export function dailyQuotaReset(
     }
   | undefined {
   if (getUpstreamStatus(error) !== 429) return undefined;
+  if (provider === 'openai' && isCreditBalanceExhausted(error)) {
+    return { until: now + 3_600_000, providerWide: true };
+  }
   const detail = getUpstreamErrorDetail(error);
   const headers = (error as { headers?: Headers | Record<string, string> }).headers;
   const retryAfter =

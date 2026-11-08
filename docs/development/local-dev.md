@@ -31,6 +31,7 @@ keys simply exclude that provider's models from routing — no error.
 | --- | --- | --- |
 | Workers AI | `CLOUDFLARE_WORKERS_AI_API_KEY` + `CLOUDFLARE_ACCOUNT_ID` | Uses CF AI binding in prod; REST fallback for local |
 | Groq | `GROQ_API_KEY` | |
+| OpenAI | `OPENAI_API_KEY` | API credits, including linked ChatGPT plan credits; participates in `auto` and provider smokes |
 | Gemini | `GEMINI_API_KEY` | Comma-separated list allowed; one key is picked at random per request |
 | OpenRouter | `OPENROUTER_API_KEY` | |
 | Cerebras | `CEREBRAS_API_KEY` | |
@@ -40,6 +41,11 @@ keys simply exclude that provider's models from routing — no error.
 
 Never commit real keys. `.env`, `.dev.vars`, and `ops/gateway-key-hashes.local.json`
 are gitignored. The pre-push hook scans tracked files for known secret patterns.
+
+OpenAI chat models are `gpt-6.1-sol`, `gpt-6-astra`, and `gpt-6-luna` (also
+selectable with the `openai-` prefix). Streaming, vision, reasoning effort, and
+structured output use the Chat Completions adapter. Tool calling is excluded
+for these models because reasoning with tools requires the Responses API.
 
 ## Gateway auth in local dev
 

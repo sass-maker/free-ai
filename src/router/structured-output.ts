@@ -16,6 +16,7 @@ const MISTRAL_SCHEMA_MODELS = new Set(['codestral-latest', 'ministral-8b-latest'
 export function supportsJsonSchema(candidate: ModelCandidate): boolean {
   if (!candidate.capabilities.jsonMode) return false;
   return (
+    (candidate.provider === 'openai' && /^gpt-6(?:\.|-)/.test(candidate.model)) ||
     (candidate.provider === 'gemini' && candidate.model.startsWith('gemini-')) ||
     (candidate.provider === 'groq' && GROQ_SCHEMA_MODELS.has(candidate.model)) ||
     (candidate.provider === 'mistral' && MISTRAL_SCHEMA_MODELS.has(candidate.model))
