@@ -52,6 +52,7 @@ describe('OpenAI embeddings', () => {
       const response = await app.fetch(request({ input, dimensions }), environment(), makeCtx());
       expect(response.status).toBe(200);
       const body = (await response.json()) as {
+        model: string;
         data: { index: number; embedding: number[] }[];
         x_gateway: unknown;
       };
@@ -59,6 +60,7 @@ describe('OpenAI embeddings', () => {
         Array.from({ length: count }, (_, index) => [index, length])
       );
       expect(body.x_gateway).toMatchObject({ provider: 'openai', model });
+      expect(body.model).toBe(model);
       expect(upstream).toHaveBeenCalledTimes(1);
       const [url, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
       expect(String(url)).toBe('https://api.openai.com/v1/embeddings');
