@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import app from '../src/index';
+import { providerEmbeddingCallers } from '../src/providers';
 import { callOpenAIEmbeddings } from '../src/providers/openai';
 import { makeCtx, makeTestEnv } from './helpers/env';
 
@@ -167,4 +168,52 @@ describe('OpenAI embeddings', () => {
     expect(response.status).toBe(401);
     expect(upstream).not.toHaveBeenCalled();
   });
+
+  it('rejects unsupported OpenAI model names before any provider call', async () => {
+    const upstream = mockUpstream();
+    const response = await app.fetch(
+      request({ model: 'openai/text-embedding-3-large' }),
+      environment(),
+      makeCtx()
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: { message: 'Unsupported OpenAI embedding model' },
+    });
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it.each(['gemini', 'voyage_ai'] as const)(
+    'preserves %s upstream encoding defaults',
+    async (provider) => {
+      const upstream = vi.fn(async (_url: unknown, init?: RequestInit) => {
+        expect(JSON.parse(String(init?.body)).encoding_format).toBe('base64');
+        return Response.json({
+          object: 'list',
+          model: 'test-embedding',
+          data: [
+            {
+              object: 'embedding',
+              index: 0,
+              embedding: Buffer.from(new Float32Array([0.25, 0.5]).buffer).toString('base64'),
+            },
+          ],
+        });
+      });
+      vi.stubGlobal('fetch', upstream);
+      const result = await providerEmbeddingCallers[provider]({
+        env: {
+          ...environment(),
+          GEMINI_API_KEY: 'synthetic-gemini-key',
+          VOYAGE_API_KEY: 'synthetic-voyage-key',
+        },
+        provider,
+        model: 'test-embedding',
+        input: ['hello'],
+        encoding_format: 'float',
+      });
+      expect(result.response.data[0].embedding).toEqual([0.25, 0.5]);
+      expect(upstream).toHaveBeenCalledTimes(1);
+    }
+  );
 });

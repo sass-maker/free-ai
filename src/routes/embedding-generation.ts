@@ -523,6 +523,14 @@ function embeddingOptionsError(input: {
   dimensions?: number;
   task?: ModalEmbeddingTask;
 }): string | undefined {
+  if (
+    input.model.startsWith('openai/') &&
+    !EMBEDDING_CANDIDATES.some(
+      (candidate) => candidate.provider === 'openai' && candidate.model === input.model
+    )
+  ) {
+    return 'Unsupported OpenAI embedding model';
+  }
   if (input.model === 'openai/text-embedding-3-small' && (input.dimensions ?? 1536) > 1536) {
     return 'OpenAI text-embedding-3-small supports 1 to 1536 dimensions';
   }
