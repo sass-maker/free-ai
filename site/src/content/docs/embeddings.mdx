@@ -31,12 +31,18 @@ Unlike the chat endpoint, `model` has no `"auto"` default for embeddings. You mu
 | Provider | Example Models | Notes |
 |---|---|---|
 | **Cloudflare Workers AI** | `@cf/baai/bge-small-en-v1.5`, `@cf/baai/bge-base-en-v1.5`, `@cf/baai/bge-large-en-v1.5` | General-purpose English embeddings |
+| **OpenAI** | `openai/text-embedding-3-small` | 1536 dimensions by default; supports 1–1536 dimensions; uses API credits |
 | **Google Gemini** | `gemini-embedding-001` (`text-embedding-004`, `text-embedding-3-small`, and `text-embedding-3-large` aliases) | Multilingual, supports requested dimensions |
 | **Voyage AI** | `voyage-3.5-lite`, `voyage-3-lite` | Domain-specialised embeddings |
 | **Modal experiment** | `google/embeddinggemma-2` | Text/code embeddings; 128, 256, 512 or 768 dimensions (default 768) |
 | **Modal experiment** | `BAAI/bge-small-en-v1.5` | Smaller English baseline; 384 dimensions |
 
 Use [`GET /v1/models`](/models) to get the full current list with provider metadata, dimensions, aliases, and `enabled` availability based on configured provider credentials/bindings.
+
+Select `openai/text-embedding-3-small` for real OpenAI vectors. The unqualified
+`text-embedding-3-small` alias retains its historical Gemini mapping. OpenAI
+requests return OpenAI vectors or an error, without falling back to another
+embedding space. Other models never fall back into OpenAI.
 
 ### Modal experiment
 

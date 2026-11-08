@@ -15,7 +15,7 @@ export type TextProvider =
   | 'modelscope'
   | 'siliconflow';
 
-export type EmbeddingProvider = 'workers_ai' | 'gemini' | 'voyage_ai' | 'modal';
+export type EmbeddingProvider = 'workers_ai' | 'gemini' | 'voyage_ai' | 'modal' | 'openai';
 
 export type ImageProvider = 'together' | 'workers_ai' | 'pollinations' | 'gemini' | 'nvidia';
 
