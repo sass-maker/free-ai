@@ -332,7 +332,7 @@ describe('NeuronBudgetDO', () => {
         storage: {
           state: 'available',
           initialized: false,
-          source: 'verified_monthly_baseline',
+          source: 'ledger',
           used: 75_000_000,
           cap: 200_000_000,
           remaining: 125_000_000,

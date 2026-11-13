@@ -417,7 +417,7 @@ function vectorizeLedgerStatus({
     state,
     initialized,
     source: effective
-      ? (canProjectBaseline && !initialized) || baselineFloorApplied
+      ? (canProjectBaseline && !initialized && effective.used === baseline) || baselineFloorApplied
         ? 'verified_monthly_baseline'
         : 'ledger'
       : null,
