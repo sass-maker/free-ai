@@ -30,8 +30,11 @@ const VECTORIZE_STORAGE_KEY = 'vectorize-budget';
 const VECTORIZE_GROWTH_KEY = 'vectorize-storage-budget';
 /** Gross stored dimensions: at $0.05/100M, at most $0.10 per full month. */
 export const VECTORIZE_STORED_CAP = 200_000_000;
-/** Oct 8 account inventory: 28,764,928 dimensions, rounded up conservatively. */
-const VERIFIED_STORAGE_BASELINES: Readonly<Record<string, number>> = { '2026-10': 30_000_000 };
+/** Reviewed account occupancy rounded up; higher historical reservations remain authoritative. */
+const VERIFIED_STORAGE_BASELINES: Readonly<Record<string, number>> = {
+  '2026-10': 30_000_000,
+  '2026-11': 30_000_000,
+};
 /** Daily Neuron cap. 500 buffer below the 10k/day free-tier quota. */
 const DAILY_NEURON_CAP = 9500;
 /** Reserve today's prior unguarded usage before shared consumers are enabled. */
@@ -39,12 +42,13 @@ const VERIFIED_DAILY_BASELINES: Readonly<Record<string, number>> = { '2026-10-02
 /** Leave headroom below the 50M queried-dimension paid allowance. */
 export const MONTHLY_VECTORIZE_CAP = 45_000_000;
 /**
- * Oct 2026 estimate from the reviewed read-only provider receipt. This seeds
- * admitted queried dimensions; it is not an account-wide billing cap or a
- * separate stored-dimensions allowance.
+ * Reviewed exact-month reconciliation floors, not measured billable usage or
+ * an account-wide cap. November's 35M reservation retains substantial headroom
+ * for processing lag beyond the provider's no-query-events observation.
  */
 const VERIFIED_VECTORIZE_BASELINES: Readonly<Record<string, number>> = {
   '2026-10': 35_000_000,
+  '2026-11': 35_000_000,
 };
 
 const json = (value: unknown, status = 200): Response =>
@@ -202,7 +206,7 @@ export class NeuronBudgetDO {
           monthKey,
           cap: VECTORIZE_STORED_CAP,
           baseline: VERIFIED_STORAGE_BASELINES[monthKey],
-          allowPriorMonthProjection: false,
+          allowPriorMonthProjection: true,
           effective: effectiveStorageState(storedStorage, monthKey),
         }),
       };
@@ -371,10 +375,13 @@ function effectiveQueryState(stored: unknown, monthKey: string): VectorizeState 
 function effectiveStorageState(stored: unknown, monthKey: string): VectorizeState | null {
   const baseline = VERIFIED_STORAGE_BASELINES[monthKey];
   if (!Number.isSafeInteger(baseline)) return null;
-  const state =
+  let state =
     stored === undefined
       ? { monthKey, used: baseline, baselineVerified: true as const }
       : readVectorizeState(stored, monthKey, VECTORIZE_STORED_CAP);
+  if (!state && isPreviousVectorizePeriod(stored, monthKey, VECTORIZE_STORED_CAP)) {
+    state = { ...(stored as VectorizeState), monthKey };
+  }
   return state ? { ...state, used: Math.max(state.used, baseline) } : null;
 }
 
@@ -396,7 +403,7 @@ function vectorizeLedgerStatus({
   const canProjectBaseline =
     Number.isSafeInteger(baseline) &&
     (stored === undefined ||
-      (allowPriorMonthProjection && isPreviousVectorizePeriod(stored, monthKey)));
+      (allowPriorMonthProjection && isPreviousVectorizePeriod(stored, monthKey, cap)));
   const used = effective?.used ?? null;
   const storedState = readVectorizeState(stored, monthKey, cap);
   const initialized = storedState !== null;
