@@ -120,6 +120,9 @@ admission values. `initialized` indicates whether a valid current-month ledger
 exists; `source: verified_monthly_baseline` identifies either a first-time
 projection or a baseline floor applied to an existing ledger. `baselineVerified`
 is true exactly when `state` is `available`; it is false for all other states.
+`source: ledger` also identifies a carried valid prior-period storage reservation
+above the reviewed floor; `initialized` remains false until it is persisted in
+the current month. The status read does not persist this projection.
 `uninitialized`, `stale`, `invalid`, or `baseline_unavailable` states have null
 usage and remaining values. The route only reads budget state; it does not
 reserve capacity or authorize a write. Keep storage growth blocked when its

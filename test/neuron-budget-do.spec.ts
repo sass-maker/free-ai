@@ -142,7 +142,7 @@ describe('NeuronBudgetDO', () => {
     }
   });
 
-  it('blocks storage growth in the next month without resetting the persistent ledger', async () => {
+  it('blocks storage growth in an unverified month without resetting the persistent ledger', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-08T12:00:00Z'));
     try {
@@ -150,7 +150,7 @@ describe('NeuronBudgetDO', () => {
       const budget = new NeuronBudgetDO(state);
       await budget.fetch(post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 })));
       const previous = values.get('vectorize-storage-budget');
-      vi.setSystemTime(new Date('2026-11-01T00:00:00Z'));
+      vi.setSystemTime(new Date('2026-12-01T00:00:00Z'));
       const response = await budget.fetch(
         post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))
       );
@@ -299,7 +299,7 @@ describe('NeuronBudgetDO', () => {
     }
   });
 
-  it('projects the verified query baseline but leaves stale storage unavailable', async () => {
+  it('projects verified baselines while retaining higher prior-period storage reservations', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
     try {
@@ -330,13 +330,13 @@ describe('NeuronBudgetDO', () => {
           baselineVerified: true,
         },
         storage: {
-          state: 'stale',
+          state: 'available',
           initialized: false,
-          source: null,
-          used: null,
+          source: 'ledger',
+          used: 75_000_000,
           cap: 200_000_000,
-          remaining: null,
-          baselineVerified: false,
+          remaining: 125_000_000,
+          baselineVerified: true,
         },
       });
       expect(puts).toEqual([]);
@@ -347,9 +347,87 @@ describe('NeuronBudgetDO', () => {
     }
   });
 
+  it('carries prior-period storage reservations atomically without refunding capacity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+    try {
+      const { state, values } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-09',
+        used: 41_000_000,
+        baselineVerified: true,
+      });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-09',
+        used: 199_999_232,
+        baselineVerified: true,
+      });
+      const budget = new NeuronBudgetDO(state);
+      const responses = await Promise.all([
+        budget.fetch(post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))),
+        budget.fetch(post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))),
+      ]);
+      const bodies = await Promise.all(
+        responses.map((response) => response.json() as Promise<{ allowed: boolean }>)
+      );
+
+      expect(responses.map((response) => response.status)).toEqual([200, 200]);
+      expect(bodies.filter((body) => body.allowed)).toHaveLength(1);
+      expect(values.get('vectorize-budget')).toEqual({
+        monthKey: '2026-10',
+        used: 35_000_768,
+        baselineVerified: true,
+      });
+      expect(values.get('vectorize-storage-budget')).toEqual({
+        monthKey: '2026-10',
+        used: 200_000_000,
+        baselineVerified: true,
+      });
+
+      const restarted = new NeuronBudgetDO(state);
+      const retry = await restarted.fetch(
+        post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 1 }))
+      );
+      await expect(retry.json()).resolves.toMatchObject({ allowed: false });
+      expect(values.get('vectorize-storage-budget')).toMatchObject({ used: 200_000_000 });
+      expect(values.get('vectorize-budget')).toMatchObject({ used: 35_000_768 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    { monthKey: '2026-09', used: Number.NaN, baselineVerified: true },
+    { monthKey: '2026-09', used: 75_000_000, baselineVerified: false },
+    { monthKey: '2026-09', used: 200_000_001, baselineVerified: true },
+    { monthKey: '2026-11', used: 75_000_000, baselineVerified: true },
+  ])('refuses invalid or future storage history without replacing it: %j', async (stored) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+    try {
+      const { state, values } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-10',
+        used: 36_000_000,
+        baselineVerified: true,
+      });
+      values.set('vectorize-storage-budget', stored);
+      const budget = new NeuronBudgetDO(state);
+      const response = await budget.fetch(
+        post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))
+      );
+
+      expect(response.status).toBe(503);
+      expect(values.get('vectorize-storage-budget')).toBe(stored);
+      expect(values.get('vectorize-budget')).toMatchObject({ used: 36_000_000 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('leaves both ledgers unknown without a verified month baseline', async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-11-01T00:00:00Z'));
+    vi.setSystemTime(new Date('2026-12-01T00:00:00Z'));
     try {
       const { state, values, puts } = makeState();
       values.set('vectorize-budget', {
@@ -367,7 +445,7 @@ describe('NeuronBudgetDO', () => {
       const response = await budget.fetch(new Request('https://internal.local/vectorize-usage'));
 
       await expect(response.json()).resolves.toEqual({
-        monthKey: '2026-11',
+        monthKey: '2026-12',
         query: {
           state: 'stale',
           initialized: false,
@@ -555,7 +633,7 @@ describe('NeuronBudgetDO', () => {
     expect(values.get('vectorize-budget')).toBe(corrupt);
   });
 
-  it('seeds the reviewed October baseline once and blocks the next unseeded month', async () => {
+  it('seeds the reviewed October baseline once and blocks an unverified month', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-02T12:00:00.000Z'));
     try {
@@ -593,7 +671,7 @@ describe('NeuronBudgetDO', () => {
         baselineVerified: true,
       });
 
-      vi.setSystemTime(new Date('2026-11-01T00:00:00.000Z'));
+      vi.setSystemTime(new Date('2026-12-01T00:00:00.000Z'));
       const nextMonth = await budget.fetch(
         post('/try-debit-vectorize', JSON.stringify({ dimensions: 1 }))
       );
@@ -606,6 +684,55 @@ describe('NeuronBudgetDO', () => {
         used: 35_000_769,
         baselineVerified: true,
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('recovers November admission from prior ledgers and retains higher same-month usage', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-13T14:23:52Z'));
+    try {
+      const { state, values } = makeState();
+      values.set('vectorize-budget', {
+        monthKey: '2026-10',
+        used: 41_000_000,
+        baselineVerified: true,
+      });
+      values.set('vectorize-storage-budget', {
+        monthKey: '2026-10',
+        used: 75_000_000,
+        baselineVerified: true,
+      });
+      const budget = new NeuronBudgetDO(state);
+      const response = await budget.fetch(
+        post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))
+      );
+      await expect(response.json()).resolves.toMatchObject({
+        allowed: true,
+        monthKey: '2026-11',
+        used: 35_000_768,
+        remaining: 9_999_232,
+        storedUsed: 75_000_768,
+        storedRemaining: 124_999_232,
+        storedCap: 200_000_000,
+      });
+      values.set('vectorize-budget', {
+        monthKey: '2026-11',
+        used: 40_000_000,
+        baselineVerified: true,
+      });
+      const restarted = new NeuronBudgetDO(state);
+      const retry = await restarted.fetch(
+        post('/try-debit-vectorize-storage', JSON.stringify({ dimensions: 768 }))
+      );
+      await expect(retry.json()).resolves.toMatchObject({
+        allowed: true,
+        used: 40_000_768,
+        storedUsed: 75_001_536,
+      });
+      expect(values.get('vectorize-budget')).toMatchObject({ used: 40_000_768 });
+      expect(values.get('vectorize-storage-budget')).toMatchObject({ used: 75_001_536 });
     } finally {
       vi.useRealTimers();
     }
