@@ -87,8 +87,9 @@ jobs:
           node - <<'NODE' >> "$GITHUB_OUTPUT"
           const report = JSON.parse(require('fs').readFileSync('catalog-report.json', 'utf8'));
           console.log(`stale=${report.stale.length}`);
+          console.log(`disabled_stale=${report.disabledStale.length}`);
           console.log(`new=${report.new.length}`);
-          console.log(`drift=${report.stale.length + report.new.length}`);
+          console.log(`drift=${report.stale.length + report.disabledStale.length + report.new.length}`);
           console.log(`incomplete=${report.summary.incompleteCatalogs}`);
           console.log(`credential_gaps=${report.summary.credentialGaps}`);
           console.log(`catalog_errors=${report.summary.catalogErrors}`);
@@ -158,7 +159,9 @@ jobs:
           const incomplete = report.catalogs.filter((catalog) => catalog.status !== 'ok');
           console.log('## Provider resync');
           console.log(`- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
-          console.log(`- Registry drift: ${report.stale.length} stale, ${report.new.length} new`);
+          console.log(
+            `- Registry drift: ${report.stale.length} enabled stale, ${report.disabledStale.length} disabled absent, ${report.new.length} new`
+          );
           console.log(`- Replay smoke: ${smoke.status}`);
           console.log(`- Live gateway health: ${health.ok ? 'healthy' : 'failed'}`);
           console.log(`- Live 7-day failure rate: ${(health.analytics_7d.failure_rate * 100).toFixed(2)}%`);
@@ -196,7 +199,10 @@ jobs:
           const health = JSON.parse(fs.readFileSync('live-health-report.json', 'utf8'));
           console.log(`Automated provider resync found a condition requiring review in run ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}.`);
           console.log(`\n- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
-          console.log(`- Stale models: ${report.stale.length}`);
+          console.log(`- Stale enabled models: ${report.stale.length}`);
+          console.log(
+            `- Disabled models absent upstream (informational): ${report.disabledStale.length}`
+          );
           console.log(`- New models: ${report.new.length}`);
           console.log(`- Replay smoke: ${smoke.status}`);
           console.log(`- Live gateway health: ${health.ok ? 'healthy' : 'failed'}`);

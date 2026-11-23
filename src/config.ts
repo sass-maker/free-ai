@@ -229,7 +229,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'liquid/lfm-2.5-2.6b:free',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // Missing from the official OpenRouter catalog on 2026-11-23.
     priority: 0.35,
     capabilities: {
       toolCalling: true,
@@ -643,7 +643,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'cohere/north-mini-code:free',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // Missing from the official OpenRouter catalog on 2026-11-23.
     priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
     capabilities: {
       toolCalling: false,
@@ -870,6 +870,17 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     },
   },
 ];
+
+export function getModelCatalogEntries(): Array<
+  Pick<ModelCandidate, 'id' | 'provider' | 'model' | 'enabled'>
+> {
+  return DEFAULT_MODELS.map(({ id, provider, model, enabled }) => ({
+    id,
+    provider,
+    model,
+    enabled,
+  }));
+}
 
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // Workers AI

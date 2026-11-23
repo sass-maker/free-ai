@@ -46,18 +46,18 @@ function digest(value: unknown): string {
 
 describe('model selection performance', () => {
   it('model selection scales across the supported registry size', () => {
-    expect(registry).toHaveLength(31);
+    expect(registry).toHaveLength(29);
     const metrics: string[] = [];
     const observedHashes: Record<number, string> = {};
 
-    // Keep the 31-candidate input workload; stalled NVIDIA20B is now manual-only.
+    // Keep the current 29-candidate registry; stalled NVIDIA20B is manual-only.
     // The hashes pin the intentional automatic-selection change, not a speed claim.
     const expectedHashes: Record<number, string> = {
-      20: '4ec5c05333cdce5733418bbcbafead7e51203625fa70edb6573102d1f54edeb7',
-      31: '4745fea717b15082cab318c123e5f9c850af5eac7dd7248af6214e33be023afc',
+      20: '8e909ed9d078936278bb00ed00740d98cc4dbbe6998e720d3197dec7900032c0',
+      29: 'd267a19286ffc2fb93bae6a4c1e8af6442a786f20c4edf75f8a650643938503e',
     };
 
-    for (const size of [20, 31]) {
+    for (const size of [20, 29]) {
       const candidates = registry.slice(0, size);
       const states = new Map(
         candidates.map((candidate, index) => {
