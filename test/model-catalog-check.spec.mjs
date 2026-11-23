@@ -5,6 +5,7 @@ import {
   buildRegistryReport,
   fetchCatalogs,
   parseConfigModels,
+  removeStaleEntries,
 } from '../scripts/check-model-ids.mjs';
 
 describe('model catalog checker', () => {
@@ -221,7 +222,7 @@ describe('model catalog checker', () => {
     );
   });
 
-  it('does not report disabled registry entries as stale or rediscover them as new', () => {
+  it('keeps disabled stale models informational and retains their IDs during discovery', () => {
     const models = parseConfigModels(`
       const DEFAULT_MODELS: ModelCandidate[] = [
         { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
@@ -242,16 +243,23 @@ describe('model catalog checker', () => {
       { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
     ]);
     expect(report.stale).toEqual([]);
-    expect(report.new).toEqual([]);
-    expect(report.skipped).toEqual([
-      {
-        id: 'retired',
-        provider: 'groq',
-        model: 'retired-model',
-        enabled: false,
-        reason: 'model disabled in registry',
-      },
+    expect(report.disabledStale).toEqual([
+      { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
     ]);
+    expect(report.new).toEqual([]);
+    expect(report.skipped).toEqual([]);
+
+    const source = `
+      const DEFAULT_MODELS = [
+        { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
+      ];
+      const DEFAULT_LIMITS = {
+        'groq:retired-model': { requestsPerDay: 100 },
+      };
+    `;
+    const patched = removeStaleEntries(source, report.disabledStale);
+    expect(patched).not.toContain("id: 'retired'");
+    expect(patched).not.toContain("'groq:retired-model'");
   });
 
   it('parses only the text registry', () => {

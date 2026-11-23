@@ -374,11 +374,6 @@ function classifyConfigModels(configModels, catalogMap, configured, report) {
     if (!configured.has(entry.provider)) configured.set(entry.provider, new Set());
     configured.get(entry.provider).add(entry.model);
 
-    if (entry.enabled === false) {
-      report.skipped.push({ ...entry, reason: 'model disabled in registry' });
-      continue;
-    }
-
     const catalog = catalogMap.get(entry.provider);
     if (!catalog) {
       report.skipped.push({ ...entry, reason: 'catalog unsupported' });
@@ -386,6 +381,8 @@ function classifyConfigModels(configModels, catalogMap, configured, report) {
       report.skipped.push({ ...entry, reason: `${catalog.status}: ${catalog.reason}` });
     } else if (catalog.all.has(entry.model)) {
       report.ok.push(entry);
+    } else if (entry.enabled === false) {
+      report.disabledStale.push(entry);
     } else {
       report.stale.push(entry);
     }
@@ -408,6 +405,7 @@ export function buildRegistryReport(configModels, catalogResults) {
   const report = {
     catalogs: [],
     stale: [],
+    disabledStale: [],
     ok: [],
     skipped: [],
     new: [],
@@ -440,6 +438,12 @@ function printReport(report) {
       console.log(`  ${m.provider}/${m.model}  (id: ${m.id})`);
     }
     console.log(`\n✓ ${report.ok.length} valid, ${report.skipped.length} skipped`);
+  }
+  if (report.disabledStale.length > 0) {
+    console.log(`\nℹ ${report.disabledStale.length} disabled model(s) are absent upstream:`);
+    for (const m of report.disabledStale) {
+      console.log(`  ${m.provider}/${m.model}  (id: ${m.id})`);
+    }
   }
   for (const catalog of report.catalogs.filter((item) => item.status !== 'ok')) {
     console.log(`⚠ ${catalog.provider}: ${catalog.status} (${catalog.reason})`);
@@ -499,7 +503,7 @@ function removeBlockById(source, id) {
   return source.slice(0, start) + source.slice(end);
 }
 
-function removeStaleEntries(src, stale) {
+export function removeStaleEntries(src, stale) {
   let result = src;
   for (const m of stale) {
     result = removeBlockById(result, m.id);
@@ -554,14 +558,17 @@ function insertNewModels(src, newModels) {
 }
 
 function applyConfigPatch(report) {
-  if (report.stale.length === 0 && report.new.length === 0) return;
+  if (report.stale.length === 0 && report.disabledStale.length === 0 && report.new.length === 0)
+    return;
   let src = readFileSync(CONFIG_PATH, 'utf-8');
-  src = removeStaleEntries(src, report.stale);
+  src = removeStaleEntries(src, [...report.stale, ...report.disabledStale]);
   if (report.new.length > 0) src = insertNewModels(src, report.new);
   src = src.replace(/\n{3,}/g, '\n\n');
   writeFileSync(CONFIG_PATH, src);
   const parts = [];
   if (report.stale.length) parts.push(`removed ${report.stale.length} stale`);
+  if (report.disabledStale.length)
+    parts.push(`cleaned ${report.disabledStale.length} disabled stale`);
   if (report.new.length) parts.push(`staged ${report.new.length} new (disabled)`);
   console.log(`\nPatched config.ts — ${parts.join(', ')}`);
 }
