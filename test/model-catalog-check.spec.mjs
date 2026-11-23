@@ -221,6 +221,39 @@ describe('model catalog checker', () => {
     );
   });
 
+  it('does not report disabled registry entries as stale or rediscover them as new', () => {
+    const models = parseConfigModels(`
+      const DEFAULT_MODELS: ModelCandidate[] = [
+        { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
+      ];
+      const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {};
+    `);
+    const report = buildRegistryReport(models, [
+      {
+        provider: 'groq',
+        status: 'ok',
+        reason: null,
+        all: new Set(),
+        addable: new Set(['retired-model']),
+      },
+    ]);
+
+    expect(models).toEqual([
+      { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
+    ]);
+    expect(report.stale).toEqual([]);
+    expect(report.new).toEqual([]);
+    expect(report.skipped).toEqual([
+      {
+        id: 'retired',
+        provider: 'groq',
+        model: 'retired-model',
+        enabled: false,
+        reason: 'model disabled in registry',
+      },
+    ]);
+  });
+
   it('parses only the text registry', () => {
     const source = `
       const DEFAULT_MODELS: ModelCandidate[] = [
@@ -233,7 +266,7 @@ describe('model catalog checker', () => {
     `;
 
     expect(parseConfigModels(source)).toEqual([
-      { id: 'chat', provider: 'groq', model: 'chat-model' },
+      { id: 'chat', provider: 'groq', model: 'chat-model', enabled: true },
     ]);
   });
 

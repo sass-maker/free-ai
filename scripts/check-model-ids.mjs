@@ -327,7 +327,12 @@ export function parseConfigModels(source = readFileSync(CONFIG_PATH, 'utf-8')) {
     /\{[^}]*?id:\s*'([^']+)'[^}]*?provider:\s*'([^']+)'[^}]*?model:\s*'([^']+)'[^}]*?\}/gs;
   let match;
   while ((match = blockRe.exec(src)) !== null) {
-    models.push({ id: match[1], provider: match[2], model: match[3] });
+    models.push({
+      id: match[1],
+      provider: match[2],
+      model: match[3],
+      enabled: !/\benabled:\s*false\b/.test(match[0]),
+    });
   }
   return models;
 }
@@ -368,6 +373,11 @@ function classifyConfigModels(configModels, catalogMap, configured, report) {
   for (const entry of configModels) {
     if (!configured.has(entry.provider)) configured.set(entry.provider, new Set());
     configured.get(entry.provider).add(entry.model);
+
+    if (entry.enabled === false) {
+      report.skipped.push({ ...entry, reason: 'model disabled in registry' });
+      continue;
+    }
 
     const catalog = catalogMap.get(entry.provider);
     if (!catalog) {
