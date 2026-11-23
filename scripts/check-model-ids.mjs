@@ -18,6 +18,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getModelCatalogEntries } from '../src/config.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = resolve(__dirname, '../src/config.ts');
@@ -312,94 +313,6 @@ export async function fetchCatalogs(
   );
 }
 
-// ── Parse current config ─────────────────────────────────────────────────────
-
-function modelIsDisabled(block) {
-  let depth = 0;
-  for (let index = 0; index < block.length; index += 1) {
-    const char = block[index];
-    const next = block[index + 1];
-
-    if (char === '/' && next === '/') {
-      while (index < block.length && block[index] !== '\n') index += 1;
-      continue;
-    }
-    if (char === '/' && next === '*') {
-      const end = block.indexOf('*/', index + 2);
-      index = end === -1 ? block.length : end + 1;
-      continue;
-    }
-    if (char === "'" || char === '"' || char === '`') {
-      const quote = char;
-      index += 1;
-      while (index < block.length && block[index] !== quote) {
-        if (block[index] === '\\') index += 1;
-        index += 1;
-      }
-      continue;
-    }
-    if (char === '{') {
-      depth += 1;
-      continue;
-    }
-    if (char === '}') {
-      depth -= 1;
-      continue;
-    }
-    if (depth !== 1 || !block.startsWith('enabled', index)) continue;
-    const before = block[index - 1];
-    const after = block[index + 'enabled'.length];
-    if ((before && /[\w$]/.test(before)) || (after && /[\w$]/.test(after))) continue;
-
-    let valueStart = index + 'enabled'.length;
-    while (/\s/.test(block[valueStart] ?? '')) valueStart += 1;
-    if (block[valueStart] !== ':') continue;
-    valueStart += 1;
-    while (/\s/.test(block[valueStart] ?? '')) valueStart += 1;
-    if (!block.startsWith('false', valueStart)) continue;
-    if (!/[\w$]/.test(block[valueStart + 'false'.length] ?? '')) return true;
-  }
-  return false;
-}
-
-export function parseConfigModels(source = readFileSync(CONFIG_PATH, 'utf-8')) {
-  const registryStart = source.indexOf('const DEFAULT_MODELS: ModelCandidate[] = [');
-  const limitsStart = source.indexOf('const DEFAULT_LIMITS:', registryStart);
-  const src =
-    registryStart >= 0 && limitsStart > registryStart
-      ? source.slice(registryStart, limitsStart)
-      : source;
-  const models = [];
-  // Match each object in DEFAULT_MODELS array
-  const blockRe =
-    /\{[^}]*?id:\s*'([^']+)'[^}]*?provider:\s*'([^']+)'[^}]*?model:\s*'([^']+)'[^}]*?\}/gs;
-  let match;
-  while ((match = blockRe.exec(src)) !== null) {
-    const blockEnd = blockEndAfter(src, match.index);
-    const modelBlock = src.slice(match.index, blockEnd);
-    models.push({
-      id: match[1],
-      provider: match[2],
-      model: match[3],
-      enabled: !modelIsDisabled(modelBlock),
-    });
-  }
-  return models;
-}
-
-// Providers with zero enabled registry entries cannot drift in a way that
-// affects routing, so checking their catalogs only produces missing_key noise
-// for credentials nobody intends to configure yet.
-export function parseEnabledProviders(source = readFileSync(CONFIG_PATH, 'utf-8')) {
-  const providers = new Set();
-  const blockRe = /\{[^}]*?provider:\s*'([^']+)'[^}]*?enabled:\s*true[^}]*?\}/gs;
-  let match;
-  while ((match = blockRe.exec(source)) !== null) {
-    providers.add(match[1]);
-  }
-  return providers;
-}
-
 function summarizeCatalogs(catalogResults, report) {
   for (const catalog of catalogResults) {
     report.catalogs.push({
@@ -626,8 +539,10 @@ function applyConfigPatch(report) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const configModels = parseConfigModels();
-  const enabledProviders = parseEnabledProviders();
+  const configModels = getModelCatalogEntries();
+  const enabledProviders = new Set(
+    configModels.filter((entry) => entry.enabled).map((entry) => entry.provider)
+  );
   const catalogs = await fetchCatalogs(process.env, fetch, enabledProviders);
   const report = buildRegistryReport(configModels, catalogs);
 

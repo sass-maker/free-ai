@@ -871,6 +871,17 @@ const DEFAULT_MODELS: ModelCandidate[] = [
   },
 ];
 
+export function getModelCatalogEntries(): Array<
+  Pick<ModelCandidate, 'id' | 'provider' | 'model' | 'enabled'>
+> {
+  return DEFAULT_MODELS.map(({ id, provider, model, enabled }) => ({
+    id,
+    provider,
+    model,
+    enabled,
+  }));
+}
+
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // Workers AI
   'workers_ai:@cf/meta/llama-3.3-70b-instruct-fp8-fast': { requestsPerDay: 200 },

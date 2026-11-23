@@ -1,12 +1,11 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildRegistryReport,
   fetchCatalogs,
-  parseConfigModels,
   removeStaleEntries,
 } from '../scripts/check-model-ids.mjs';
+import { getModelCatalogEntries } from '../src/config.ts';
 
 describe('model catalog checker', () => {
   const gatewayEnv = {
@@ -204,9 +203,7 @@ describe('model catalog checker', () => {
   });
 
   it('does not send retired inactive aliases to catalog verification', () => {
-    const models = parseConfigModels(
-      readFileSync(new URL('../src/config.ts', import.meta.url), 'utf-8')
-    );
+    const models = getModelCatalogEntries();
     const retired = new Set(['z-ai/glm-5.2:free', 'inclusionai/ling-3.0-flash-fin:free']);
     const available = new Set(
       models
@@ -223,12 +220,7 @@ describe('model catalog checker', () => {
   });
 
   it('keeps disabled stale models informational and retains their IDs during discovery', () => {
-    const models = parseConfigModels(`
-      const DEFAULT_MODELS: ModelCandidate[] = [
-        { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
-      ];
-      const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {};
-    `);
+    const models = [{ id: 'retired', provider: 'groq', model: 'retired-model', enabled: false }];
     const report = buildRegistryReport(models, [
       {
         provider: 'groq',
@@ -260,52 +252,6 @@ describe('model catalog checker', () => {
     const patched = removeStaleEntries(source, report.disabledStale);
     expect(patched).not.toContain("id: 'retired'");
     expect(patched).not.toContain("'groq:retired-model'");
-  });
-
-  it('reads enabled flags after nested properties and ignores commented examples', () => {
-    const models = parseConfigModels(`
-      const DEFAULT_MODELS: ModelCandidate[] = [
-        { id: 'disabled', provider: 'groq', model: 'retired-model', capabilities: { nested: false }, url: 'https://x', enabled: false },
-        { id: 'enabled', provider: 'groq', model: 'current-model', enabled: true, // enabled: false
-          capabilities: {} },
-        { id: 'nested-only', provider: 'groq', model: 'nested-stale', capabilities: { enabled: false } },
-      ];
-      const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {};
-    `);
-    const report = buildRegistryReport(models, [
-      {
-        provider: 'groq',
-        status: 'ok',
-        reason: null,
-        all: new Set(['current-model']),
-        addable: new Set(),
-      },
-    ]);
-
-    expect(models.map(({ id, enabled }) => ({ id, enabled }))).toEqual([
-      { id: 'disabled', enabled: false },
-      { id: 'enabled', enabled: true },
-      { id: 'nested-only', enabled: true },
-    ]);
-    expect(report.stale.map((model) => model.id)).toEqual(['nested-only']);
-    expect(report.disabledStale.map((model) => model.id)).toEqual(['disabled']);
-    expect(report.ok.map((model) => model.id)).toEqual(['enabled']);
-  });
-
-  it('parses only the text registry', () => {
-    const source = `
-      const DEFAULT_MODELS: ModelCandidate[] = [
-        { id: 'chat', provider: 'groq', model: 'chat-model' },
-      ];
-      const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {};
-      const IMAGE_MODELS = [
-        { id: 'image', provider: 'workers_ai', model: 'image-model' },
-      ];
-    `;
-
-    expect(parseConfigModels(source)).toEqual([
-      { id: 'chat', provider: 'groq', model: 'chat-model', enabled: true },
-    ]);
   });
 
   it('never marks models stale when a catalog is unavailable', () => {
