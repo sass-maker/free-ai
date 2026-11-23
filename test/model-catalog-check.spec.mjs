@@ -262,6 +262,34 @@ describe('model catalog checker', () => {
     expect(patched).not.toContain("'groq:retired-model'");
   });
 
+  it('reads enabled flags after nested properties and ignores commented examples', () => {
+    const models = parseConfigModels(`
+      const DEFAULT_MODELS: ModelCandidate[] = [
+        { id: 'disabled', provider: 'groq', model: 'retired-model', capabilities: {}, enabled: false },
+        { id: 'enabled', provider: 'groq', model: 'current-model', enabled: true, // enabled: false
+          capabilities: {} },
+      ];
+      const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {};
+    `);
+    const report = buildRegistryReport(models, [
+      {
+        provider: 'groq',
+        status: 'ok',
+        reason: null,
+        all: new Set(['current-model']),
+        addable: new Set(),
+      },
+    ]);
+
+    expect(models.map(({ id, enabled }) => ({ id, enabled }))).toEqual([
+      { id: 'disabled', enabled: false },
+      { id: 'enabled', enabled: true },
+    ]);
+    expect(report.stale).toEqual([]);
+    expect(report.disabledStale.map((model) => model.id)).toEqual(['disabled']);
+    expect(report.ok.map((model) => model.id)).toEqual(['enabled']);
+  });
+
   it('parses only the text registry', () => {
     const source = `
       const DEFAULT_MODELS: ModelCandidate[] = [

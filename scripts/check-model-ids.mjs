@@ -327,11 +327,13 @@ export function parseConfigModels(source = readFileSync(CONFIG_PATH, 'utf-8')) {
     /\{[^}]*?id:\s*'([^']+)'[^}]*?provider:\s*'([^']+)'[^}]*?model:\s*'([^']+)'[^}]*?\}/gs;
   let match;
   while ((match = blockRe.exec(src)) !== null) {
+    const blockEnd = blockEndAfter(src, match.index);
+    const properties = src.slice(match.index, blockEnd).replace(/\/\/[^\r\n]*/g, '');
     models.push({
       id: match[1],
       provider: match[2],
       model: match[3],
-      enabled: !/\benabled:\s*false\b/.test(match[0]),
+      enabled: !/(?:^|[,{\n])\s*enabled\s*:\s*false\b(?=\s*[,}]|$)/m.test(properties),
     });
   }
   return models;
