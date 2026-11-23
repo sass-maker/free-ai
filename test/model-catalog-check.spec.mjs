@@ -265,9 +265,10 @@ describe('model catalog checker', () => {
   it('reads enabled flags after nested properties and ignores commented examples', () => {
     const models = parseConfigModels(`
       const DEFAULT_MODELS: ModelCandidate[] = [
-        { id: 'disabled', provider: 'groq', model: 'retired-model', capabilities: {}, enabled: false },
+        { id: 'disabled', provider: 'groq', model: 'retired-model', capabilities: { nested: false }, url: 'https://x', enabled: false },
         { id: 'enabled', provider: 'groq', model: 'current-model', enabled: true, // enabled: false
           capabilities: {} },
+        { id: 'nested-only', provider: 'groq', model: 'nested-stale', capabilities: { enabled: false } },
       ];
       const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {};
     `);
@@ -284,8 +285,9 @@ describe('model catalog checker', () => {
     expect(models.map(({ id, enabled }) => ({ id, enabled }))).toEqual([
       { id: 'disabled', enabled: false },
       { id: 'enabled', enabled: true },
+      { id: 'nested-only', enabled: true },
     ]);
-    expect(report.stale).toEqual([]);
+    expect(report.stale.map((model) => model.id)).toEqual(['nested-only']);
     expect(report.disabledStale.map((model) => model.id)).toEqual(['disabled']);
     expect(report.ok.map((model) => model.id)).toEqual(['enabled']);
   });

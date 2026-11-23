@@ -314,6 +314,54 @@ export async function fetchCatalogs(
 
 // ── Parse current config ─────────────────────────────────────────────────────
 
+function modelIsDisabled(block) {
+  let depth = 0;
+  for (let index = 0; index < block.length; index += 1) {
+    const char = block[index];
+    const next = block[index + 1];
+
+    if (char === '/' && next === '/') {
+      while (index < block.length && block[index] !== '\n') index += 1;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      const end = block.indexOf('*/', index + 2);
+      index = end === -1 ? block.length : end + 1;
+      continue;
+    }
+    if (char === "'" || char === '"' || char === '`') {
+      const quote = char;
+      index += 1;
+      while (index < block.length && block[index] !== quote) {
+        if (block[index] === '\\') index += 1;
+        index += 1;
+      }
+      continue;
+    }
+    if (char === '{') {
+      depth += 1;
+      continue;
+    }
+    if (char === '}') {
+      depth -= 1;
+      continue;
+    }
+    if (depth !== 1 || !block.startsWith('enabled', index)) continue;
+    const before = block[index - 1];
+    const after = block[index + 'enabled'.length];
+    if ((before && /[\w$]/.test(before)) || (after && /[\w$]/.test(after))) continue;
+
+    let valueStart = index + 'enabled'.length;
+    while (/\s/.test(block[valueStart] ?? '')) valueStart += 1;
+    if (block[valueStart] !== ':') continue;
+    valueStart += 1;
+    while (/\s/.test(block[valueStart] ?? '')) valueStart += 1;
+    if (!block.startsWith('false', valueStart)) continue;
+    if (!/[\w$]/.test(block[valueStart + 'false'.length] ?? '')) return true;
+  }
+  return false;
+}
+
 export function parseConfigModels(source = readFileSync(CONFIG_PATH, 'utf-8')) {
   const registryStart = source.indexOf('const DEFAULT_MODELS: ModelCandidate[] = [');
   const limitsStart = source.indexOf('const DEFAULT_LIMITS:', registryStart);
@@ -328,12 +376,12 @@ export function parseConfigModels(source = readFileSync(CONFIG_PATH, 'utf-8')) {
   let match;
   while ((match = blockRe.exec(src)) !== null) {
     const blockEnd = blockEndAfter(src, match.index);
-    const properties = src.slice(match.index, blockEnd).replace(/\/\/[^\r\n]*/g, '');
+    const modelBlock = src.slice(match.index, blockEnd);
     models.push({
       id: match[1],
       provider: match[2],
       model: match[3],
-      enabled: !/(?:^|[,{\n])\s*enabled\s*:\s*false\b(?=\s*[,}]|$)/m.test(properties),
+      enabled: !modelIsDisabled(modelBlock),
     });
   }
   return models;
