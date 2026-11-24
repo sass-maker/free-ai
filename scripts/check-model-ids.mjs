@@ -346,6 +346,8 @@ function classifyConfigModels(configModels, catalogMap, configured, report) {
       report.ok.push(entry);
     } else if (entry.enabled === false) {
       report.disabledStale.push(entry);
+    } else if (entry.automaticRouting === false) {
+      report.diagnosticStale.push(entry);
     } else {
       report.stale.push(entry);
     }
@@ -369,6 +371,7 @@ export function buildRegistryReport(configModels, catalogResults) {
     catalogs: [],
     stale: [],
     disabledStale: [],
+    diagnosticStale: [],
     ok: [],
     skipped: [],
     new: [],
@@ -393,7 +396,7 @@ export function buildRegistryReport(configModels, catalogResults) {
 function printReport(report) {
   if (report.stale.length === 0) {
     console.log(
-      `✓ All ${report.ok.length} checked models are valid (${report.skipped.length} skipped; ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs} catalogs checked)`
+      `✓ ${report.ok.length} models found in provider catalogs (${report.skipped.length} skipped; ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs} catalogs checked)`
     );
   } else {
     console.log(`⚠ ${report.stale.length} stale model(s) found:\n`);
@@ -407,6 +410,11 @@ function printReport(report) {
     for (const m of report.disabledStale) {
       console.log(`  ${m.provider}/${m.model}  (id: ${m.id})`);
     }
+  }
+  if (report.diagnosticStale.length > 0) {
+    console.log('\n⚠ Diagnostic-only pins absent from the provider catalog:');
+    for (const model of report.diagnosticStale)
+      console.log(`  ${model.provider}/${model.model}  (id: ${model.id})`);
   }
   for (const catalog of report.catalogs.filter((item) => item.status !== 'ok')) {
     console.log(`⚠ ${catalog.provider}: ${catalog.status} (${catalog.reason})`);

@@ -872,13 +872,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 ];
 
 export function getModelCatalogEntries(): Array<
-  Pick<ModelCandidate, 'id' | 'provider' | 'model' | 'enabled'>
+  Pick<ModelCandidate, 'id' | 'provider' | 'model' | 'enabled'> & { automaticRouting: boolean }
 > {
-  return DEFAULT_MODELS.map(({ id, provider, model, enabled }) => ({
-    id,
-    provider,
-    model,
-    enabled,
+  return DEFAULT_MODELS.map((candidate) => ({
+    id: candidate.id,
+    provider: candidate.provider,
+    model: candidate.model,
+    enabled: candidate.enabled,
+    automaticRouting: isAutomaticRoutingEligible(candidate),
   }));
 }
 

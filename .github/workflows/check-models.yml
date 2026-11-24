@@ -5,6 +5,10 @@ on:
     - cron: '0 9 * * 0' # Every Sunday at 09:00 UTC
   workflow_dispatch:
     inputs:
+      catalog_only:
+        description: "Check catalogs and gateway health without inference or issue updates"
+        type: boolean
+        default: false
       gateway_only:
         description: "Skip direct provider replays when rechecking gateway capabilities"
         type: boolean
@@ -24,7 +28,7 @@ concurrency:
 
 jobs:
   qualify-capacity:
-    if: github.event_name == 'workflow_dispatch' && inputs.qualify_capacity
+    if: github.event_name == 'workflow_dispatch' && inputs.qualify_capacity && !inputs.catalog_only
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -51,7 +55,7 @@ jobs:
           if-no-files-found: error
 
   check:
-    if: github.event_name != 'workflow_dispatch' || !inputs.qualify_capacity
+    if: github.event_name != 'workflow_dispatch' || !inputs.qualify_capacity || inputs.catalog_only
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -117,6 +121,7 @@ jobs:
 
       - name: Run bounded provider replay smoke
         id: smoke
+        if: '!inputs.catalog_only'
         env:
           FREE_AI_BASE_URL: https://ai-gateway.sassmaker.com
           GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
@@ -154,13 +159,15 @@ jobs:
           node - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
           const fs = require('fs');
           const report = JSON.parse(fs.readFileSync('catalog-report.json', 'utf8'));
-          const smoke = JSON.parse(fs.readFileSync('smoke-report.json', 'utf8'));
+          const smoke = fs.existsSync('smoke-report.json')
+            ? JSON.parse(fs.readFileSync('smoke-report.json', 'utf8'))
+            : { status: 'skipped' };
           const health = JSON.parse(fs.readFileSync('live-health-report.json', 'utf8'));
           const incomplete = report.catalogs.filter((catalog) => catalog.status !== 'ok');
           console.log('## Provider resync');
           console.log(`- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
           console.log(
-            `- Registry drift: ${report.stale.length} enabled stale, ${report.disabledStale.length} disabled absent, ${report.new.length} new`
+            `- Registry drift: ${report.stale.length} automatic stale, ${report.diagnosticStale.length} diagnostic absent, ${report.disabledStale.length} disabled absent, ${report.new.length} new`
           );
           console.log(`- Replay smoke: ${smoke.status}`);
           console.log(`- Live gateway health: ${health.ok ? 'healthy' : 'failed'}`);
@@ -199,7 +206,8 @@ jobs:
           const health = JSON.parse(fs.readFileSync('live-health-report.json', 'utf8'));
           console.log(`Automated provider resync found a condition requiring review in run ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}.`);
           console.log(`\n- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
-          console.log(`- Stale enabled models: ${report.stale.length}`);
+          console.log(`- Stale automatic models: ${report.stale.length}`);
+          console.log(`- Diagnostic-only pins absent upstream: ${report.diagnosticStale.length}`);
           console.log(
             `- Disabled models absent upstream (informational): ${report.disabledStale.length}`
           );
@@ -227,5 +235,5 @@ jobs:
           fi
 
       - name: Fail on stale models or product-health failure
-        if: steps.catalog.outputs.stale != '0' || steps.catalog.outputs.checker_exit == '2' || steps.live-health.outputs.exit != '0' || (steps.smoke.outputs.status != 'skipped' && steps.smoke.outputs.exit != '0')
+        if: steps.catalog.outputs.stale != '0' || steps.catalog.outputs.checker_exit == '2' || steps.live-health.outputs.exit != '0' || (!inputs.catalog_only && steps.smoke.outputs.status != 'skipped' && steps.smoke.outputs.exit != '0')
         run: exit 1
