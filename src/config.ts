@@ -872,13 +872,14 @@ const DEFAULT_MODELS: ModelCandidate[] = [
 ];
 
 export function getModelCatalogEntries(): Array<
-  Pick<ModelCandidate, 'id' | 'provider' | 'model' | 'enabled'>
+  Pick<ModelCandidate, 'id' | 'provider' | 'model' | 'enabled'> & { diagnosticPin: boolean }
 > {
-  return DEFAULT_MODELS.map(({ id, provider, model, enabled }) => ({
-    id,
-    provider,
-    model,
-    enabled,
+  return DEFAULT_MODELS.map((candidate) => ({
+    id: candidate.id,
+    provider: candidate.provider,
+    model: candidate.model,
+    enabled: candidate.enabled,
+    diagnosticPin: isDiagnosticRoutingPin(candidate),
   }));
 }
 
@@ -998,10 +999,14 @@ const AUTOMATIC_ROUTING_QUARANTINED_MODELS = new Set<string>([
   'nvidia:openai/gpt-oss-20b',
 ]);
 
+function isDiagnosticRoutingPin(candidate: ModelCandidate): boolean {
+  return AUTOMATIC_ROUTING_QUARANTINED_MODELS.has(`${candidate.provider}:${candidate.model}`);
+}
+
 export function isAutomaticRoutingEligible(candidate: ModelCandidate): boolean {
   return (
     !AUTOMATIC_ROUTING_QUARANTINED_PROVIDERS.has(candidate.provider) &&
-    !AUTOMATIC_ROUTING_QUARANTINED_MODELS.has(`${candidate.provider}:${candidate.model}`)
+    !isDiagnosticRoutingPin(candidate)
   );
 }
 

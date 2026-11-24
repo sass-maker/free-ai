@@ -254,6 +254,50 @@ describe('model catalog checker', () => {
     expect(patched).not.toContain("'groq:retired-model'");
   });
 
+  it('reports an absent diagnostic pin without removing it or masking automatic drift', () => {
+    const models = getModelCatalogEntries();
+    const pin = models.find(({ id }) => id === 'nvidia-gpt-oss-20b');
+    const automatic = models.find(({ id }) => id === 'nvidia-nemotron-3-5-lightning-30b');
+    expect(pin).toMatchObject({ enabled: true, diagnosticPin: true });
+    expect(automatic).toMatchObject({ enabled: true, diagnosticPin: false });
+
+    const quarantinedProviderModel = models.find(
+      ({ provider, enabled }) => provider === 'zai' && enabled
+    );
+    expect(quarantinedProviderModel).toMatchObject({ enabled: true, diagnosticPin: false });
+
+    const report = buildRegistryReport(
+      [pin, automatic, quarantinedProviderModel],
+      [
+        {
+          provider: 'nvidia',
+          status: 'ok',
+          reason: null,
+          all: new Set(),
+          addable: new Set([pin.model]),
+        },
+        {
+          provider: 'zai',
+          status: 'ok',
+          reason: null,
+          all: new Set(),
+          addable: new Set(),
+        },
+      ]
+    );
+
+    expect(report.diagnosticStale).toEqual([pin]);
+    expect(report.stale).toEqual([automatic, quarantinedProviderModel]);
+    expect(report.new).toEqual([]);
+    const config = `[
+      { id: '${pin.id}' },
+      { id: '${automatic.id}' },
+    ];`;
+    const patch = removeStaleEntries(config, [...report.stale, ...report.disabledStale]);
+    expect(patch).toContain(pin.id);
+    expect(patch).not.toContain(automatic.id);
+  });
+
   it('never marks models stale when a catalog is unavailable', () => {
     const report = buildRegistryReport(
       [{ id: 'chat', provider: 'groq', model: 'configured-model' }],
