@@ -346,7 +346,7 @@ function classifyConfigModels(configModels, catalogMap, configured, report) {
       report.ok.push(entry);
     } else if (entry.enabled === false) {
       report.disabledStale.push(entry);
-    } else if (entry.automaticRouting === false) {
+    } else if (entry.diagnosticPin === true) {
       report.diagnosticStale.push(entry);
     } else {
       report.stale.push(entry);

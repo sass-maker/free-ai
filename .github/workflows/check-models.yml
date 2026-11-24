@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       catalog_only:
-        description: "Check catalogs and gateway health without inference or issue updates"
+        description: "Check catalogs and gateway health without inference or issue updates (takes precedence)"
         type: boolean
         default: false
       gateway_only:
@@ -167,8 +167,11 @@ jobs:
           console.log('## Provider resync');
           console.log(`- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
           console.log(
-            `- Registry drift: ${report.stale.length} automatic stale, ${report.diagnosticStale.length} diagnostic absent, ${report.disabledStale.length} disabled absent, ${report.new.length} new`
+            `- Registry drift: ${report.stale.length} enabled stale, ${report.diagnosticStale.length} diagnostic absent, ${report.disabledStale.length} disabled absent, ${report.new.length} new`
           );
+          if (report.diagnosticStale.length) {
+            console.error('::warning::Diagnostic-only pins absent from a provider catalog. See the catalog artifact.');
+          }
           console.log(`- Replay smoke: ${smoke.status}`);
           console.log(`- Live gateway health: ${health.ok ? 'healthy' : 'failed'}`);
           console.log(`- Live 7-day failure rate: ${(health.analytics_7d.failure_rate * 100).toFixed(2)}%`);
@@ -206,7 +209,7 @@ jobs:
           const health = JSON.parse(fs.readFileSync('live-health-report.json', 'utf8'));
           console.log(`Automated provider resync found a condition requiring review in run ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}.`);
           console.log(`\n- Catalog coverage: ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs}`);
-          console.log(`- Stale automatic models: ${report.stale.length}`);
+          console.log(`- Stale enabled models: ${report.stale.length}`);
           console.log(`- Diagnostic-only pins absent upstream: ${report.diagnosticStale.length}`);
           console.log(
             `- Disabled models absent upstream (informational): ${report.disabledStale.length}`

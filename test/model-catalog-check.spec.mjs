@@ -258,11 +258,16 @@ describe('model catalog checker', () => {
     const models = getModelCatalogEntries();
     const pin = models.find(({ id }) => id === 'nvidia-gpt-oss-20b');
     const automatic = models.find(({ id }) => id === 'nvidia-nemotron-3-5-lightning-30b');
-    expect(pin).toMatchObject({ enabled: true, automaticRouting: false });
-    expect(automatic).toMatchObject({ enabled: true, automaticRouting: true });
+    expect(pin).toMatchObject({ enabled: true, diagnosticPin: true });
+    expect(automatic).toMatchObject({ enabled: true, diagnosticPin: false });
+
+    const quarantinedProviderModel = models.find(
+      ({ provider, enabled }) => provider === 'zai' && enabled
+    );
+    expect(quarantinedProviderModel).toMatchObject({ enabled: true, diagnosticPin: false });
 
     const report = buildRegistryReport(
-      [pin, automatic],
+      [pin, automatic, quarantinedProviderModel],
       [
         {
           provider: 'nvidia',
@@ -271,11 +276,18 @@ describe('model catalog checker', () => {
           all: new Set(),
           addable: new Set([pin.model]),
         },
+        {
+          provider: 'zai',
+          status: 'ok',
+          reason: null,
+          all: new Set(),
+          addable: new Set(),
+        },
       ]
     );
 
     expect(report.diagnosticStale).toEqual([pin]);
-    expect(report.stale).toEqual([automatic]);
+    expect(report.stale).toEqual([automatic, quarantinedProviderModel]);
     expect(report.new).toEqual([]);
     const config = `[
       { id: '${pin.id}' },
