@@ -18,6 +18,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getModelCatalogEntries } from '../src/config.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = resolve(__dirname, '../src/config.ts');
@@ -312,39 +313,6 @@ export async function fetchCatalogs(
   );
 }
 
-// ── Parse current config ─────────────────────────────────────────────────────
-
-export function parseConfigModels(source = readFileSync(CONFIG_PATH, 'utf-8')) {
-  const registryStart = source.indexOf('const DEFAULT_MODELS: ModelCandidate[] = [');
-  const limitsStart = source.indexOf('const DEFAULT_LIMITS:', registryStart);
-  const src =
-    registryStart >= 0 && limitsStart > registryStart
-      ? source.slice(registryStart, limitsStart)
-      : source;
-  const models = [];
-  // Match each object in DEFAULT_MODELS array
-  const blockRe =
-    /\{[^}]*?id:\s*'([^']+)'[^}]*?provider:\s*'([^']+)'[^}]*?model:\s*'([^']+)'[^}]*?\}/gs;
-  let match;
-  while ((match = blockRe.exec(src)) !== null) {
-    models.push({ id: match[1], provider: match[2], model: match[3] });
-  }
-  return models;
-}
-
-// Providers with zero enabled registry entries cannot drift in a way that
-// affects routing, so checking their catalogs only produces missing_key noise
-// for credentials nobody intends to configure yet.
-export function parseEnabledProviders(source = readFileSync(CONFIG_PATH, 'utf-8')) {
-  const providers = new Set();
-  const blockRe = /\{[^}]*?provider:\s*'([^']+)'[^}]*?enabled:\s*true[^}]*?\}/gs;
-  let match;
-  while ((match = blockRe.exec(source)) !== null) {
-    providers.add(match[1]);
-  }
-  return providers;
-}
-
 function summarizeCatalogs(catalogResults, report) {
   for (const catalog of catalogResults) {
     report.catalogs.push({
@@ -376,6 +344,10 @@ function classifyConfigModels(configModels, catalogMap, configured, report) {
       report.skipped.push({ ...entry, reason: `${catalog.status}: ${catalog.reason}` });
     } else if (catalog.all.has(entry.model)) {
       report.ok.push(entry);
+    } else if (entry.enabled === false) {
+      report.disabledStale.push(entry);
+    } else if (entry.diagnosticPin === true) {
+      report.diagnosticStale.push(entry);
     } else {
       report.stale.push(entry);
     }
@@ -398,6 +370,8 @@ export function buildRegistryReport(configModels, catalogResults) {
   const report = {
     catalogs: [],
     stale: [],
+    disabledStale: [],
+    diagnosticStale: [],
     ok: [],
     skipped: [],
     new: [],
@@ -422,7 +396,7 @@ export function buildRegistryReport(configModels, catalogResults) {
 function printReport(report) {
   if (report.stale.length === 0) {
     console.log(
-      `✓ All ${report.ok.length} checked models are valid (${report.skipped.length} skipped; ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs} catalogs checked)`
+      `✓ ${report.ok.length} models found in provider catalogs (${report.skipped.length} skipped; ${report.summary.checkedCatalogs}/${report.summary.managedCatalogs} catalogs checked)`
     );
   } else {
     console.log(`⚠ ${report.stale.length} stale model(s) found:\n`);
@@ -430,6 +404,17 @@ function printReport(report) {
       console.log(`  ${m.provider}/${m.model}  (id: ${m.id})`);
     }
     console.log(`\n✓ ${report.ok.length} valid, ${report.skipped.length} skipped`);
+  }
+  if (report.disabledStale.length > 0) {
+    console.log(`\nℹ ${report.disabledStale.length} disabled model(s) are absent upstream:`);
+    for (const m of report.disabledStale) {
+      console.log(`  ${m.provider}/${m.model}  (id: ${m.id})`);
+    }
+  }
+  if (report.diagnosticStale.length > 0) {
+    console.log('\n⚠ Diagnostic-only pins absent from the provider catalog:');
+    for (const model of report.diagnosticStale)
+      console.log(`  ${model.provider}/${model.model}  (id: ${model.id})`);
   }
   for (const catalog of report.catalogs.filter((item) => item.status !== 'ok')) {
     console.log(`⚠ ${catalog.provider}: ${catalog.status} (${catalog.reason})`);
@@ -489,7 +474,7 @@ function removeBlockById(source, id) {
   return source.slice(0, start) + source.slice(end);
 }
 
-function removeStaleEntries(src, stale) {
+export function removeStaleEntries(src, stale) {
   let result = src;
   for (const m of stale) {
     result = removeBlockById(result, m.id);
@@ -544,14 +529,17 @@ function insertNewModels(src, newModels) {
 }
 
 function applyConfigPatch(report) {
-  if (report.stale.length === 0 && report.new.length === 0) return;
+  if (report.stale.length === 0 && report.disabledStale.length === 0 && report.new.length === 0)
+    return;
   let src = readFileSync(CONFIG_PATH, 'utf-8');
-  src = removeStaleEntries(src, report.stale);
+  src = removeStaleEntries(src, [...report.stale, ...report.disabledStale]);
   if (report.new.length > 0) src = insertNewModels(src, report.new);
   src = src.replace(/\n{3,}/g, '\n\n');
   writeFileSync(CONFIG_PATH, src);
   const parts = [];
   if (report.stale.length) parts.push(`removed ${report.stale.length} stale`);
+  if (report.disabledStale.length)
+    parts.push(`cleaned ${report.disabledStale.length} disabled stale`);
   if (report.new.length) parts.push(`staged ${report.new.length} new (disabled)`);
   console.log(`\nPatched config.ts — ${parts.join(', ')}`);
 }
@@ -559,8 +547,10 @@ function applyConfigPatch(report) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const configModels = parseConfigModels();
-  const enabledProviders = parseEnabledProviders();
+  const configModels = getModelCatalogEntries();
+  const enabledProviders = new Set(
+    configModels.filter((entry) => entry.enabled).map((entry) => entry.provider)
+  );
   const catalogs = await fetchCatalogs(process.env, fetch, enabledProviders);
   const report = buildRegistryReport(configModels, catalogs);
 

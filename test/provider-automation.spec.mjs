@@ -4,9 +4,10 @@ import {
   evaluateLiveProviderHealth,
   runLiveProviderHealth,
 } from '../scripts/check-live-provider-health.mjs';
-import { buildRegistryReport, parseConfigModels } from '../scripts/check-model-ids.mjs';
+import { buildRegistryReport } from '../scripts/check-model-ids.mjs';
 import { runTextProviderSmoke } from '../scripts/smoke-text-providers.mjs';
 import { getProviderLimits } from '../src/config';
+import { getModelCatalogEntries } from '../src/config.ts';
 
 describe('live provider health automation', () => {
   it('accepts fresh fallback-ready health with a bounded failure rate', () => {
@@ -303,7 +304,7 @@ describe('bounded text-provider smoke', () => {
 
 describe('OpenRouter catalog metadata retirement', () => {
   it('does not leave retired inactive aliases as stale checker entries', () => {
-    const report = buildRegistryReport(parseConfigModels(), [
+    const report = buildRegistryReport(getModelCatalogEntries(), [
       {
         provider: 'openrouter',
         status: 'ok',

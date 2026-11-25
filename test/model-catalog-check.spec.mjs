@@ -1,11 +1,11 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildRegistryReport,
   fetchCatalogs,
-  parseConfigModels,
+  removeStaleEntries,
 } from '../scripts/check-model-ids.mjs';
+import { getModelCatalogEntries } from '../src/config.ts';
 
 describe('model catalog checker', () => {
   const gatewayEnv = {
@@ -203,9 +203,7 @@ describe('model catalog checker', () => {
   });
 
   it('does not send retired inactive aliases to catalog verification', () => {
-    const models = parseConfigModels(
-      readFileSync(new URL('../src/config.ts', import.meta.url), 'utf-8')
-    );
+    const models = getModelCatalogEntries();
     const retired = new Set(['z-ai/glm-5.2:free', 'inclusionai/ling-3.0-flash-fin:free']);
     const available = new Set(
       models
@@ -221,20 +219,83 @@ describe('model catalog checker', () => {
     );
   });
 
-  it('parses only the text registry', () => {
-    const source = `
-      const DEFAULT_MODELS: ModelCandidate[] = [
-        { id: 'chat', provider: 'groq', model: 'chat-model' },
-      ];
-      const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {};
-      const IMAGE_MODELS = [
-        { id: 'image', provider: 'workers_ai', model: 'image-model' },
-      ];
-    `;
-
-    expect(parseConfigModels(source)).toEqual([
-      { id: 'chat', provider: 'groq', model: 'chat-model' },
+  it('keeps disabled stale models informational and retains their IDs during discovery', () => {
+    const models = [{ id: 'retired', provider: 'groq', model: 'retired-model', enabled: false }];
+    const report = buildRegistryReport(models, [
+      {
+        provider: 'groq',
+        status: 'ok',
+        reason: null,
+        all: new Set(),
+        addable: new Set(['retired-model']),
+      },
     ]);
+
+    expect(models).toEqual([
+      { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
+    ]);
+    expect(report.stale).toEqual([]);
+    expect(report.disabledStale).toEqual([
+      { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
+    ]);
+    expect(report.new).toEqual([]);
+    expect(report.skipped).toEqual([]);
+
+    const source = `
+      const DEFAULT_MODELS = [
+        { id: 'retired', provider: 'groq', model: 'retired-model', enabled: false },
+      ];
+      const DEFAULT_LIMITS = {
+        'groq:retired-model': { requestsPerDay: 100 },
+      };
+    `;
+    const patched = removeStaleEntries(source, report.disabledStale);
+    expect(patched).not.toContain("id: 'retired'");
+    expect(patched).not.toContain("'groq:retired-model'");
+  });
+
+  it('reports an absent diagnostic pin without removing it or masking automatic drift', () => {
+    const models = getModelCatalogEntries();
+    const pin = models.find(({ id }) => id === 'nvidia-gpt-oss-20b');
+    const automatic = models.find(({ id }) => id === 'nvidia-nemotron-3-5-lightning-30b');
+    expect(pin).toMatchObject({ enabled: true, diagnosticPin: true });
+    expect(automatic).toMatchObject({ enabled: true, diagnosticPin: false });
+
+    const quarantinedProviderModel = models.find(
+      ({ provider, enabled }) => provider === 'zai' && enabled
+    );
+    expect(quarantinedProviderModel).toMatchObject({ enabled: true, diagnosticPin: false });
+
+    const report = buildRegistryReport(
+      [pin, automatic, quarantinedProviderModel],
+      [
+        {
+          provider: 'nvidia',
+          status: 'ok',
+          reason: null,
+          all: new Set(),
+          addable: new Set([pin.model]),
+        },
+        {
+          provider: 'zai',
+          status: 'ok',
+          reason: null,
+          all: new Set(),
+          addable: new Set(),
+        },
+      ]
+    );
+
+    expect(report.diagnosticStale).toEqual([pin]);
+    expect(report.stale).toEqual([automatic, quarantinedProviderModel]);
+    expect(report.new).toEqual([]);
+    const config = `[
+      { id: '${pin.id}' },
+      { id: '${automatic.id}' },
+    ];`;
+    const patch = removeStaleEntries(config, [...report.stale, ...report.disabledStale]);
+    expect(patch).toContain(pin.id);
+    expect(patch).not.toContain(automatic.id);
   });
 
   it('never marks models stale when a catalog is unavailable', () => {

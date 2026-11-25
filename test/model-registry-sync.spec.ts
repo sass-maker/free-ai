@@ -20,6 +20,8 @@ describe('reviewed model registry sync', () => {
     expect(models).not.toContain('qwen/qwen3-coder:free');
     expect(models).not.toContain('poolside/laguna-m.1:free');
     expect(models).not.toContain('z-ai/glm-5.2:free');
+    expect(models).not.toContain('liquid/lfm-2.5-2.6b:free');
+    expect(models).not.toContain('cohere/north-mini-code:free');
     expect(models).toContain('dots-studio/dots-3-note-preview:free');
   });
 });

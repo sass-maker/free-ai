@@ -229,7 +229,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'liquid/lfm-2.5-2.6b:free',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // Missing from the official OpenRouter catalog on 2026-11-23.
     priority: 0.35,
     capabilities: {
       toolCalling: true,
@@ -643,7 +643,7 @@ const DEFAULT_MODELS: ModelCandidate[] = [
     model: 'cohere/north-mini-code:free',
     reasoning: 'medium',
     supportsStreaming: true,
-    enabled: true,
+    enabled: false, // Missing from the official OpenRouter catalog on 2026-11-23.
     priority: 0.5, // AUTO-ADDED by check-model-ids — review caps + priority
     capabilities: {
       toolCalling: false,
@@ -871,6 +871,18 @@ const DEFAULT_MODELS: ModelCandidate[] = [
   },
 ];
 
+export function getModelCatalogEntries(): Array<
+  Pick<ModelCandidate, 'id' | 'provider' | 'model' | 'enabled'> & { diagnosticPin: boolean }
+> {
+  return DEFAULT_MODELS.map((candidate) => ({
+    id: candidate.id,
+    provider: candidate.provider,
+    model: candidate.model,
+    enabled: candidate.enabled,
+    diagnosticPin: isDiagnosticRoutingPin(candidate),
+  }));
+}
+
 const DEFAULT_LIMITS: Record<string, ProviderLimitConfig> = {
   // Workers AI
   'workers_ai:@cf/meta/llama-3.3-70b-instruct-fp8-fast': { requestsPerDay: 200 },
@@ -987,10 +999,14 @@ const AUTOMATIC_ROUTING_QUARANTINED_MODELS = new Set<string>([
   'nvidia:openai/gpt-oss-20b',
 ]);
 
+function isDiagnosticRoutingPin(candidate: ModelCandidate): boolean {
+  return AUTOMATIC_ROUTING_QUARANTINED_MODELS.has(`${candidate.provider}:${candidate.model}`);
+}
+
 export function isAutomaticRoutingEligible(candidate: ModelCandidate): boolean {
   return (
     !AUTOMATIC_ROUTING_QUARANTINED_PROVIDERS.has(candidate.provider) &&
-    !AUTOMATIC_ROUTING_QUARANTINED_MODELS.has(`${candidate.provider}:${candidate.model}`)
+    !isDiagnosticRoutingPin(candidate)
   );
 }
 
