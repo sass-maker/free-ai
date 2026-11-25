@@ -63,13 +63,9 @@ Use `model: "auto"` to let the gateway pick the best available model, or specify
 | Model ID | Actual Model | Tier | TC | JM | V | CTX | MOT | Daily Limit |
 |----------|-------------|------|:--:|:--:|:-:|----:|----:|------------:|
 | `workers-ai-llama-3.3-70b` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | high | | | | 131k | 4k | 200 |
-| `workers-ai-deepseek-r1-32b` | `@cf/deepseek-ai/deepseek-r1-distill-qwen-32b` | high | | | | 32k | 4k | 200 |
 | `workers-ai-qwen-14b` | `@cf/qwen/qwen1.5-14b-chat-awq` | medium | | | | 8k | 2k | 300 |
 | `workers-ai-llama-8b` | `@cf/meta/llama-3.1-8b-instruct` | medium | | | | 131k | 4k | 500 |
-| `workers-ai-gemma-7b` | `@cf/google/gemma-7b-it-lora` | medium | | | | 8k | 2k | 500 |
 | `workers-ai-mistral-7b` | `@cf/mistral/mistral-7b-instruct-v0.1` | low | | | | 8k | 2k | 500 |
-| `workers-ai-llama-3b` | `@cf/meta/llama-3.2-3b-instruct` | low | | | | 131k | 4k | 800 |
-| `workers-ai-llama-1b` | `@cf/meta/llama-3.2-1b-instruct` | low | | | | 131k | 4k | 1000 |
 | `workers-ai-phi-2` | `@cf/microsoft/phi-2` | low | | | | 2k | 1k | 800 |
 
 ### Groq (free tier)
